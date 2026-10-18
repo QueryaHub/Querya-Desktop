@@ -763,20 +763,20 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
   /// The "Move to folder" submenu of a connection: every other folder and,
   /// when the connection is in one, "No folder". Empty when there is nowhere to
   /// move it.
-  List<MenuItem> _moveItems(ConnectionRow conn) {
+  List<QueryaMenuItem> _moveItems(ConnectionRow conn) {
     final colors = context.colors;
     final current = conn.folderId;
-    final targets = <MenuItem>[
+    final targets = <QueryaMenuItem>[
       for (final name in _folders)
         if (_folderIdByName[name] != current)
-          MenuButton(
+          QueryaMenuItem(
             leading: material.Icon(material.Icons.folder_outlined,
                 size: 18, color: colors.mutedForeground),
             onPressed: (_) => _moveConnection(conn, _folderIdByName[name]),
             child: Text(name),
           ),
       if (current != null)
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(material.Icons.folder_off_outlined,
               size: 18, color: colors.mutedForeground),
           onPressed: (_) => _moveConnection(conn, null),
@@ -785,7 +785,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     ];
     if (targets.isEmpty) return const [];
     return [
-      MenuButton(
+      QueryaMenuItem(
         leading: material.Icon(material.Icons.drive_file_move_outlined,
             size: 18, color: colors.mutedForeground),
         subMenu: targets,
@@ -1385,14 +1385,14 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                       ),
                   material.SliverFillRemaining(
                     hasScrollBody: false,
-                    child: ContextMenu(
+                    child: QueryaContextMenu(
                       items: [
-                        MenuButton(
+                        QueryaMenuItem(
                           leading: material.Icon(material.Icons.add_rounded,
                               size: 18,
                               color: colors.mutedForeground),
                           subMenu: [
-                            MenuButton(
+                            QueryaMenuItem(
                               leading: material.Icon(
                                   material.Icons.settings_ethernet_rounded,
                                   size: 18,
@@ -1405,7 +1405,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                               },
                               child: const Text('New Connection'),
                             ),
-                            MenuButton(
+                            QueryaMenuItem(
                               leading: material.Icon(
                                   material.Icons.folder_rounded,
                                   size: 18,

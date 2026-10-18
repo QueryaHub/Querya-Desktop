@@ -2,8 +2,9 @@ import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/erd/erd_note_text.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
+import 'package:flutter/widgets.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
+import 'package:querya_desktop/shared/widgets/querya_context_menu.dart';
 
 /// A sticky note on the canvas: draggable by its body, resizable by its
 /// corner, with an edit / colour / attach / delete menu (#1283).
@@ -65,21 +66,21 @@ class ErdNoteCard extends material.StatelessWidget {
       top: n.y,
       width: n.width,
       height: n.height,
-      child: ContextMenu(
+      child: QueryaContextMenu(
         items: [
-          MenuButton(
+          QueryaMenuItem(
             key: material.ValueKey('erd_note_edit_${n.id}'),
             onPressed: (_) => onEdit(),
             child: const Text('Edit note…'),
           ),
-          MenuButton(
+          QueryaMenuItem(
             subMenu: [
-              MenuButton(
+              QueryaMenuItem(
                 onPressed: (_) => onChange((o) => o.copyWith(color: () => null)),
                 child: const Text('None'),
               ),
               for (var i = 0; i < erdHeaderSlots.length; i++)
-                MenuButton(
+                QueryaMenuItem(
                   leading: material.Icon(material.Icons.circle,
                       size: 12, color: slotColor(erdHeaderSlots[i])),
                   onPressed: (_) => onChange(
@@ -90,19 +91,19 @@ class ErdNoteCard extends material.StatelessWidget {
             child: const Text('Colour'),
           ),
           if (n.attachedTo == null)
-            MenuButton(
+            QueryaMenuItem(
               key: material.ValueKey('erd_note_attach_${n.id}'),
               onPressed: (_) => onAttachNearest(),
               child: const Text('Attach to nearest table'),
             )
           else
-            MenuButton(
+            QueryaMenuItem(
               key: material.ValueKey('erd_note_detach_${n.id}'),
               onPressed: (_) =>
                   onChange((o) => o.copyWith(attachedTo: () => null)),
               child: Text('Detach from ${n.attachedTo}'),
             ),
-          MenuButton(
+          QueryaMenuItem(
             key: material.ValueKey('erd_note_delete_${n.id}'),
             onPressed: (_) => onDelete(),
             child: const Text('Delete note'),

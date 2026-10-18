@@ -43,7 +43,7 @@ import 'package:querya_desktop/features/erd/widgets/erd_views_menu.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_table_card.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
 import 'package:querya_desktop/shared/widgets/querya_spinner.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
+import 'package:querya_desktop/shared/widgets/querya_context_menu.dart';
 
 // Moved out of this file (#1362); re-exported for existing importers.
 export 'package:querya_desktop/features/erd/widgets/erd_relation_painter.dart'
@@ -1144,7 +1144,7 @@ class _ErdViewState extends material.State<ErdView>
       builder: (context, focus, _) => material.Opacity(
         // Unrelated cards fade while a table is picked.
         opacity: focus.faded ? 0.35 : 1,
-        child: ContextMenu(
+        child: QueryaContextMenu(
         items: ErdTableMenu.items(
           table: t.name,
           onOpenData: widget.onOpenTable,

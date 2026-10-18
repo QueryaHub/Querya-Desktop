@@ -29,7 +29,7 @@ class _SqliteConnectionTile extends StatefulWidget {
   final VoidCallback onEdit;
 
   /// "Move to folder" menu entries; empty when there is nowhere to move.
-  final List<MenuItem> moveItems;
+  final List<QueryaMenuItem> moveItems;
   final VoidCallback? onTap;
   final void Function(
     ConnectionRow connection,
@@ -151,9 +151,9 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
             size: QueryaIconSizes.sidebarConnectionIcon,
             color: colors.primary);
 
-    return ContextMenu(
+    return QueryaContextMenu(
       items: [
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(material.Icons.refresh_rounded,
               size: 18, color: colors.mutedForeground),
           onPressed: (_) {
@@ -166,21 +166,21 @@ class _SqliteConnectionTileState extends State<_SqliteConnectionTile> {
           child: const Text('Refresh database'),
         ),
         if (widget.onSqliteOpenSqlWorkspace != null)
-          MenuButton(
+          QueryaMenuItem(
             leading: material.Icon(material.Icons.terminal_rounded,
                 size: 18, color: colors.mutedForeground),
             onPressed: (_) =>
                 widget.onSqliteOpenSqlWorkspace!(widget.connection),
             child: const Text('Open in SQL'),
           ),
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(material.Icons.edit_outlined,
               size: 18, color: colors.mutedForeground),
           onPressed: (_) => widget.onEdit(),
           child: const Text('Edit connection…'),
         ),
         ...widget.moveItems,
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(material.Icons.delete_outline_rounded,
               size: 18, color: colors.destructive),
           onPressed: (_) => widget.onRemove(),

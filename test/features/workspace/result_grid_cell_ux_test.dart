@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/grid_cell_editor.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart';
+import 'package:querya_desktop/shared/widgets/querya_context_menu.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -250,7 +250,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const material.ValueKey('result-row-0')),
-          matching: find.byType(ContextMenu),
+          matching: find.byType(QueryaContextMenu),
         ),
         findsNothing,
       );

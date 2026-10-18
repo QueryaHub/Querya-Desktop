@@ -88,7 +88,7 @@ class _ConnectionTile extends StatelessWidget {
   final VoidCallback onEdit;
 
   /// "Move to folder" menu entries; empty when there is nowhere to move.
-  final List<MenuItem> moveItems;
+  final List<QueryaMenuItem> moveItems;
   final VoidCallback? onTap;
 
   @override
@@ -113,16 +113,16 @@ class _ConnectionTile extends StatelessWidget {
             size: QueryaIconSizes.sidebarConnectionIcon,
             color: colors.primary,
           );
-    return ContextMenu(
+    return QueryaContextMenu(
       items: [
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(material.Icons.edit_outlined,
               size: 18, color: colors.mutedForeground),
           onPressed: (_) => onEdit(),
           child: const Text('Edit connection…'),
         ),
         ...moveItems,
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(material.Icons.delete_outline_rounded,
               size: 18, color: colors.destructive),
           onPressed: (_) => onRemove(),
@@ -274,15 +274,15 @@ class _FolderTileState extends State<_FolderTile> {
   }
 
   Widget _buildMenu(BuildContext context, QueryaUiColors colors) {
-    return ContextMenu(
+    return QueryaContextMenu(
       items: [
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(material.Icons.settings_ethernet_rounded,
               size: 18, color: colors.mutedForeground),
           onPressed: (menuContext) => widget.onNewConnection(widget.name),
           child: const Text('New connection'),
         ),
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(material.Icons.delete_outline_rounded,
               size: 18, color: colors.mutedForeground),
           onPressed: (_) => widget.onRemove(),

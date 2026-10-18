@@ -128,10 +128,10 @@ class _ConnectionDatabasesFolderState
       ),
     );
 
-    final menu = ContextMenu(
+    final menu = QueryaContextMenu(
       items: [
         if (widget.onRefresh != null)
-          MenuButton(
+          QueryaMenuItem(
             leading: material.Icon(
               material.Icons.refresh_rounded,
               size: 18,
@@ -140,7 +140,7 @@ class _ConnectionDatabasesFolderState
             onPressed: (_) => widget.onRefresh!(),
             child: const Text('Refresh'),
           ),
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(
             material.Icons.copy_rounded,
             size: 18,
@@ -152,7 +152,7 @@ class _ConnectionDatabasesFolderState
           child: const Text('Copy name'),
         ),
         if (widget.onOpenSql != null)
-          MenuButton(
+          QueryaMenuItem(
             leading: material.Icon(
               material.Icons.terminal_rounded,
               size: 18,

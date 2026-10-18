@@ -195,11 +195,11 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
               child: row,
             );
     }
-    final menu = ContextMenu(
+    final menu = QueryaContextMenu(
       items: [
         if (openSqlName != null) ...[
           if (onTogglePin != null) ...[
-            MenuButton(
+            QueryaMenuItem(
               leading: material.Icon(
                 isPinned
                     ? material.Icons.star_rounded
@@ -212,9 +212,9 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
               onPressed: (_) => onTogglePin!(),
               child: Text(isPinned ? 'Unpin from top' : 'Pin to top ⭐'),
             ),
-            const MenuDivider(),
+            const QueryaMenuDivider(),
           ],
-          MenuButton(
+          QueryaMenuItem(
             leading: material.Icon(
               material.Icons.table_rows_outlined,
               size: 18,
@@ -239,7 +239,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
             },
             child: const Text('Select TOP 100'),
           ),
-          MenuButton(
+          QueryaMenuItem(
             leading: material.Icon(
               material.Icons.code_rounded,
               size: 18,
@@ -253,10 +253,10 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
             },
             child: const Text('Copy SELECT statement'),
           ),
-          const MenuDivider(),
+          const QueryaMenuDivider(),
         ],
         if (onContextRefresh != null)
-          MenuButton(
+          QueryaMenuItem(
             leading: material.Icon(
               material.Icons.refresh_rounded,
               size: 18,
@@ -265,7 +265,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
             onPressed: (_) => onContextRefresh!(),
             child: const Text('Refresh'),
           ),
-        MenuButton(
+        QueryaMenuItem(
           leading: material.Icon(
             material.Icons.copy_rounded,
             size: 18,
@@ -279,7 +279,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
         if (onOpenSqlWorkspace != null &&
             openSqlName == null &&
             connection != null)
-          MenuButton(
+          QueryaMenuItem(
             leading: material.Icon(
               material.Icons.terminal_rounded,
               size: 18,
@@ -295,8 +295,8 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
             child: const Text('Open in SQL'),
           ),
         if (onContextDelete != null) ...[
-          const MenuDivider(),
-          MenuButton(
+          const QueryaMenuDivider(),
+          QueryaMenuItem(
             leading: material.Icon(
               material.Icons.delete_outline_rounded,
               size: 18,
