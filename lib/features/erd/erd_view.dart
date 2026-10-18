@@ -27,6 +27,8 @@ import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_note_ops.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/core/erd/erd_router.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_card_cache.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_card_inputs.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_edge_tip_label.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_export_menu.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_group_frame.dart';
@@ -34,6 +36,7 @@ import 'package:querya_desktop/features/erd/widgets/erd_note_card.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_relation_painter.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_search_panel.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_status_body.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_group_menu.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_table_menu.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_toolbar.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_views_menu.dart';
@@ -272,9 +275,7 @@ class _ErdViewState extends material.State<ErdView>
         _c.marked.clear();
         _setLayout(ErdLayoutEngine.withSaved(_compute(_visibleOf(schema)), saved));
         _loading = false;
-        _cardCache = {};
-        _mountedTables =
-            schema.tables.length > _progressiveFrom ? _mountChunk : 1 << 30;
+        _cardCache.reset(schema.tables.length);
       });
       if (schema.truncated) {
         showAppToast(
@@ -1017,46 +1018,6 @@ class _ErdViewState extends material.State<ErdView>
         onDelete: _deleteView,
       );
 
-  /// Group entries of a card's menu: group it (with the marked tables), add
-  /// it to a group, take it out of its group.
-  List<MenuItem> _groupMenu(String table) {
-    final tables = {..._c.marked, table};
-    final current = _c.groupOf(table);
-    return [
-      MenuButton(
-        key: material.ValueKey('erd_menu_group_$table'),
-        onPressed: (_) => unawaited(_newGroup(tables)),
-        // The way to put more tables in is not obvious: say it here.
-        trailing: tables.length == 1
-            ? Text('Shift+click marks more',
-                style: material.TextStyle(
-                    fontSize: 11, color: context.workbench.mutedForeground))
-            : null,
-        child: Text(tables.length == 1
-            ? 'New group…'
-            : 'Group ${tables.length} tables…'),
-      ),
-      if (_c.groups.any((g) => g.id != current?.id))
-        MenuButton(
-          subMenu: [
-            for (final g in _c.groups)
-              if (g.id != current?.id)
-                MenuButton(
-                  onPressed: (_) => _addToGroup(g.id, tables),
-                  child: Text(g.name),
-                ),
-          ],
-          child: const Text('Add to group'),
-        ),
-      if (current != null)
-        MenuButton(
-          key: material.ValueKey('erd_menu_ungroup_$table'),
-          onPressed: (_) => _removeFromGroup(table),
-          child: Text('Remove from ${current.name}'),
-        ),
-    ];
-  }
-
   /// Notes for the SVG, tinted as on screen over the export background.
   List<ErdSvgNote> _svgNotes(ErdSvgColors colors) => ErdExportData.notes(
         _c.notes,
@@ -1239,21 +1200,12 @@ class _ErdViewState extends material.State<ErdView>
     );
   }
 
-  /// Cards built so far for the open diagram: a big one mounts a chunk per
-  /// frame (see [_mountedTables]) instead of in one long frame.
-  static const _progressiveFrom = 60;
-  static const _mountChunk = 24;
-  int _mountedTables = 1 << 30;
-  bool _mountPending = false;
-
-  /// Cards by table, with what they were built from. A rebuild of the diagram
-  /// (a pick, a drag, a toolbar change) reuses every card whose inputs did not
-  /// change, so Flutter skips its subtree instead of rebuilding 200 of them.
-  var _cardCache = <String, (_CardInputs, material.Widget)>{};
+  late final _cardCache = ErdCardCache(
+    isMounted: () => mounted,
+    rebuild: () => setState(() {}),
+  );
 
   List<material.Widget> _cards(ErdSchema schema, ErdLayout layout) {
-    final tables = schema.tables;
-    final shown = min(tables.length, _mountedTables);
     final menuKey = Object.hash(
       Object.hashAll(_c.marked),
       Object.hashAll([
@@ -1265,11 +1217,9 @@ class _ErdViewState extends material.State<ErdView>
     // cards and the menu use.
     final p = context.semanticPalette;
     final palette = (p.type1, p.type2, p.type3, p.type4, p.type5);
-    final next = <String, (_CardInputs, material.Widget)>{};
-    final cards = <material.Widget>[];
-    for (var i = 0; i < shown; i++) {
-      final t = tables[i];
-      final inputs = _CardInputs(
+    return _cardCache.cards(
+      tables: schema.tables,
+      inputsFor: (t) => ErdCardInputs(
         columns: t.columns,
         comment: t.comment,
         position: layout.positions[t.name]!,
@@ -1284,28 +1234,9 @@ class _ErdViewState extends material.State<ErdView>
         onOpenTable: widget.onOpenTable,
         onOpenInSql: widget.onOpenInSql,
         onShowRelations: widget.onShowRelations,
-      );
-      final cached = _cardCache[t.name];
-      final card = cached != null && cached.$1 == inputs
-          ? cached.$2
-          : _card(t, layout);
-      next[t.name] = (inputs, card);
-      cards.add(card);
-    }
-    _cardCache = next;
-    if (shown < tables.length) _mountMore();
-    return cards;
-  }
-
-  /// Mounts the next chunk of cards after this frame.
-  void _mountMore() {
-    if (_mountPending) return;
-    _mountPending = true;
-    material.WidgetsBinding.instance.addPostFrameCallback((_) {
-      _mountPending = false;
-      if (!mounted) return;
-      setState(() => _mountedTables += _mountChunk);
-    });
+      ),
+      build: (t) => _card(t, layout),
+    );
   }
 
   material.Widget _card(ErdTable t, ErdLayout layout) {
@@ -1329,7 +1260,16 @@ class _ErdViewState extends material.State<ErdView>
           onToggleCollapsed: () =>
               _toggleCollapsed(t.name),
           onHide: () => _hide(t.name),
-          groupItems: _groupMenu(t.name),
+          groupItems: erdGroupMenu(
+            table: t.name,
+            marked: _c.marked,
+            groups: _c.groups,
+            current: _c.groupOf(t.name),
+            mutedColor: context.workbench.mutedForeground,
+            onNewGroup: (tables) => unawaited(_newGroup(tables)),
+            onAddToGroup: _addToGroup,
+            onRemoveFromGroup: _removeFromGroup,
+          ),
           slotColor: _slotColor,
           onHeaderColor: (slot) =>
               _setHeaderColor(t.name, slot),
@@ -1539,68 +1479,4 @@ class _ErdViewState extends material.State<ErdView>
       ],
     );
   }
-}
-
-/// What a table card is built from outside its own focus: when all of it is
-/// equal to the last build's, the card is reused as it is.
-@immutable
-class _CardInputs {
-  const _CardInputs({
-    required this.columns,
-    required this.comment,
-    required this.position,
-    required this.width,
-    required this.headerColor,
-    required this.collapsed,
-    required this.marked,
-    required this.dragging,
-    required this.junctionOf,
-    required this.menuKey,
-    required this.palette,
-    required this.onOpenTable,
-    required this.onOpenInSql,
-    required this.onShowRelations,
-  });
-
-  final List<ErdColumn> columns;
-  final String? comment;
-  final material.Offset position;
-  final double width;
-  final material.Color headerColor;
-  final bool collapsed;
-  final bool marked;
-  final bool dragging;
-  final String? junctionOf;
-
-  /// Hash of what the card's menu lists: the marked tables and the groups.
-  final int menuKey;
-  final Object palette;
-  final Object? onOpenTable;
-  final Object? onOpenInSql;
-  final Object? onShowRelations;
-
-  @override
-  bool operator ==(Object other) {
-    if (other is! _CardInputs) return false;
-    if (columns.length != other.columns.length) return false;
-    for (var i = 0; i < columns.length; i++) {
-      if (!identical(columns[i], other.columns[i])) return false;
-    }
-    return comment == other.comment &&
-        position == other.position &&
-        width == other.width &&
-        headerColor == other.headerColor &&
-        collapsed == other.collapsed &&
-        marked == other.marked &&
-        dragging == other.dragging &&
-        junctionOf == other.junctionOf &&
-        menuKey == other.menuKey &&
-        palette == other.palette &&
-        onOpenTable == other.onOpenTable &&
-        onOpenInSql == other.onOpenInSql &&
-        onShowRelations == other.onShowRelations;
-  }
-
-  @override
-  int get hashCode => Object.hash(columns.length, position, width, menuKey);
 }
