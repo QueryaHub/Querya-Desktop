@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/services.dart';
+import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/actions/querya_command.dart';
@@ -25,7 +26,7 @@ void main() {
           child: Builder(
             builder: (context) {
               return Center(
-                child: Button.primary(
+                child: material.ElevatedButton(
                   onPressed: () => showCommandPalette(context),
                   child: const Text('Open palette'),
                 ),

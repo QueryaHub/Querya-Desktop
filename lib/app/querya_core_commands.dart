@@ -1,7 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' show Icons;
-import 'package:shadcn_flutter/shadcn_flutter.dart' show ThemeMode;
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:querya_desktop/core/actions/data_grid_command_bridge.dart';
 import 'package:querya_desktop/core/actions/querya_command.dart';
 import 'package:querya_desktop/core/actions/querya_command_host.dart';

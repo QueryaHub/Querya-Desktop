@@ -4,7 +4,7 @@ import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/mongodb/mongo_aggregation_stage.dart';
 import 'package:querya_desktop/features/mongodb/mongo_aggregation_workspace.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' show Switch;
+import 'package:flutter/material.dart' show Switch;
 
 import '../../support/querya_theme_test_shell.dart';
 

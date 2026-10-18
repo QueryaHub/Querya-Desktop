@@ -20,7 +20,7 @@ void main() {
       );
 
       expect(draft.shadcnColors['primary'],
-          formatVsCodeColor(theme.colorScheme.primary));
+          formatVsCodeColor(theme.colors.primary));
       expect(draft.editorColors['background'],
           formatVsCodeColor(theme.editor.background));
       expect(draft.editorColors['canvas'],
@@ -43,7 +43,7 @@ void main() {
       expect(reparsed.shadcnColors['primary'], '#ff00aa');
 
       final theme = queryaThemeFromManifest(reparsed);
-      expect(theme.colorScheme.primary, parseQueryaThemeColor('#FF00AA'));
+      expect(theme.colors.primary, parseQueryaThemeColor('#FF00AA'));
     });
 
     test('forExport assigns new id for read-only built-in source', () {

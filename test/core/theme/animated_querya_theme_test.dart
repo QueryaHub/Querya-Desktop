@@ -14,7 +14,7 @@ void main() {
         child: Builder(
           builder: (context) {
             return ColoredBox(
-              color: context.queryaTheme.colorScheme.background,
+              color: context.queryaTheme.colors.background,
               child: const SizedBox(width: 10, height: 10),
             );
           },
@@ -25,7 +25,7 @@ void main() {
 
     expect(
       contextBackground(tester),
-      QueryaTheme.darkDefault.colorScheme.background,
+      QueryaTheme.darkDefault.colors.background,
     );
 
     await tester.pumpWidget(
@@ -35,7 +35,7 @@ void main() {
         child: Builder(
           builder: (context) {
             return ColoredBox(
-              color: context.queryaTheme.colorScheme.background,
+              color: context.queryaTheme.colors.background,
               child: const SizedBox(width: 10, height: 10),
             );
           },
@@ -45,7 +45,7 @@ void main() {
     await tester.pump();
     expect(
       contextBackground(tester),
-      QueryaTheme.lightDefault.colorScheme.background,
+      QueryaTheme.lightDefault.colors.background,
     );
   });
 
@@ -59,7 +59,7 @@ void main() {
           builder: (context) {
             return ColoredBox(
               key: const Key('swatch'),
-              color: context.queryaTheme.colorScheme.background,
+              color: context.queryaTheme.colors.background,
               child: const SizedBox(width: 10, height: 10),
             );
           },
@@ -77,7 +77,7 @@ void main() {
           builder: (context) {
             return ColoredBox(
               key: const Key('swatch'),
-              color: context.queryaTheme.colorScheme.background,
+              color: context.queryaTheme.colors.background,
               child: const SizedBox(width: 10, height: 10),
             );
           },
@@ -88,13 +88,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 80));
 
     final mid = contextBackground(tester);
-    expect(mid, isNot(QueryaTheme.darkDefault.colorScheme.background));
-    expect(mid, isNot(QueryaTheme.lightDefault.colorScheme.background));
+    expect(mid, isNot(QueryaTheme.darkDefault.colors.background));
+    expect(mid, isNot(QueryaTheme.lightDefault.colors.background));
 
     await tester.pumpAndSettle();
     expect(
       contextBackground(tester),
-      QueryaTheme.lightDefault.colorScheme.background,
+      QueryaTheme.lightDefault.colors.background,
     );
   });
 
@@ -105,10 +105,10 @@ void main() {
     );
     final mid = tween.lerp(0.5);
     expect(
-      mid.colorScheme.background,
+      mid.colors.background,
       Color.lerp(
-        QueryaTheme.darkDefault.colorScheme.background,
-        QueryaTheme.lightDefault.colorScheme.background,
+        QueryaTheme.darkDefault.colors.background,
+        QueryaTheme.lightDefault.colors.background,
         0.5,
       ),
     );

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -120,7 +121,7 @@ void main() {
   test('load defaults to dark preset', () async {
     final c = ThemeController.instance;
     await c.load();
-    expect(c.themeMode, ThemeMode.dark);
+    expect(c.themeMode, material.ThemeMode.dark);
     expect(c.preset, QueryaThemePreset.queryaDark);
     expect(c.activeTheme, QueryaTheme.darkDefault);
     expect(c.isLoaded, isTrue);
@@ -136,9 +137,9 @@ void main() {
   test('setThemeMode light persists and updates activeTheme', () async {
     final c = ThemeController.instance;
     await c.load();
-    await c.setThemeMode(ThemeMode.light);
+    await c.setThemeMode(material.ThemeMode.light);
     expect(c.activeTheme, QueryaTheme.lightDefault);
-    expect(await AppSettings.instance.getThemeMode(), ThemeMode.light);
+    expect(await AppSettings.instance.getThemeMode(), material.ThemeMode.light);
     expect(
       await AppSettings.instance.getThemePreset(),
       QueryaThemePreset.queryaLight,
@@ -148,9 +149,9 @@ void main() {
   test('resetToDefaults restores dark', () async {
     final c = ThemeController.instance;
     await c.load();
-    await c.setThemeMode(ThemeMode.light);
+    await c.setThemeMode(material.ThemeMode.light);
     await c.resetToDefaults();
-    expect(c.themeMode, ThemeMode.dark);
+    expect(c.themeMode, material.ThemeMode.dark);
     expect(c.activeTheme, QueryaTheme.darkDefault);
   });
 
@@ -198,10 +199,10 @@ void main() {
   test('clearColorOverrides does not reset theme mode', () async {
     final c = ThemeController.instance;
     await c.load();
-    await c.setThemeMode(ThemeMode.light);
+    await c.setThemeMode(material.ThemeMode.light);
     await c.setWorkbenchColor('editor.background', const Color(0xFF111111));
     await c.clearColorOverrides();
-    expect(c.themeMode, ThemeMode.light);
+    expect(c.themeMode, material.ThemeMode.light);
     expect(c.activeTheme, QueryaTheme.lightDefault);
   });
 
@@ -220,7 +221,7 @@ void main() {
       expect(c.selectedThemeId, 'fixture-custom-dark');
       expect(c.selectedThemeLoadError, isNull);
       expect(
-          c.activeTheme.colorScheme.primary, parseQueryaThemeColor('#38BDF8'));
+          c.activeTheme.colors.primary, parseQueryaThemeColor('#38BDF8'));
       expect(await AppSettings.instance.getSelectedThemeId(),
           'fixture-custom-dark');
       expect(
@@ -334,7 +335,7 @@ void main() {
 
       expect(c.selectedThemeLoadError, isNull);
       expect(
-          c.activeTheme.colorScheme.primary, parseQueryaThemeColor('#38BDF8'));
+          c.activeTheme.colors.primary, parseQueryaThemeColor('#38BDF8'));
     });
 
     test('setPreset clears registry selection', () async {
@@ -367,7 +368,7 @@ void main() {
       expect(c.selectedThemeId, 'fixture-custom-dark');
       expect(c.activeTheme.brightness, Brightness.dark);
 
-      await c.setThemeMode(ThemeMode.light);
+      await c.setThemeMode(material.ThemeMode.light);
 
       expect(c.selectedThemeId, isNull);
       expect(c.activeTheme, QueryaTheme.lightDefault);
@@ -417,7 +418,7 @@ void main() {
     test('resetToDefaults keeps built-in themes in picker list', () async {
       final c = ThemeController.instance;
       await c.load();
-      await c.setThemeMode(ThemeMode.light);
+      await c.setThemeMode(material.ThemeMode.light);
       await c.resetToDefaults();
 
       expect(
@@ -517,26 +518,26 @@ void main() {
         contains('fixture-custom-dark'),
       );
       expect(
-          c.activeTheme.colorScheme.primary, parseQueryaThemeColor('#38BDF8'));
+          c.activeTheme.colors.primary, parseQueryaThemeColor('#38BDF8'));
     });
   });
 
-  group('ThemeMode.system platform brightness listener (#899)', () {
+  group('material.ThemeMode.system platform brightness listener (#899)', () {
     test(
-        'listens to platform brightness when ThemeMode.system and updates activeTheme',
+        'listens to platform brightness when material.ThemeMode.system and updates activeTheme',
         () async {
       final c = ThemeController.instance;
       await c.load();
 
       // Initially not system, so should not observe
-      await c.setThemeMode(ThemeMode.dark);
+      await c.setThemeMode(material.ThemeMode.dark);
       expect(c.isObservingPlatformBrightness, isFalse);
 
       // Set to system mode with dark platform brightness
       TestWidgetsFlutterBinding.instance.platformDispatcher
           .platformBrightnessTestValue = Brightness.dark;
-      await c.setThemeMode(ThemeMode.system);
-      expect(c.themeMode, ThemeMode.system);
+      await c.setThemeMode(material.ThemeMode.system);
+      expect(c.themeMode, material.ThemeMode.system);
       expect(c.isObservingPlatformBrightness, isTrue);
       expect(c.activeTheme.brightness, Brightness.dark);
 
@@ -566,7 +567,7 @@ void main() {
         expect(c.activeTheme.brightness, Brightness.dark);
 
         // Switching away from system unregisters observer
-        await c.setThemeMode(ThemeMode.light);
+        await c.setThemeMode(material.ThemeMode.light);
         expect(c.isObservingPlatformBrightness, isFalse);
       } finally {
         c.removeListener(listener);
@@ -578,11 +579,11 @@ void main() {
     test('cleans up brightness observer on resetToDefaults', () async {
       final c = ThemeController.instance;
       await c.load();
-      await c.setThemeMode(ThemeMode.system);
+      await c.setThemeMode(material.ThemeMode.system);
       expect(c.isObservingPlatformBrightness, isTrue);
 
       await c.resetToDefaults();
-      expect(c.themeMode, ThemeMode.dark);
+      expect(c.themeMode, material.ThemeMode.dark);
       expect(c.isObservingPlatformBrightness, isFalse);
     });
   });

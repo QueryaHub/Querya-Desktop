@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
+import 'package:flutter/material.dart' show MaterialApp;
+import '../../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/features/connections/sqlite_connection_form.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
@@ -11,10 +12,10 @@ void main() {
         (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 600));
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
           home: material.Builder(
             builder: (context) => material.ElevatedButton(
               onPressed: () => showSqliteConnectionForm(context),
@@ -50,10 +51,10 @@ void main() {
       );
 
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
           home: material.Builder(
             builder: (context) => material.ElevatedButton(
               onPressed: () =>

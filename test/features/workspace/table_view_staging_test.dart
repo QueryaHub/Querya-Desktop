@@ -4,10 +4,10 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/table_mutation_engine.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
+import 'package:flutter/material.dart' show MaterialApp;
+import '../../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/table_view_staging.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
   group('tableViewEditingEnabled', () {
@@ -288,8 +288,8 @@ void main() {
   group('applyTableViewStagedChanges', () {
     testWidgets('returns noop when the buffer is clean', (tester) async {
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
           home: const material.Scaffold(body: material.SizedBox()),
         ),
       );
@@ -319,8 +319,8 @@ void main() {
 
     testWidgets('returns failed when dirty but no primary key', (tester) async {
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
           home: const material.Scaffold(body: material.SizedBox()),
         ),
       );
@@ -353,8 +353,8 @@ void main() {
         'applied save yields a baseline without deleted rows or NULL sentinels',
         (tester) async {
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
           home: const material.Scaffold(body: material.SizedBox()),
         ),
       );
@@ -392,8 +392,8 @@ void main() {
     testWidgets('0-row DML is failed and the staging buffer stays dirty',
         (tester) async {
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
           home: const material.Scaffold(body: material.SizedBox()),
         ),
       );
@@ -461,8 +461,8 @@ void main() {
   group('confirmDiscardTableEditsIfDirty', () {
     testWidgets('returns true immediately when clean', (tester) async {
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
           home: const material.Scaffold(body: material.SizedBox()),
         ),
       );
@@ -486,8 +486,8 @@ void main() {
     testWidgets('shows dialog and returns false when dirty and Cancel pressed',
         (tester) async {
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
           home: const material.Scaffold(body: material.SizedBox()),
         ),
       );
@@ -529,8 +529,8 @@ void main() {
     testWidgets('shows dialog and returns true when dirty and Discard pressed',
         (tester) async {
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
           home: const material.Scaffold(body: material.SizedBox()),
         ),
       );
@@ -565,8 +565,8 @@ void main() {
   group('TableEditModeButton', () {
     Future<void> pump(WidgetTester tester, material.Widget child) =>
         tester.pumpWidget(
-          ShadcnApp(
-            theme: AppTheme.dark,
+          MaterialApp(
+            theme: queryaDarkMaterialTheme,
             home: material.Scaffold(body: material.Center(child: child)),
           ),
         );

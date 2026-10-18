@@ -3,13 +3,12 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:querya_desktop/core/theme/querya_material_theme.dart';
 
 material.Widget _testShell({required material.Widget child}) {
-  final td = QueryaTheme.darkDefault
-      .toShadcnThemeData()
-      .copyWith(platform: () => material.TargetPlatform.linux);
-  return ShadcnApp(
+  final td = materialThemeFromQuerya(QueryaTheme.darkDefault.colors)
+      .copyWith(platform: material.TargetPlatform.linux);
+  return material.MaterialApp(
     theme: td,
     home: material.Scaffold(
       body: child,
@@ -65,7 +64,7 @@ void main() {
 
       // Right-clicking a cell opens its context menu, which is exactly when
       // the (now lazy) item list must be built.
-      await _secondaryClick(tester, find.text('Admin').first);
+      await _secondaryClick(tester, find.text('Admin').at(3));
 
       expect(gridCellContextMenuItemsBuiltCount, greaterThan(before));
     });

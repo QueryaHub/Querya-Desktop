@@ -214,7 +214,7 @@ void main() {
       expect(success.definition, definition);
       expect(success.theme.brightness, Brightness.dark);
       expect(
-          success.theme.colorScheme.primary, parseQueryaThemeColor('#38BDF8'));
+          success.theme.colors.primary, parseQueryaThemeColor('#38BDF8'));
     });
 
     test('loads VS Code theme successfully', () async {

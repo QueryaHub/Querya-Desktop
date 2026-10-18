@@ -275,7 +275,7 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
             decoration: BoxDecoration(
               color: active
                   ? context.colors.primary.withValues(alpha: 0.12)
-                  : Colors.transparent,
+                  : material.Colors.transparent,
               borderRadius: BorderRadius.circular(6),
             ),
             child: Padding(

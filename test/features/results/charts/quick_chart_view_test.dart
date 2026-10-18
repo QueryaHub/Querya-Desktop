@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/theme/parser/querya_theme_from_vscode.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
 import 'package:querya_desktop/features/results/charts/quick_chart_view.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
@@ -205,7 +206,7 @@ void main() {
       tooltip.getTooltipItem(group, 0, group.barRods.first, 0)?.text,
       contains('1,234,567'),
     );
-    final popover = Theme.of(t.element(find.byType(BarChart))).colorScheme.popover;
+    final popover = t.element(find.byType(BarChart)).colors.popover;
     expect(tooltip.getTooltipColor(group), popover);
   });
 
@@ -289,7 +290,7 @@ void main() {
       final background = tooltip.getTooltipColor(group);
       final text =
           tooltip.getTooltipItem(group, 0, group.barRods.first, 0)!.textStyle.color!;
-      final cs = Theme.of(t.element(find.byType(BarChart))).colorScheme;
+      final cs = t.element(find.byType(BarChart)).colors;
       expect(background, cs.popover);
       expect(text, cs.popoverForeground);
       // WCAG AA for normal text.

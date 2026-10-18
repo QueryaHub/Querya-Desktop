@@ -34,7 +34,7 @@ void main() {
               captured = _Captured(
                 context.workbench,
                 context.semanticPalette,
-                Theme.of(context).colorScheme.foreground,
+                context.colors.foreground,
               );
               return kit;
             },

@@ -6,7 +6,8 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/layout/ui_scale.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
+import 'package:flutter/material.dart' show MaterialApp;
+import '../../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/core/updater/installers/update_install_context.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
@@ -49,10 +50,10 @@ void main() {
   Widget buildTestApp({
     PreferencesCategory? initialCategory,
   }) {
-    return ShadcnApp(
-      theme: AppTheme.dark,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.dark,
+    return MaterialApp(
+      theme: queryaDarkMaterialTheme,
+      darkTheme: queryaDarkMaterialTheme,
+      themeMode: material.ThemeMode.dark,
       home: material.Scaffold(
         body: material.Builder(
           builder: (context) {
@@ -223,8 +224,8 @@ void main() {
       var currentValue = false;
 
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
           home: material.Scaffold(
             body: StatefulBuilder(
               builder: (context, setState) {

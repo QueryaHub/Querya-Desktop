@@ -6,7 +6,7 @@ import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:flutter/material.dart' as material;
 
 class _FakePathProvider extends PathProviderPlatform {
   _FakePathProvider(this._root);
@@ -44,43 +44,43 @@ void main() {
     await AppSettings.instance.clearThemeSettings();
   });
 
-  test('ThemeController shadcn themes differ for light vs dark background',
+  test('ThemeController material themes differ for light vs dark background',
       () async {
     final controller = ThemeController.instance;
     await controller.load();
 
     expect(
-      controller.darkShadcnTheme.colorScheme.background,
-      QueryaTheme.darkDefault.colorScheme.background,
+      controller.darkMaterialTheme.colorScheme.surface,
+      QueryaTheme.darkDefault.colors.popover,
     );
     expect(
-      controller.lightShadcnTheme.colorScheme.background,
-      QueryaTheme.lightDefault.colorScheme.background,
+      controller.lightMaterialTheme.colorScheme.surface,
+      QueryaTheme.lightDefault.colors.popover,
     );
     expect(
-      controller.darkShadcnTheme.colorScheme.background,
-      isNot(controller.lightShadcnTheme.colorScheme.background),
+      controller.darkMaterialTheme.colorScheme.surface,
+      isNot(controller.lightMaterialTheme.colorScheme.surface),
     );
   });
 
-  test('setThemeMode switches activeTheme and shadcn background', () async {
+  test('setThemeMode switches activeTheme and material surface', () async {
     final controller = ThemeController.instance;
     await controller.load();
 
     expect(
-      controller.activeTheme.colorScheme.background,
-      QueryaTheme.darkDefault.colorScheme.background,
+      controller.activeTheme.colors.background,
+      QueryaTheme.darkDefault.colors.background,
     );
 
-    await controller.setThemeMode(ThemeMode.light);
+    await controller.setThemeMode(material.ThemeMode.light);
 
     expect(
-      controller.activeTheme.colorScheme.background,
-      QueryaTheme.lightDefault.colorScheme.background,
+      controller.activeTheme.colors.background,
+      QueryaTheme.lightDefault.colors.background,
     );
     expect(
-      controller.darkShadcnTheme.colorScheme.background,
-      isNot(controller.lightShadcnTheme.colorScheme.background),
+      controller.darkMaterialTheme.colorScheme.surface,
+      isNot(controller.lightMaterialTheme.colorScheme.surface),
     );
   });
 }

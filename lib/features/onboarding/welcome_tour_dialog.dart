@@ -49,7 +49,7 @@ class KbdBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final wb = context.workbench;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = context.colors.brightness == Brightness.dark;
 
     return material.Row(
       mainAxisSize: material.MainAxisSize.min,

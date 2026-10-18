@@ -87,7 +87,7 @@ QueryaTheme buildQueryaThemeFromVsCodeManifest(
     editor = editor.copyWith(background: workbench.editorBackground);
   }
 
-  var colorScheme = QueryaTheme.colorSchemeFromWorkbench(
+  var colors = QueryaTheme.colorsFromWorkbench(
     workbench,
     brightness: brightness,
   );
@@ -95,37 +95,37 @@ QueryaTheme buildQueryaThemeFromVsCodeManifest(
   final editorForegroundChanged = editor.foreground != base.editor.foreground;
   if (schemeForeground != null || editorForegroundChanged) {
     final fg = schemeForeground ?? editor.foreground;
-    colorScheme = colorScheme.copyWith(
-      foreground: () => fg,
-      cardForeground: () => fg,
-      popoverForeground: () => fg,
+    colors = colors.copyWith(
+      foreground: fg,
+      cardForeground: fg,
+      popoverForeground: fg,
     );
   }
   if (schemeBackground != null) {
-    colorScheme = colorScheme.copyWith(background: () => schemeBackground!);
+    colors = colors.copyWith(background: schemeBackground);
   }
   if (schemeCard != null) {
-    colorScheme = colorScheme.copyWith(
-      card: () => schemeCard!,
-      popover: () => schemeCard!,
+    colors = colors.copyWith(
+      card: schemeCard,
+      popover: schemeCard,
     );
   }
   if (schemeBorder != null) {
-    colorScheme = colorScheme.copyWith(border: () => schemeBorder!);
+    colors = colors.copyWith(border: schemeBorder);
   }
   if (schemeInput != null) {
-    colorScheme = colorScheme.copyWith(input: () => schemeInput!);
+    colors = colors.copyWith(input: schemeInput);
   }
   if (schemeRing != null) {
-    colorScheme = colorScheme.copyWith(ring: () => schemeRing!);
+    colors = colors.copyWith(ring: schemeRing);
   }
   if (schemeMutedForeground != null) {
-    colorScheme = colorScheme.copyWith(
-      mutedForeground: () => schemeMutedForeground!,
+    colors = colors.copyWith(
+      mutedForeground: schemeMutedForeground,
     );
   }
   if (schemeAccent != null) {
-    colorScheme = colorScheme.copyWith(accent: () => schemeAccent!);
+    colors = colors.copyWith(accent: schemeAccent);
   }
 
   if (manifest.tokenColors.isNotEmpty) {
@@ -136,7 +136,7 @@ QueryaTheme buildQueryaThemeFromVsCodeManifest(
     workbench: workbench,
     editor: editor,
     brightness: brightness,
-    colorScheme: colorScheme,
+    colors: colors,
     tokenColors: manifest.tokenColors,
   );
 }

@@ -380,7 +380,7 @@ class _DatabaseRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = colors;
     return material.Material(
-      color: Colors.transparent,
+      color: material.Colors.transparent,
       child: material.InkWell(
         onTap: onView,
         hoverColor: cs.muted.withValues(alpha: 0.15),

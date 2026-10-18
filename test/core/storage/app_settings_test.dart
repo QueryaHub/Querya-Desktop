@@ -1,12 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme_preset.dart';
 import 'package:querya_desktop/core/updater/update_manifest.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 /// path_provider has no implementation in plain `flutter test`; LocalDb needs a path.
 class _FakePathProvider extends PathProviderPlatform {
@@ -275,22 +275,22 @@ void main() {
 
   group('theme settings', () {
     test('theme mode and preset roundtrip', () async {
-      expect(await AppSettings.instance.getThemeMode(), ThemeMode.dark);
+      expect(await AppSettings.instance.getThemeMode(), material.ThemeMode.dark);
       expect(
         await AppSettings.instance.getThemePreset(),
         QueryaThemePreset.queryaDark,
       );
 
-      await AppSettings.instance.setThemeMode(ThemeMode.light);
+      await AppSettings.instance.setThemeMode(material.ThemeMode.light);
       await AppSettings.instance.setThemePreset(QueryaThemePreset.queryaLight);
-      expect(await AppSettings.instance.getThemeMode(), ThemeMode.light);
+      expect(await AppSettings.instance.getThemeMode(), material.ThemeMode.light);
       expect(
         await AppSettings.instance.getThemePreset(),
         QueryaThemePreset.queryaLight,
       );
 
       await AppSettings.instance.clearThemeSettings();
-      expect(await AppSettings.instance.getThemeMode(), ThemeMode.dark);
+      expect(await AppSettings.instance.getThemeMode(), material.ThemeMode.dark);
     });
 
     test('theme animation defaults off and roundtrip', () async {
@@ -419,7 +419,7 @@ void main() {
 
       SqlWorkspaceSettingsRevision.listenable.addListener(listener);
       final before = SqlWorkspaceSettingsRevision.listenable.value;
-      await AppSettings.instance.setThemeMode(ThemeMode.light);
+      await AppSettings.instance.setThemeMode(material.ThemeMode.light);
       expect(SqlWorkspaceSettingsRevision.listenable.value, before);
       expect(sqlCalls, 0);
       SqlWorkspaceSettingsRevision.listenable.removeListener(listener);

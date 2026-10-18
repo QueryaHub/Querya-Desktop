@@ -240,7 +240,7 @@ class _CommandPaletteDialogState extends State<CommandPaletteDialog> {
                                 color: active
                                     ? colors.primary
                                         .withValues(alpha: 0.12)
-                                    : Colors.transparent,
+                                    : material.Colors.transparent,
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Padding(

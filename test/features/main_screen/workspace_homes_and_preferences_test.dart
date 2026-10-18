@@ -6,11 +6,10 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:querya_desktop/core/extensions/extension_paths.dart';
 import 'package:querya_desktop/core/extensions/local_extension_registry.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
+import 'package:flutter/material.dart' show MaterialApp;
 import 'package:querya_desktop/features/connections/driver_manager_dialog.dart';
 import 'package:querya_desktop/features/mysql/mysql_workspace_home.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -113,10 +112,10 @@ void main() {
 
       late material.BuildContext ctx;
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
           home: material.Builder(
             builder: (c) {
               ctx = c;
@@ -161,10 +160,10 @@ void main() {
         (tester) async {
       late material.BuildContext ctx;
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
           home: material.Builder(
             builder: (c) {
               ctx = c;

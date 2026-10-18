@@ -99,7 +99,7 @@ void main() {
           child: material.Builder(
             builder: (ctx) => material.Scaffold(
               body: material.Center(
-                child: PrimaryButton(
+                child: material.ElevatedButton(
                   onPressed: () => showExtensionManagerDialog(ctx),
                   child: const Text('Open Dialog'),
                 ),
@@ -152,7 +152,7 @@ void main() {
             child: material.Builder(
               builder: (ctx) => material.Scaffold(
                 body: material.Center(
-                  child: PrimaryButton(
+                  child: material.ElevatedButton(
                     onPressed: () => showExtensionManagerDialog(ctx),
                     child: const Text('Open Dialog'),
                   ),
@@ -199,7 +199,7 @@ void main() {
             child: material.Builder(
               builder: (ctx) => material.Scaffold(
                 body: material.Center(
-                  child: PrimaryButton(
+                  child: material.ElevatedButton(
                     onPressed: () => showExtensionManagerDialog(ctx),
                     child: const Text('Open Dialog'),
                   ),

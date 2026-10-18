@@ -2,7 +2,7 @@ import 'dart:ui';
 
 /// Design tokens aligned with [design-front] mockups (near-black canvas, cyan accent).
 ///
-/// Canonical semantic mapping lives in [QueryaColorScheme]; these are named aliases
+/// Canonical semantic mapping lives in [QueryaTheme.colors]; these are named aliases
 /// for documentation and for a few widgets that need the raw accent (e.g. glows).
 abstract class QueryaColors {
   QueryaColors._();

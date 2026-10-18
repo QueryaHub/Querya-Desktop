@@ -18,7 +18,7 @@ void main() {
       child: material.Material(
         child: material.Builder(
           builder: (context) {
-            return OutlineButton(
+            return material.ElevatedButton(
               onPressed: () async {
                 final res = await showDmlPreviewDialog(context: context, plan: plan);
                 onResult?.call(res);
@@ -161,7 +161,7 @@ void main() {
           tester.widget<material.SelectableText>(selectableTextFinder);
       expect(
         selectableText.style?.color,
-        QueryaTheme.lightDefault.colorScheme.foreground,
+        QueryaTheme.lightDefault.colors.foreground,
       );
     });
 

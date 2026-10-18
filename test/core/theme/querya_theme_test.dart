@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/core/theme/querya_color_scheme.dart';
 import 'package:querya_desktop/core/theme/querya_colors.dart';
 import 'package:querya_desktop/core/theme/querya_editor_theme.dart';
+import 'package:querya_desktop/core/theme/querya_material_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/querya_workbench_theme.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:flutter/material.dart' show Brightness, Color;
 
 void main() {
   group('QueryaWorkbenchTheme', () {
@@ -42,16 +42,7 @@ void main() {
   });
 
   group('QueryaTheme', () {
-    test('darkDefault colorScheme matches legacy QueryaColorScheme.dark', () {
-      final legacy = QueryaColorScheme.dark;
-      final next = QueryaTheme.darkDefault.colorScheme;
-      expect(next.background, legacy.background);
-      expect(next.primary, legacy.primary);
-      expect(next.card, legacy.card);
-      expect(next.border, legacy.border);
-    });
-
-    test('colorSchemeFromWorkbench uses workbench tokens', () {
+    test('colorsFromWorkbench uses workbench tokens', () {
       const w = QueryaWorkbenchTheme(
         canvas: Color(0xFF111111),
         surface: Color(0xFF222222),
@@ -67,7 +58,7 @@ void main() {
         gitModified: Color(0xFFFF00FF),
         gitUntracked: Color(0xFF00FF00),
       );
-      final cs = QueryaTheme.colorSchemeFromWorkbench(
+      final cs = QueryaTheme.colorsFromWorkbench(
         w,
         brightness: Brightness.dark,
       );
@@ -83,23 +74,10 @@ void main() {
       expect(mid.editor.foreground, isNot(equals(a.editor.foreground)));
     });
 
-    test('toShadcnThemeData preserves brightness', () {
-      final td = QueryaTheme.darkDefault.toShadcnThemeData();
+    test('material theme preserves brightness and accent', () {
+      final td = materialThemeFromQuerya(QueryaTheme.darkDefault.colors);
       expect(td.brightness, Brightness.dark);
       expect(td.colorScheme.primary, QueryaColors.accentCyan);
-    });
-
-    test('ThemeData.lerp at 0.5 matches QueryaTheme.lerp colorScheme', () {
-      const a = QueryaTheme.darkDefault;
-      const b = QueryaTheme.lightDefault;
-      final qaMid = QueryaTheme.lerp(a, b, 0.5);
-      final tdMid = ThemeData.lerp(
-        a.toShadcnThemeData(),
-        b.toShadcnThemeData(),
-        0.5,
-      );
-      expect(tdMid.colorScheme.primary, qaMid.colorScheme.primary);
-      expect(tdMid.colorScheme.background, qaMid.colorScheme.background);
     });
   });
 }

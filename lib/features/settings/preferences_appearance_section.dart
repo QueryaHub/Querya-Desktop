@@ -36,7 +36,7 @@ class _PreferencesAppearanceSectionState
   bool _installingFromUrl = false;
   bool _openingThemesFolder = false;
 
-  Future<void> _setThemeMode(ThemeMode mode) async {
+  Future<void> _setThemeMode(material.ThemeMode mode) async {
     await _controller.setThemeMode(mode);
   }
 
@@ -159,22 +159,22 @@ class _PreferencesAppearanceSectionState
           const material.SizedBox(height: 8),
           PreferencesFieldRow(
             label: 'Theme mode',
-            control: PreferencesDropdownMenu<ThemeMode>(
+            control: PreferencesDropdownMenu<material.ThemeMode>(
               value: c.themeMode,
               onSelected: (v) {
                 if (v != null) unawaited(_setThemeMode(v));
               },
               entries: const [
                 material.DropdownMenuEntry(
-                  value: ThemeMode.system,
+                  value: material.ThemeMode.system,
                   label: 'System (match OS)',
                 ),
                 material.DropdownMenuEntry(
-                  value: ThemeMode.dark,
+                  value: material.ThemeMode.dark,
                   label: 'Dark',
                 ),
                 material.DropdownMenuEntry(
-                  value: ThemeMode.light,
+                  value: material.ThemeMode.light,
                   label: 'Light',
                 ),
               ],

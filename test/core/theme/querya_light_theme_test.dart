@@ -1,25 +1,18 @@
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/core/theme/querya_color_scheme.dart';
+import 'package:querya_desktop/core/theme/querya_material_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
   group('QueryaTheme.lightDefault', () {
-    test('colorScheme differs from dark preset', () {
-      final light = QueryaTheme.lightDefault.colorScheme;
-      final dark = QueryaTheme.darkDefault.colorScheme;
+    test('colors differ from dark preset', () {
+      final light = QueryaTheme.lightDefault.colors;
+      final dark = QueryaTheme.darkDefault.colors;
       expect(light.background, isNot(dark.background));
       expect(light.foreground, isNot(dark.foreground));
       expect(light.brightness, Brightness.light);
-    });
-
-    test('QueryaColorScheme.light matches lightDefault', () {
-      expect(
-        QueryaColorScheme.light.background,
-        QueryaTheme.lightDefault.colorScheme.background,
-      );
     });
 
     test('primary text on canvas meets WCAG AA contrast (4.5:1)', () {
@@ -34,8 +27,8 @@ void main() {
       expect(ratio, greaterThanOrEqualTo(4.5));
     });
 
-    test('toShadcnThemeData uses light brightness', () {
-      final td = QueryaTheme.lightDefault.toShadcnThemeData();
+    test('material theme uses light brightness', () {
+      final td = materialThemeFromQuerya(QueryaTheme.lightDefault.colors);
       expect(td.brightness, Brightness.light);
       expect(td.colorScheme.primary, QueryaTheme.lightDefault.workbench.accent);
     });

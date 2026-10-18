@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
+import 'package:flutter/material.dart' show MaterialApp;
+import '../../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_toolbar.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
@@ -46,10 +47,10 @@ void main() {
           await pumpWidgetWithSurfaceSize(
             tester,
             entry.value,
-            ShadcnApp(
-              theme: AppTheme.dark,
-              darkTheme: AppTheme.dark,
-              themeMode: ThemeMode.dark,
+            MaterialApp(
+              theme: queryaDarkMaterialTheme,
+              darkTheme: queryaDarkMaterialTheme,
+              themeMode: material.ThemeMode.dark,
               home: material.Scaffold(
                 body: _toolbar(
                   title:
@@ -67,10 +68,10 @@ void main() {
         await pumpWidgetWithSurfaceSize(
           tester,
           const material.Size(400, 140),
-          ShadcnApp(
-            theme: AppTheme.dark,
-            darkTheme: AppTheme.dark,
-            themeMode: ThemeMode.dark,
+          MaterialApp(
+            theme: queryaDarkMaterialTheme,
+            darkTheme: queryaDarkMaterialTheme,
+            themeMode: material.ThemeMode.dark,
             home: material.Scaffold(
               body: _toolbar(
                 title: 'mv_schema.long_materialized_view_name',
@@ -87,10 +88,10 @@ void main() {
         await pumpWidgetWithSurfaceSize(
           tester,
           const material.Size(400, 140),
-          ShadcnApp(
-            theme: AppTheme.dark,
-            darkTheme: AppTheme.dark,
-            themeMode: ThemeMode.dark,
+          MaterialApp(
+            theme: queryaDarkMaterialTheme,
+            darkTheme: queryaDarkMaterialTheme,
+            themeMode: material.ThemeMode.dark,
             home: material.Scaffold(
               body: PostgresTableToolbar(
                 title: 'public.users',
@@ -112,13 +113,11 @@ void main() {
                   mainAxisSize: material.MainAxisSize.min,
                   children: [
                     const material.Text('2 pending changes'),
-                    OutlineButton(
-                      size: ButtonSize.small,
+                    material.ElevatedButton(
                       onPressed: () {},
                       child: const Text('Revert'),
                     ),
-                    PrimaryButton(
-                      size: ButtonSize.small,
+                    material.ElevatedButton(
                       onPressed: () {},
                       child: const Text('Save'),
                     ),

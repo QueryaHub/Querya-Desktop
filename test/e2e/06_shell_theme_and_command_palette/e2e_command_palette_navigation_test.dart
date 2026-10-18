@@ -1,4 +1,5 @@
-import 'package:shadcn_flutter/shadcn_flutter.dart' show ThemeMode, ValueKey;
+import 'package:flutter/material.dart' as material;
+import 'package:flutter/widgets.dart' show ValueKey;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
@@ -25,21 +26,21 @@ void main() {
       (tester) async {
     final controller = ThemeController.instance;
     // Settings I/O is real async work: run it outside the fake-async zone.
-    await tester.runAsync(() => controller.setThemeMode(ThemeMode.dark));
+    await tester.runAsync(() => controller.setThemeMode(material.ThemeMode.dark));
     await app.launch(tester);
 
     await E2ePalette.run(tester, 'dark', 'querya.theme.toggle');
     await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 300)));
     await E2eAppHarness.settle(tester);
-    expect(controller.themeMode, ThemeMode.light);
+    expect(controller.themeMode, material.ThemeMode.light);
     expect(E2ePalette.field, findsNothing, reason: 'palette closes after run');
 
     await E2ePalette.run(tester, 'dark', 'querya.theme.toggle');
     await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 300)));
     await E2eAppHarness.settle(tester);
-    expect(controller.themeMode, ThemeMode.dark);
+    expect(controller.themeMode, material.ThemeMode.dark);
     await app.close(tester);
   });
 

@@ -1,7 +1,8 @@
 import 'dart:convert';
 
 
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show ThemeMode;
 
 import '../motion/querya_motion_scope.dart';
 import '../theme/querya_theme_preset.dart';

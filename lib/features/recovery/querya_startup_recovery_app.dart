@@ -5,6 +5,7 @@ import 'package:querya_desktop/app/app.dart';
 import 'package:querya_desktop/core/storage/app_data_root.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
@@ -127,12 +128,16 @@ class _QueryaStartupRecoveryAppState
   material.Widget build(material.BuildContext context) {
     final colors = QueryaTheme.darkDefault.colors;
 
-    return ShadcnApp(
+    return material.MaterialApp(
       title: 'Querya - Startup Recovery',
-      theme: ThemeController.instance.darkShadcnTheme,
-      darkTheme: ThemeController.instance.darkShadcnTheme,
-      themeMode: ThemeMode.dark,
+      theme: ThemeController.instance.darkMaterialTheme,
+      darkTheme: ThemeController.instance.darkMaterialTheme,
+      themeMode: material.ThemeMode.dark,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => QueryaThemeScope(
+        data: QueryaTheme.darkDefault,
+        child: child ?? const material.SizedBox.shrink(),
+      ),
       home: material.Scaffold(
         backgroundColor: colors.background,
         body: material.Center(

@@ -208,7 +208,6 @@ class _PreferencesShortcutsSectionState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final q = widget.searchQuery.trim().toLowerCase();
 
     final all = PreferencesShortcutsSection.allShortcuts;
@@ -307,7 +306,7 @@ class _PreferencesShortcutsSectionState
             ),
           )
         else ...[
-          _buildShortcutTable(context, filtered, theme),
+          _buildShortcutTable(context, filtered),
         ],
       ],
     );
@@ -316,7 +315,6 @@ class _PreferencesShortcutsSectionState
   material.Widget _buildShortcutTable(
     BuildContext context,
     List<ShortcutItem> items,
-    ThemeData theme,
   ) {
     final categories = <String, List<ShortcutItem>>{};
     for (final item in items) {
@@ -347,7 +345,7 @@ class _PreferencesShortcutsSectionState
                       height: 1,
                       color: context.colors.border.withValues(alpha: 0.18),
                     ),
-                  _buildShortcutRow(context, entry.value[i], theme),
+                  _buildShortcutRow(context, entry.value[i]),
                 ],
               ],
             ),
@@ -361,7 +359,6 @@ class _PreferencesShortcutsSectionState
   material.Widget _buildShortcutRow(
     BuildContext context,
     ShortcutItem item,
-    ThemeData theme,
   ) {
     return material.Padding(
       padding: const material.EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -394,7 +391,7 @@ class _PreferencesShortcutsSectionState
                       padding: const material.EdgeInsets.symmetric(horizontal: 4),
                       child: const Text('or').muted().xSmall(),
                     ),
-                  ..._keycaps(context, item.allKeys[c], theme),
+                  ..._keycaps(context, item.allKeys[c]),
                 ],
               ],
             ),
@@ -407,7 +404,6 @@ class _PreferencesShortcutsSectionState
   List<material.Widget> _keycaps(
     BuildContext context,
     List<String> keys,
-    ThemeData theme,
   ) {
     final wb = context.workbenchOrDefault;
     return [

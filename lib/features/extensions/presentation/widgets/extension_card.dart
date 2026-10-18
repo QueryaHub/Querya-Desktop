@@ -31,7 +31,7 @@ class ExtensionCard extends material.StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     final theme = context.colors;
-    final radius = Theme.of(context).radiusMd;
+    final radius = 7.0;
     final isPreview = ExtensionSupport.isPreviewOnlyManifest(manifest);
     
     return material.Container(

@@ -19,9 +19,8 @@ class ExtensionDriverRecoveryBanner extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = context.colors;
-    final isDark = theme.brightness == material.Brightness.dark;
+        final colors = context.colors;
+    final isDark = context.colors.brightness == material.Brightness.dark;
 
     final bgColor = isDark
         ? colors.destructive.withValues(alpha: 0.12)

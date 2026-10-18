@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/theme/querya_material_theme.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 import 'parser/apply_token_colors_to_editor.dart';
 import 'parser/color_parser.dart';
@@ -85,10 +85,8 @@ class ThemeController extends ChangeNotifier with WidgetsBindingObserver {
   QueryaTheme? _cachedLightTheme;
   QueryaTheme? _cachedDarkTheme;
   QueryaTheme? _cachedActiveTheme;
-  ThemeData? _cachedLightShadcnTheme;
-  ThemeData? _cachedDarkShadcnTheme;
-  material.ThemeData? _cachedMaterialTheme;
-  ColorScheme? _cachedMaterialThemeScheme;
+  material.ThemeData? _cachedLightMaterialTheme;
+  material.ThemeData? _cachedDarkMaterialTheme;
 
   ThemeMode get themeMode => _themeMode;
 
@@ -166,24 +164,13 @@ class ThemeController extends ChangeNotifier with WidgetsBindingObserver {
   QueryaTheme get activeTheme =>
       _resolvedThemeForBrightness(_effectiveBrightness());
 
-  ThemeData get lightShadcnTheme => _cachedLightShadcnTheme ??=
-      _resolvedThemeForBrightness(Brightness.light).toShadcnThemeData();
+  /// The Material theme of the light and the dark resolved theme: what the
+  /// app shell shows for [themeMode] (the Material app picks, system included).
+  material.ThemeData get lightMaterialTheme => _cachedLightMaterialTheme ??=
+      materialThemeFromQuerya(_resolvedThemeForBrightness(Brightness.light).colors);
 
-  ThemeData get darkShadcnTheme => _cachedDarkShadcnTheme ??=
-      _resolvedThemeForBrightness(Brightness.dark).toShadcnThemeData();
-
-  /// Active Material theme aligned with [activeTheme].
-  material.ThemeData get activeMaterialTheme =>
-      materialThemeFor(activeTheme.colorScheme);
-
-  /// Cached Material theme for dialogs/dropdowns (avoids rebuild churn).
-  material.ThemeData materialThemeFor(ColorScheme scheme) {
-    if (_cachedMaterialTheme != null && _cachedMaterialThemeScheme == scheme) {
-      return _cachedMaterialTheme!;
-    }
-    _cachedMaterialThemeScheme = scheme;
-    return _cachedMaterialTheme = materialThemeFromQuerya(scheme);
-  }
+  material.ThemeData get darkMaterialTheme => _cachedDarkMaterialTheme ??=
+      materialThemeFromQuerya(_resolvedThemeForBrightness(Brightness.dark).colors);
 
   @visibleForTesting
   void setRegistryServiceForTest(ThemeRegistryService service) {
@@ -270,10 +257,8 @@ class ThemeController extends ChangeNotifier with WidgetsBindingObserver {
     _cachedLightTheme = null;
     _cachedDarkTheme = null;
     _cachedActiveTheme = null;
-    _cachedLightShadcnTheme = null;
-    _cachedDarkShadcnTheme = null;
-    _cachedMaterialTheme = null;
-    _cachedMaterialThemeScheme = null;
+    _cachedLightMaterialTheme = null;
+    _cachedDarkMaterialTheme = null;
   }
 
   void _updateBrightnessObserver() {

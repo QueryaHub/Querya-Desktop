@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
+import 'package:flutter/material.dart' show MaterialApp;
+import '../../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
@@ -10,10 +11,10 @@ void main() {
     late Color seenAccent;
 
     await tester.pumpWidget(
-      ShadcnApp(
-        theme: AppTheme.dark,
-        darkTheme: AppTheme.dark,
-        themeMode: ThemeMode.dark,
+      MaterialApp(
+        theme: queryaDarkMaterialTheme,
+        darkTheme: queryaDarkMaterialTheme,
+        themeMode: material.ThemeMode.dark,
         home: QueryaThemeScope(
           data: QueryaTheme.darkDefault,
           child: material.Builder(
@@ -63,10 +64,10 @@ class _ScopeHost extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ShadcnApp(
-      theme: AppTheme.dark,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.dark,
+    return MaterialApp(
+      theme: queryaDarkMaterialTheme,
+      darkTheme: queryaDarkMaterialTheme,
+      themeMode: material.ThemeMode.dark,
       home: QueryaThemeScope(
         data: data,
         child: material.Builder(

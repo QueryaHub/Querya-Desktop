@@ -2,7 +2,8 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
+import 'package:flutter/material.dart' show MaterialApp;
+import '../../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/features/postgresql/postgresql_connection_form.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
@@ -12,10 +13,10 @@ void main() {
         (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 700));
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
           home: material.Builder(
             builder: (context) => material.ElevatedButton(
               onPressed: () => showPostgresConnectionForm(context),
@@ -44,10 +45,10 @@ void main() {
     testWidgets('dialog shows Use SSL/TLS option', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 700));
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
           home: material.Builder(
             builder: (context) => material.ElevatedButton(
               onPressed: () => showPostgresConnectionForm(context),
@@ -67,10 +68,10 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(800, 700));
       dynamic result;
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
           home: material.Builder(
             builder: (context) => material.ElevatedButton(
               onPressed: () async {
@@ -96,10 +97,10 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(800, 700));
       ConnectionRow? result;
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
           home: material.Builder(
             builder: (context) => material.ElevatedButton(
               onPressed: () async {
@@ -135,10 +136,10 @@ void main() {
     testWidgets('SSL certificate path is appended to the URI', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 700));
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
           home: material.Builder(
             builder: (context) => material.ElevatedButton(
               onPressed: () => showPostgresConnectionForm(context),
@@ -194,10 +195,10 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(800, 700));
       ConnectionRow? result;
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
           home: material.Builder(
             builder: (context) => material.ElevatedButton(
               onPressed: () async {
@@ -305,10 +306,10 @@ void main() {
       ConnectionRow? result;
 
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
           home: material.Builder(
             builder: (context) => material.ElevatedButton(
               onPressed: () async {
