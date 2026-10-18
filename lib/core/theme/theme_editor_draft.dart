@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:ui';
 
-import 'package:shadcn_flutter/shadcn_flutter.dart' show ColorScheme;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/theme/parser/color_parser.dart';
 import 'package:querya_desktop/core/theme/parser/querya_theme_manifest.dart';
 import 'package:querya_desktop/core/theme/parser/vscode_theme_manifest.dart';
@@ -144,7 +144,7 @@ class ThemeEditorDraft {
     ThemeMetadata? metadata,
     bool readOnlySource = false,
   }) {
-    final scheme = theme.colorScheme;
+    final colors = theme.colors;
     final editor = theme.editor;
     final workbench = theme.workbench;
 
@@ -155,7 +155,7 @@ class ThemeEditorDraft {
       shadcnColors: {
         for (final field in themeEditorMvpColorFields)
           if (field.section == 'shadcn_colors')
-            field.key: _colorForShadcnField(field.key, scheme),
+            field.key: _colorForShadcnField(field.key, colors),
       },
       editorColors: {
         'background': formatVsCodeColor(editor.background),
@@ -176,14 +176,14 @@ class ThemeEditorDraft {
     );
   }
 
-  static String _colorForShadcnField(String key, ColorScheme scheme) {
+  static String _colorForShadcnField(String key, QueryaUiColors colors) {
     final color = switch (key) {
-      'primary' => scheme.primary,
-      'background' => scheme.background,
-      'foreground' => scheme.foreground,
-      'card' => scheme.card,
-      'border' => scheme.border,
-      _ => scheme.primary,
+      'primary' => colors.primary,
+      'background' => colors.background,
+      'foreground' => colors.foreground,
+      'card' => colors.card,
+      'border' => colors.border,
+      _ => colors.primary,
     };
     return formatVsCodeColor(color);
   }

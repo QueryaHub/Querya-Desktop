@@ -21,18 +21,18 @@ class QueryaSemanticPalette {
   });
 
   factory QueryaSemanticPalette.fromTheme(QueryaTheme theme) {
-    final scheme = theme.colorScheme;
+    final colors = theme.colors;
     final workbench = theme.workbench;
     return QueryaSemanticPalette(
       action: workbench.accent,
       success: workbench.success,
       destructive: workbench.destructive,
       muted: workbench.mutedForeground,
-      type1: scheme.chart1,
-      type2: scheme.chart2,
-      type3: scheme.chart3,
-      type4: scheme.chart4,
-      type5: scheme.chart5,
+      type1: colors.chart1,
+      type2: colors.chart2,
+      type3: colors.chart3,
+      type4: colors.chart4,
+      type5: colors.chart5,
     );
   }
 

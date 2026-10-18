@@ -4,46 +4,26 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Epic #1465, #1731: colours are read through `context.colors`
 /// (`QueryaUiColors`), not through a theme's `colorScheme`. `Theme.of` itself
-/// stays allowed for what is not a colour (brightness, radius) until #1735. A folder joins
-/// [migrated] in the PR that moves it; at the end the list is all of `lib/`.
+/// stays allowed for what is not a colour (brightness, radius) until #1735.
+///
+/// The guard covers all of `lib/` except `lib/core/theme/`, which bridges to
+/// the shadcn shell and leaves with #1465 step 5.
 void main() {
-  const migrated = <String>[
-    'lib/app',
-    'lib/features/command_palette',
-    'lib/features/connections',
-    'lib/features/erd',
-    'lib/features/extensions',
-    'lib/features/help',
-    'lib/features/main_screen',
-    'lib/features/mongodb',
-    'lib/features/mysql',
-    'lib/features/onboarding',
-    'lib/features/postgresql',
-    'lib/features/recovery',
-    'lib/features/redis',
-    'lib/features/results',
-    'lib/features/settings',
-    'lib/features/sqlite',
-    'lib/features/updater',
-    'lib/features/workspace',
-    'lib/shared',
-  ];
-
   final banned = RegExp(r'\bcolorScheme\b|\bColorScheme\b');
 
-  test('migrated folders read colours through context.colors', () {
+  test('lib/ reads colours through context.colors (outside core/theme)', () {
     final offenders = <String>[];
-    for (final dir in migrated) {
-      for (final e in Directory(dir).listSync(recursive: true)) {
-        if (e is! File || !e.path.endsWith('.dart')) continue;
-        final lines = e.readAsLinesSync();
-        for (var i = 0; i < lines.length; i++) {
-          final line = lines[i];
-          if (line.trimLeft().startsWith('//')) continue;
-          if (banned.hasMatch(line)) {
-            offenders.add('${e.path.replaceAll(r'\', '/')}:${i + 1}: '
-                '${line.trim()}');
-          }
+    for (final e in Directory('lib').listSync(recursive: true)) {
+      if (e is! File || !e.path.endsWith('.dart')) continue;
+      final normalized = e.path.replaceAll(r'\', '/');
+      if (normalized.startsWith('lib/core/theme/')) continue;
+
+      final lines = e.readAsLinesSync();
+      for (var i = 0; i < lines.length; i++) {
+        final line = lines[i];
+        if (line.trimLeft().startsWith('//')) continue;
+        if (banned.hasMatch(line)) {
+          offenders.add('$normalized:${i + 1}: ${line.trim()}');
         }
       }
     }
