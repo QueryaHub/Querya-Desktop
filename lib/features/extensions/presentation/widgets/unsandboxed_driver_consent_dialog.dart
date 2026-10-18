@@ -24,7 +24,7 @@ Future<bool> showUnsandboxedDriverConsentDialog(
                 details.installHint!,
                 style: material.TextStyle(
                   fontSize: 13,
-                  color: Theme.of(dialogContext).colorScheme.mutedForeground,
+                  color: dialogContext.colors.mutedForeground,
                 ),
               ),
             ],

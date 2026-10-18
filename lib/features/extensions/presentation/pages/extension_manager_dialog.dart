@@ -211,7 +211,7 @@ class _ExtensionManagerContentState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
+    final theme = context.colors;
     final onPopover = theme.popoverForeground;
 
     return material.DefaultTextStyle(
@@ -364,7 +364,7 @@ class _ExtensionManagerContentState
         child: QueryaSpinner(size: QueryaSpinnerSize.lg),
       );
     }
-    final theme = Theme.of(context).colorScheme;
+    final theme = context.colors;
     return material.Column(
       children: [
         material.Padding(
@@ -499,7 +499,7 @@ class _ExtensionManagerContentState
         child: QueryaSpinner(size: QueryaSpinnerSize.lg),
       );
     }
-    final theme = Theme.of(context).colorScheme;
+    final theme = context.colors;
     return material.Center(
       child: material.Padding(
         padding: const material.EdgeInsets.all(32.0),

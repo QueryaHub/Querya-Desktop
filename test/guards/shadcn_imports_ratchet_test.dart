@@ -30,7 +30,6 @@ void main() {
     'lib/features/erd/widgets/erd_group_menu.dart',
     'lib/features/erd/widgets/erd_note_card.dart',
     'lib/features/erd/widgets/erd_table_menu.dart',
-    'lib/features/extensions/extension_stats_view.dart',
     'lib/features/main_screen/querya_window_title_bar.dart',
     'lib/features/mongodb/mongo_document_tree_view.dart',
     'lib/features/mongodb/mongo_documents_json_view.dart',

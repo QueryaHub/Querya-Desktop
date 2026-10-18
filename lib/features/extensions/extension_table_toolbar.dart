@@ -54,7 +54,7 @@ class ExtensionTableToolbar extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final isFiltered = filterActive || filterText.trim().isNotEmpty;
 
     return material.Container(

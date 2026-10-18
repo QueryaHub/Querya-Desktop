@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/extensions/extension_support.dart';
 import 'package:querya_desktop/core/extensions/models/extension_manifest.dart';
 import 'package:querya_desktop/core/extensions/models/extension_type.dart';
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
@@ -29,7 +30,7 @@ class ExtensionCard extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
+    final theme = context.colors;
     final radius = Theme.of(context).radiusMd;
     final isPreview = ExtensionSupport.isPreviewOnlyManifest(manifest);
     
@@ -161,7 +162,7 @@ class ExtensionCard extends material.StatelessWidget {
     );
   }
 
-  material.Widget _buildIcon(ColorScheme theme, double radius) {
+  material.Widget _buildIcon(QueryaUiColors theme, double radius) {
     return material.Container(
       width: 48,
       height: 48,
@@ -179,7 +180,7 @@ class ExtensionCard extends material.StatelessWidget {
     );
   }
 
-  material.Widget _buildPreviewBadge(ColorScheme theme) {
+  material.Widget _buildPreviewBadge(QueryaUiColors theme) {
     return material.Container(
       padding: const material.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: material.BoxDecoration(
@@ -198,7 +199,7 @@ class ExtensionCard extends material.StatelessWidget {
     );
   }
 
-  material.Widget _buildTagBadge(ColorScheme theme, String tag) {
+  material.Widget _buildTagBadge(QueryaUiColors theme, String tag) {
     return material.Container(
       padding: const material.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: material.BoxDecoration(

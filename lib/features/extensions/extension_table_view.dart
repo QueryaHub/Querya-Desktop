@@ -484,13 +484,10 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
                   horizontal: 16, vertical: 8),
               decoration: material.BoxDecoration(
                 color:
-                    Theme.of(context).colorScheme.muted.withValues(alpha: 0.3),
+                    context.colors.muted.withValues(alpha: 0.3),
                 border: material.Border(
                   bottom: material.BorderSide(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .border
-                        .withValues(alpha: 0.3),
+                    color: context.colors.border.withValues(alpha: 0.3),
                   ),
                 ),
               ),
