@@ -40,6 +40,7 @@ import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'main_screen_workspace_state.dart';
 import 'main_content_split.dart';
+import 'main_screen_shortcuts.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -148,187 +149,62 @@ class _MainScreenState extends State<MainScreen> {
   bool _handleGlobalKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
 
-    final isMac = Platform.isMacOS;
-    final isCmdOrCtrl = isMac
-        ? (HardwareKeyboard.instance.isMetaPressed ||
-            HardwareKeyboard.instance.isControlPressed)
-        : HardwareKeyboard.instance.isControlPressed;
-    final isShift = HardwareKeyboard.instance.isShiftPressed;
-    final isAlt = HardwareKeyboard.instance.isAltPressed;
+    final keyboard = HardwareKeyboard.instance;
+    final shortcut = MainScreenShortcuts.resolve(
+      event,
+      cmdOrCtrl: Platform.isMacOS
+          ? (keyboard.isMetaPressed || keyboard.isControlPressed)
+          : keyboard.isControlPressed,
+      shift: keyboard.isShiftPressed,
+      alt: keyboard.isAltPressed,
+    );
+    if (shortcut == null) return false;
 
-    final physical = event.physicalKey;
-    final logical = event.logicalKey;
-
-    // 1. Execute SQL, as in the editor: Ctrl/Cmd+Enter and Ctrl/Cmd+R run the
-    // selection or the statement at the cursor; F5 and Ctrl/Cmd+Shift+Enter
-    // run the whole script.
-    final isEnter = physical == PhysicalKeyboardKey.enter ||
-        physical == PhysicalKeyboardKey.numpadEnter ||
-        logical == LogicalKeyboardKey.enter ||
-        logical == LogicalKeyboardKey.numpadEnter;
-    final isF5 = physical == PhysicalKeyboardKey.f5 ||
-        logical == LogicalKeyboardKey.f5;
-    final isKeyR = physical == PhysicalKeyboardKey.keyR ||
-        logical == LogicalKeyboardKey.keyR ||
-        logical == const LogicalKeyboardKey(0x0000043a); // Russian 'к'
-
-    final runScript = isF5 || (isCmdOrCtrl && isShift && !isAlt && isEnter);
-    final runStatement = isCmdOrCtrl &&
-        !isShift &&
-        !isAlt &&
-        (isEnter || isKeyR);
-    if ((runScript || runStatement) &&
-        SqlEditorCommandBridge.instance.canExecute) {
-      if (runScript) {
-        SqlEditorCommandBridge.instance.invokeExecute();
-      } else {
-        SqlEditorCommandBridge.instance.invokeExecuteStatement();
-      }
-      return true;
+    BuildContext focused() =>
+        FocusManager.instance.primaryFocus?.context ?? context;
+    // An intent the focused editor handles, else the bridge to the open one.
+    void intentOr(Intent intent, void Function() fallback) {
+      if (Actions.maybeInvoke(focused(), intent) == null) fallback();
     }
 
-    // Preferences: Ctrl+, / Cmd+, (Physical comma, Logical comma, Russian 'б')
-    final isComma = physical == PhysicalKeyboardKey.comma ||
-        logical == LogicalKeyboardKey.comma ||
-        logical == const LogicalKeyboardKey(0x00000431); // Russian 'б'
-    if (isCmdOrCtrl && !isShift && !isAlt && isComma) {
-      showPreferencesDialog(context);
-      return true;
-    }
-
-    // 2. Toggle Left Sidebar: Ctrl+B / Cmd+B (Physical B, Logical B, Russian 'и')
-    final isKeyB = physical == PhysicalKeyboardKey.keyB ||
-        logical == LogicalKeyboardKey.keyB ||
-        logical == const LogicalKeyboardKey(0x00000438); // Russian 'и'
-    if (isCmdOrCtrl && !isShift && !isAlt && isKeyB) {
-      _splitKey.currentState?.toggleSidebar();
-      return true;
-    }
-
-    // Command Palette: Ctrl+P / Cmd+P (Physical P, Logical P, Russian 'з')
-    final isKeyP = physical == PhysicalKeyboardKey.keyP ||
-        logical == LogicalKeyboardKey.keyP ||
-        logical == const LogicalKeyboardKey(0x00000437) || // з
-        logical == const LogicalKeyboardKey(0x00000417); // З
-    if (isCmdOrCtrl && !isShift && !isAlt && isKeyP) {
-      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-      unawaited(showCommandPalette(ctx));
-      return true;
-    }
-
-    // Quick Switcher: Ctrl+K / Cmd+K (Physical K, Logical K, Russian 'л')
-    final isKeyK = physical == PhysicalKeyboardKey.keyK ||
-        logical == LogicalKeyboardKey.keyK ||
-        logical == const LogicalKeyboardKey(0x0000043b) || // л
-        logical == const LogicalKeyboardKey(0x0000041b); // Л
-    if (isCmdOrCtrl && !isShift && !isAlt && isKeyK) {
-      _openQuickSwitcher();
-      return true;
-    }
-
-    // 3. New Connection / New Query Tab: (Physical N, Logical N, Russian 'т')
-    final isKeyN = physical == PhysicalKeyboardKey.keyN ||
-        logical == LogicalKeyboardKey.keyN ||
-        logical == const LogicalKeyboardKey(0x00000442); // Russian 'т'
-    if (isCmdOrCtrl && !isAlt && isKeyN) {
-      if (isShift) {
-        // Ctrl+Shift+N: New Query
-        final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-        Actions.maybeInvoke(ctx, const NewSqlIntent());
-      } else {
-        // Ctrl+N: New Database Connection
+    final bridge = SqlEditorCommandBridge.instance;
+    switch (shortcut) {
+      case MainShortcut.runScript:
+        if (!bridge.canExecute) return false;
+        bridge.invokeExecute();
+      case MainShortcut.runStatement:
+        if (!bridge.canExecute) return false;
+        bridge.invokeExecuteStatement();
+      case MainShortcut.preferences:
+        showPreferencesDialog(context);
+      case MainShortcut.toggleSidebar:
+        _splitKey.currentState?.toggleSidebar();
+      case MainShortcut.commandPalette:
+        unawaited(showCommandPalette(focused()));
+      case MainShortcut.quickSwitcher:
+        _openQuickSwitcher();
+      case MainShortcut.newConnection:
         unawaited(_onNewDatabaseConnectionFromMenu());
-      }
-      return true;
+      case MainShortcut.newQuery:
+        Actions.maybeInvoke(focused(), const NewSqlIntent());
+      case MainShortcut.newQueryTab:
+        intentOr(const NewSqlIntent(), bridge.invokeNew);
+      case MainShortcut.closeQueryTab:
+        intentOr(const CloseSqlTabIntent(), bridge.invokeCloseTab);
+      case MainShortcut.nextQueryTab:
+        intentOr(const NextSqlTabIntent(), bridge.invokeNextTab);
+      case MainShortcut.prevQueryTab:
+        intentOr(const PrevSqlTabIntent(), bridge.invokePrevTab);
+      case MainShortcut.openSql:
+        Actions.maybeInvoke(focused(), const OpenSqlIntent());
+      case MainShortcut.saveSql:
+        Actions.maybeInvoke(focused(), const SaveSqlIntent());
+      case MainShortcut.welcomeTour:
+        _onOpenWelcomeTour();
+      case MainShortcut.goHome:
+        _onGoHome();
     }
-
-    // New Query Tab: Ctrl+T / Cmd+T (Physical T, Logical T, Russian 'е')
-    final isKeyT = physical == PhysicalKeyboardKey.keyT ||
-        logical == LogicalKeyboardKey.keyT ||
-        logical == const LogicalKeyboardKey(0x00000435); // Russian 'е'
-    if (isCmdOrCtrl && !isShift && !isAlt && isKeyT) {
-      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-      final handled = Actions.maybeInvoke(ctx, const NewSqlIntent());
-      if (handled == null) {
-        SqlEditorCommandBridge.instance.invokeNew();
-      }
-      return true;
-    }
-
-    // Close Query Tab: Ctrl+W / Cmd+W (Physical W, Logical W, Russian 'ц')
-    final isKeyW = physical == PhysicalKeyboardKey.keyW ||
-        logical == LogicalKeyboardKey.keyW ||
-        logical == const LogicalKeyboardKey(0x00000446); // Russian 'ц'
-    if (isCmdOrCtrl && !isShift && !isAlt && isKeyW) {
-      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-      final handled = Actions.maybeInvoke(ctx, const CloseSqlTabIntent());
-      if (handled == null) {
-        SqlEditorCommandBridge.instance.invokeCloseTab();
-      }
-      return true;
-    }
-
-    // Next / Prev Tab: Ctrl+Tab / Ctrl+Shift+Tab
-    final isTab = physical == PhysicalKeyboardKey.tab ||
-        logical == LogicalKeyboardKey.tab;
-    if (isCmdOrCtrl && !isAlt && isTab) {
-      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-      if (isShift) {
-        final handled = Actions.maybeInvoke(ctx, const PrevSqlTabIntent());
-        if (handled == null) {
-          SqlEditorCommandBridge.instance.invokePrevTab();
-        }
-      } else {
-        final handled = Actions.maybeInvoke(ctx, const NextSqlTabIntent());
-        if (handled == null) {
-          SqlEditorCommandBridge.instance.invokeNextTab();
-        }
-      }
-      return true;
-    }
-
-    // 4. Open SQL: Ctrl+O / Cmd+O (Physical O, Logical O, Russian 'щ')
-    final isKeyO = physical == PhysicalKeyboardKey.keyO ||
-        logical == LogicalKeyboardKey.keyO ||
-        logical == const LogicalKeyboardKey(0x00000449); // Russian 'щ'
-    if (isCmdOrCtrl && !isShift && !isAlt && isKeyO) {
-      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-      Actions.maybeInvoke(ctx, const OpenSqlIntent());
-      return true;
-    }
-
-    // 5. Save SQL: Ctrl+S / Cmd+S (Physical S, Logical S, Russian 'ы')
-    final isKeyS = physical == PhysicalKeyboardKey.keyS ||
-        logical == LogicalKeyboardKey.keyS ||
-        logical == const LogicalKeyboardKey(0x0000044b); // Russian 'ы'
-    if (isCmdOrCtrl && !isShift && !isAlt && isKeyS) {
-      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-      Actions.maybeInvoke(ctx, const SaveSqlIntent());
-      return true;
-    }
-
-    // 6. Tutorial & Welcome: F1 or Ctrl+Shift+H / Cmd+Shift+H (Physical H, Logical H, Russian 'р')
-    final isF1 = physical == PhysicalKeyboardKey.f1 ||
-        logical == LogicalKeyboardKey.f1;
-    final isKeyH = physical == PhysicalKeyboardKey.keyH ||
-        logical == LogicalKeyboardKey.keyH ||
-        logical == const LogicalKeyboardKey(0x00000440); // Russian 'р'
-    if (isF1 || (isCmdOrCtrl && isShift && isKeyH)) {
-      _onOpenWelcomeTour();
-      return true;
-    }
-
-    // 7. Home / Start Screen: Ctrl+Shift+0 / Cmd+Shift+0
-    final isDigit0 = physical == PhysicalKeyboardKey.digit0 ||
-        physical == PhysicalKeyboardKey.numpad0 ||
-        logical == LogicalKeyboardKey.digit0 ||
-        logical == LogicalKeyboardKey.numpad0;
-    if (isCmdOrCtrl && isShift && isDigit0) {
-      _onGoHome();
-      return true;
-    }
-
-    return false;
+    return true;
   }
 
   Future<bool> _allowUnsavedNavigation() {
