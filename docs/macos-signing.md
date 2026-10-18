@@ -157,7 +157,7 @@ Related: secrets are stored in the login keychain, so they work without `keychai
 
 ## Minimum macOS version
 
-`MACOSX_DEPLOYMENT_TARGET` is **10.15** in every Xcode configuration, and `LSMinimumSystemVersion` follows it. That is also the highest minimum among the macOS plugins in use (`file_selector_macos` and `url_launcher_macos` need 10.15; `package_info_plus`, `device_info_plus` and the vendored `refresh_rate` need 10.14). Raising it needs no plugin change, lowering it is not possible.
+`MACOSX_DEPLOYMENT_TARGET` is **10.15** in every Xcode configuration, and `LSMinimumSystemVersion` follows it. That is also the highest minimum among the macOS plugins in use (`file_selector_macos` and `url_launcher_macos` need 10.15; `package_info_plus`, `device_info_plus` and `refresh_rate` need 10.14). Raising it needs no plugin change, lowering it is not possible.
 
 Rendering above 60 Hz on a ProMotion display needs **macOS 14** or later (`refresh_rate`, see [motion and high refresh](motion-and-high-refresh.md)); on older versions the app runs at 60 Hz.
 

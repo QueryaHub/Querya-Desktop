@@ -65,7 +65,7 @@ Root cause (engine): per `flutter/flutter#160952`, the engine "can render at 120
 ### Practical implication for Querya (desktop)
 
 - **Windows:** usually follows DWM monitor Hz; **measure and verify**.
-- **Linux:** **query-only** — `enable` / prefer-max are no-ops in `third_party/refresh_rate` Linux plugin. Overlay/`RefreshRate.info` report what GDK sees; actual frame pacing is compositor-dependent. Do not treat a 120/144 reading as “unlocked by Querya”.
+- **Linux:** **query-only** — `enable` / prefer-max are no-ops in the `refresh_rate` Linux plugin. Overlay/`RefreshRate.info` report what GDK sees; actual frame pacing is compositor-dependent. Do not treat a 120/144 reading as “unlocked by Querya”.
 - **macOS:** unlock via `RefreshRate.enable()` when capped at 60 (ProMotion / high-Hz).
 - Use `refresh_rate` for **diagnostics** (debug overlay / benchmark) plus the macOS unlock in `main()`.
 - **Implementation:** `lib/core/motion/display_refresh_service.dart` calls `RefreshRate.enable()` in `main()`. Debug Hz badge: `flutter run --dart-define=QUERYA_REFRESH_OVERLAY=true`.
