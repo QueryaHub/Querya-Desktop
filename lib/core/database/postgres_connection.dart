@@ -5,9 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:postgres/postgres.dart';
 import 'package:querya_desktop/core/database/statement_queue.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
+import 'package:querya_desktop/core/database/ssh_tunnel_host.dart';
 import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
-import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 
@@ -69,7 +69,7 @@ int? postgresReltuplesEstimate(Object? value) {
 }
 
 /// PostgreSQL connection using the pure-Dart `postgres` package.
-class PostgresConnection {
+class PostgresConnection with SshTunnelHost {
   PostgresConnection({
     required this.id,
     required this.name,
@@ -135,11 +135,10 @@ class PostgresConnection {
   final String? sslCert;
   final String? sslKey;
 
+  @override
   final SshTunnelConfig? sshConfig;
+  @override
   final SshTunnelSecrets? sshSecrets;
-  SshTunnelHandle? _sshTunnelHandle;
-
-  SshTunnelHandle? get sshTunnelHandle => _sshTunnelHandle;
 
   String? get password => _password;
   String? get connectionString => _connectionString;
@@ -262,25 +261,7 @@ class PostgresConnection {
     }
 
     try {
-      if (sshConfig != null && sshConfig!.enabled) {
-        var sec = sshSecrets;
-        if (sec == null && id > 0) {
-          final stored =
-              await ConnectionSecretsStore.readSshSecretsForConnection(id);
-          sec = SshTunnelSecrets(
-            password: stored.password,
-            privateKey: stored.privateKey,
-            passphrase: stored.passphrase,
-            jumpPassword: stored.jumpPassword,
-          );
-        }
-        _sshTunnelHandle = await SshTunnelManager.instance.openTunnel(
-          config: sshConfig!,
-          secrets: sec ?? SshTunnelSecrets(),
-          remoteHost: host,
-          remotePort: port,
-        );
-      }
+      adoptSshTunnel(await openSshTunnel(id: id, host: host, port: port));
 
       if (_usesConnectionString(effectiveConnectionString)) {
         // Pool passes target catalog via [database]; URI alone would always open
@@ -300,10 +281,10 @@ class PostgresConnection {
               (sslKey != null && sslKey!.trim().isNotEmpty),
           hasRootCert: sslRootCert != null && sslRootCert!.trim().isNotEmpty,
         );
-        final endpoint = _sshTunnelHandle != null
+        final endpoint = sshTunnelHandle != null
             ? Endpoint(
-                host: _sshTunnelHandle!.localHost,
-                port: _sshTunnelHandle!.localPort,
+                host: sshTunnelHandle!.localHost,
+                port: sshTunnelHandle!.localPort,
                 database: parsed.endpoints.first.database,
                 username: parsed.endpoints.first.username,
                 password: parsed.endpoints.first.password,
@@ -330,8 +311,8 @@ class PostgresConnection {
         _conn = await Connection.open(
           _buildEndpoint(
             pass: effectivePassword,
-            hostOverride: _sshTunnelHandle?.localHost,
-            portOverride: _sshTunnelHandle?.localPort,
+            hostOverride: sshTunnelHandle?.localHost,
+            portOverride: sshTunnelHandle?.localPort,
           ),
           settings: _buildSettings(),
         );
@@ -342,10 +323,7 @@ class PostgresConnection {
     } catch (e, st) {
       _isConnected = false;
       _conn = null;
-      try {
-        await _sshTunnelHandle?.release();
-      } catch (_) {}
-      _sshTunnelHandle = null;
+      await releaseSshTunnel();
       Error.throwWithStackTrace(
         PostgresConnectionException(
           'Failed to connect to PostgreSQL${name.isNotEmpty ? ' ($name)' : ''}: '
@@ -368,12 +346,7 @@ class PostgresConnection {
     } catch (e) {
       debugPrint('PostgresConnection.disconnect: $e');
     }
-    try {
-      await _sshTunnelHandle?.release();
-    } catch (e) {
-      debugPrint('PostgresConnection.sshRelease: $e');
-    }
-    _sshTunnelHandle = null;
+    await releaseSshTunnel(logLabel: 'PostgresConnection.sshRelease');
   }
 
   /// Drops the TCP session immediately (kills pending client I/O). Used when
@@ -388,12 +361,7 @@ class PostgresConnection {
     } catch (e) {
       debugPrint('PostgresConnection.forceClose: $e');
     }
-    try {
-      await _sshTunnelHandle?.release();
-    } catch (e) {
-      debugPrint('PostgresConnection.forceClose ssh: $e');
-    }
-    _sshTunnelHandle = null;
+    await releaseSshTunnel(logLabel: 'PostgresConnection.forceClose ssh');
   }
 
   /// Session-level default for transactions (browse vs SQL editor).
