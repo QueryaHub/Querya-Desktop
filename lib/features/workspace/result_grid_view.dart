@@ -332,7 +332,6 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     final overlay = material.Overlay.maybeOf(context);
     if (overlay == null || !mounted) return;
 
-    final theme = Theme.of(context);
     final cs = context.colors;
     final media = material.MediaQuery.maybeOf(context);
     final screenW = media?.size.width ?? 1920.0;
@@ -356,7 +355,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
                 ),
                 decoration: material.BoxDecoration(
                   color: cs.popover,
-                  borderRadius: BorderRadius.circular(theme.radiusSm),
+                  borderRadius: BorderRadius.circular(5.0),
                   border: material.Border.all(
                     color: cs.border,
                     width: 0.8,

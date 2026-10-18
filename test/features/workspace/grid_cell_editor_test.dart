@@ -150,7 +150,7 @@ void main() {
       );
       expect(
         errorIcon.color,
-        QueryaTheme.darkDefault.colorScheme.destructive,
+        QueryaTheme.darkDefault.colors.destructive,
       );
     });
   });

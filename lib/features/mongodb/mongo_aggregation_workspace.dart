@@ -603,7 +603,7 @@ class _StageCardState extends material.State<_StageCard> {
                     ),
                   ),
                   const Gap(8),
-                  Switch(
+                  material.Switch(
                     value: stage.isEnabled,
                     onChanged: widget.onToggleEnabled,
                   ),

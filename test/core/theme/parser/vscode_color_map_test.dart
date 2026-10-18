@@ -36,7 +36,7 @@ void main() {
       expect(theme.workbench.accent, const Color(0xFF007FD4));
       expect(theme.workbench.gitModified, const Color(0xFFE2C08D));
       expect(theme.workbench.gitUntracked, const Color(0xFF73C991));
-      expect(theme.colorScheme.foreground, const Color(0xFFD4D4D4));
+      expect(theme.colors.foreground, const Color(0xFFD4D4D4));
       expect(theme.editor.background, const Color(0xFF1E1E1E));
     });
 

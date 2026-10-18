@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart' as material;
-import 'package:shadcn_flutter/shadcn_flutter.dart' show ColorScheme;
+import 'querya_ui_colors.dart';
 
-/// Material [ThemeData] aligned with Querya [ColorScheme] for dialogs, dropdowns, etc.
-material.ThemeData materialThemeFromQuerya(ColorScheme scheme) {
+/// Material [ThemeData] aligned with Querya [QueryaUiColors] for dialogs, dropdowns, etc.
+material.ThemeData materialThemeFromQuerya(QueryaUiColors scheme) {
   final materialScheme = material.ColorScheme(
     brightness: scheme.brightness,
     primary: scheme.primary,
@@ -21,6 +21,9 @@ material.ThemeData materialThemeFromQuerya(ColorScheme scheme) {
 
   return material.ThemeData(
     useMaterial3: true,
+    // The app text face: shadcn_flutter carries it until the fonts move (#1736).
+    fontFamily: 'GeistSans',
+    package: 'shadcn_flutter',
     // Safety net: stray Material popups must not ripple.
     splashFactory: material.NoSplash.splashFactory,
     colorScheme: materialScheme,

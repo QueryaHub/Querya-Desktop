@@ -16,7 +16,7 @@ void main() {
       final theme = queryaThemeFromManifest(manifest);
 
       expect(theme.brightness, Brightness.dark);
-      expect(theme.colorScheme.primary, parseQueryaThemeColor('#38BDF8'));
+      expect(theme.colors.primary, parseQueryaThemeColor('#38BDF8'));
       expect(theme.workbench.canvas, parseQueryaThemeColor('#09090B'));
       expect(theme.editor.background, parseQueryaThemeColor('#0F1117'));
       expect(theme.editor.selection, parseQueryaThemeColor('#264F78'));
@@ -29,7 +29,7 @@ void main() {
       final theme = queryaThemeFromManifest(manifest);
 
       expect(theme.brightness, Brightness.light);
-      expect(theme.colorScheme.background, parseQueryaThemeColor('#F8FAFC'));
+      expect(theme.colors.background, parseQueryaThemeColor('#F8FAFC'));
       expect(theme.workbench.surface, parseQueryaThemeColor('#FFFFFF'));
       expect(theme.editor.foreground, parseQueryaThemeColor('#1E293B'));
     });
@@ -52,7 +52,7 @@ void main() {
       const fallback = QueryaTheme.darkDefault;
 
       expect(theme.brightness, Brightness.dark);
-      expect(theme.colorScheme.primary, parseQueryaThemeColor('#FF00AA'));
+      expect(theme.colors.primary, parseQueryaThemeColor('#FF00AA'));
       expect(theme.editor.background, parseQueryaThemeColor('#010203'));
       expect(theme.editor.foreground, fallback.editor.foreground);
       expect(theme.workbench.canvas, fallback.workbench.canvas);

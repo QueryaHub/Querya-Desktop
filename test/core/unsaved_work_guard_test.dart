@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
+import 'package:flutter/material.dart' show MaterialApp;
+import '../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/core/unsaved_work_guard.dart';
 import 'package:querya_desktop/core/unsaved_work_registry.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
   tearDown(UnsavedWorkRegistry.instance.resetForTest);
@@ -12,8 +12,8 @@ void main() {
   testWidgets('returns true immediately when nothing is unsaved',
       (tester) async {
     await tester.pumpWidget(
-      ShadcnApp(
-        theme: AppTheme.dark,
+      MaterialApp(
+        theme: queryaDarkMaterialTheme,
         home: const material.Scaffold(body: material.SizedBox()),
       ),
     );
@@ -35,8 +35,8 @@ void main() {
 
       var navigated = false;
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
           home: material.Builder(
             builder: (context) {
               return material.TextButton(

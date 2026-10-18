@@ -61,10 +61,9 @@ class _DmlPreviewDialogState extends material.State<_DmlPreviewDialog> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = context.colors;
+        final cs = context.colors;
     final wb = context.workbench;
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = context.colors.brightness == Brightness.dark;
     final sql = widget.plan.toTransactionSql();
 
     return QueryaDialogCard(

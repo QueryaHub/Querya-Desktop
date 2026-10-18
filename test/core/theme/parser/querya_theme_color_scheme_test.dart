@@ -8,12 +8,12 @@ import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
-  group('colorSchemeFromQueryaThemeColors', () {
+  group('uiColorsFromQueryaThemeColors', () {
     test('full fixture maps custom shadcn values', () {
       final raw = File('test/fixtures/themes/querya_custom_dark.json')
           .readAsStringSync();
       final manifest = QueryaThemeManifest.fromJsonString(raw);
-      final scheme = colorSchemeFromQueryaThemeColors(
+      final scheme = uiColorsFromQueryaThemeColors(
         colors: manifest.shadcnColors,
         fallback: QueryaTheme.darkDefault,
       );
@@ -28,11 +28,11 @@ void main() {
     });
 
     test('missing keys preserve fallback colorScheme values', () {
-      final scheme = colorSchemeFromQueryaThemeColors(
+      final scheme = uiColorsFromQueryaThemeColors(
         colors: const {'primary': '#FF00AA'},
         fallback: QueryaTheme.darkDefault,
       );
-      final fallback = QueryaTheme.darkDefault.colorScheme;
+      final fallback = QueryaTheme.darkDefault.colors;
 
       expect(scheme.primary, parseQueryaThemeColor('#FF00AA'));
       expect(scheme.background, fallback.background);
@@ -42,8 +42,8 @@ void main() {
     });
 
     test('invalid optional color uses fallback value', () {
-      final fallback = QueryaTheme.darkDefault.colorScheme;
-      final scheme = colorSchemeFromQueryaThemeColors(
+      final fallback = QueryaTheme.darkDefault.colors;
+      final scheme = uiColorsFromQueryaThemeColors(
         colors: const {
           'primary': 'not-a-color',
           'background': '#101014',
@@ -56,8 +56,8 @@ void main() {
     });
 
     test('chart colors fall back when omitted', () {
-      final fallback = QueryaTheme.lightDefault.colorScheme;
-      final scheme = colorSchemeFromQueryaThemeColors(
+      final fallback = QueryaTheme.lightDefault.colors;
+      final scheme = uiColorsFromQueryaThemeColors(
         colors: const {'background': '#FFFFFF'},
         fallback: QueryaTheme.lightDefault,
       );
@@ -71,7 +71,7 @@ void main() {
     });
 
     test('brightness comes from fallback theme, not colors map', () {
-      final scheme = colorSchemeFromQueryaThemeColors(
+      final scheme = uiColorsFromQueryaThemeColors(
         colors: const {
           'background': '#101014',
           'foreground': '#E2E8F0',

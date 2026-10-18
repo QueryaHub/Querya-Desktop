@@ -90,7 +90,7 @@ void main() {
     test('previewEditorManifest updates active theme and restores', () async {
       final c = ThemeController.instance;
       await c.load();
-      final beforePrimary = c.activeTheme.colorScheme.primary;
+      final beforePrimary = c.activeTheme.colors.primary;
 
       final manifest = QueryaThemeManifest.fromJsonString('''
 {
@@ -106,11 +106,11 @@ void main() {
       await c.previewEditorManifest(manifest);
       expect(c.isEditorPreviewActive, isTrue);
       expect(
-          c.activeTheme.colorScheme.primary, parseQueryaThemeColor('#FF00AA'));
+          c.activeTheme.colors.primary, parseQueryaThemeColor('#FF00AA'));
 
       await c.endEditorPreview();
       expect(c.isEditorPreviewActive, isFalse);
-      expect(c.activeTheme.colorScheme.primary, beforePrimary);
+      expect(c.activeTheme.colors.primary, beforePrimary);
     });
   });
 }

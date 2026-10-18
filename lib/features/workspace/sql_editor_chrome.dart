@@ -75,7 +75,7 @@ class SqlEditorChrome extends StatefulWidget {
     return inlineFieldDecoration(
       context.editorTheme,
       context.workbench,
-      brightness: Theme.of(context).brightness,
+      brightness: context.colors.brightness,
     );
   }
 

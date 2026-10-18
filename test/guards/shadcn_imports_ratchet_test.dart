@@ -10,17 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// and a file that imports shadcn without a prefix hides shadcn's copy.
 void main() {
   const allowed = <String>{
-    'lib/app/app.dart',
-    'lib/app/querya_core_commands.dart',
     'lib/core/editor/querya_code_editor.dart',
-    'lib/core/storage/app_settings.dart',
-    'lib/core/theme/app_theme.dart',
-    'lib/core/theme/parser/querya_theme_color_scheme.dart',
-    'lib/core/theme/querya_color_scheme.dart',
-    'lib/core/theme/querya_material_theme.dart',
-    'lib/core/theme/querya_theme.dart',
-    'lib/core/theme/querya_theme_scope.dart',
-    'lib/core/theme/theme_controller.dart',
     'lib/features/mongodb/mongo_document_tree_view.dart',
     'lib/features/mongodb/mongo_documents_json_view.dart',
     'lib/features/mongodb/mongo_documents_table_view.dart',

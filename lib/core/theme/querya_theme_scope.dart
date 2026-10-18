@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 
-import 'querya_color_scheme.dart';
 import 'querya_editor_theme.dart';
 import 'querya_semantic_palette.dart';
 import 'querya_theme.dart';
 import 'querya_ui_colors.dart';
 import 'querya_workbench_theme.dart';
 
-/// Provides [QueryaTheme] (workbench + editor tokens) below [ShadcnApp].
+/// Provides [QueryaTheme] (workbench, editor and colour tokens) below the app.
 class QueryaThemeScope extends InheritedWidget {
   const QueryaThemeScope({
     super.key,
@@ -56,32 +53,21 @@ extension QueryaThemeContext on BuildContext {
   /// Shortcut for Material [material.Theme.of].
   material.ThemeData get theme => material.Theme.of(this);
 
-  /// The colours widgets read (#1730): the ones the running shell uses, so a
-  /// caller that moves here from `Theme.of(context).colorScheme` sees the same
-  /// values, mid theme animation included. Without a shell theme (a bare app
-  /// in a test) the nearest [QueryaThemeScope]'s, else the default theme's.
-  QueryaUiColors get colors {
-    final shell =
-        dependOnInheritedWidgetOfExactType<shadcn.Theme>()?.data.colorScheme;
-    if (shell != null) return shell.uiColors;
-    return (QueryaThemeScope.maybeOf(this) ??
-            (_ambientBrightness == Brightness.light
-                ? QueryaTheme.lightDefault
-                : QueryaTheme.darkDefault))
-        .colors;
-  }
+  /// The colours widgets read (#1730): the nearest [QueryaThemeScope]'s, which
+  /// follows a theme animation frame by frame. Without a scope (a bare app in a
+  /// test) the default theme of the ambient brightness.
+  QueryaUiColors get colors =>
+      (QueryaThemeScope.maybeOf(this) ?? _defaultTheme).colors;
+
+  QueryaTheme get _defaultTheme => _ambientBrightness == Brightness.light
+      ? QueryaTheme.lightDefault
+      : QueryaTheme.darkDefault;
 
   QueryaTheme get queryaTheme => QueryaThemeScope.of(this);
 
   /// The brightness the defaults below follow when there is no
-  /// [QueryaThemeScope]: the shadcn theme's, else Material's (a widget under a
-  /// bare app, as in tests).
-  Brightness get _ambientBrightness =>
-      dependOnInheritedWidgetOfExactType<shadcn.Theme>()
-          ?.data
-          .colorScheme
-          .brightness ??
-      material.Theme.of(this).brightness;
+  /// [QueryaThemeScope]: Material's (a widget under a bare app, as in tests).
+  Brightness get _ambientBrightness => material.Theme.of(this).brightness;
 
   QueryaWorkbenchTheme get workbench => workbenchOrDefault;
 

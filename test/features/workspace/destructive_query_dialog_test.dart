@@ -328,7 +328,7 @@ void main() {
           tester.widget<material.SelectableText>(selectableTextFinder);
       expect(
         selectableText.style?.color,
-        QueryaTheme.lightDefault.colorScheme.foreground,
+        QueryaTheme.lightDefault.colors.foreground,
       );
     });
 

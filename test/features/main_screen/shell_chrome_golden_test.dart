@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
 import 'package:querya_desktop/shared/widgets/app_dialog.dart';
 import 'package:querya_desktop/shared/widgets/querya_tab_strip.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -108,7 +107,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     await expectLater(
-      find.byType(ShadcnApp),
+      find.byType(material.MaterialApp),
       matchesGoldenFile('goldens/app_dialog_overlay.png'),
     );
 

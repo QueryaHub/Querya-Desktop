@@ -5,7 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
+import 'package:flutter/material.dart' show MaterialApp;
+import '../../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/core/ui/querya_tree_tokens.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
@@ -99,10 +100,11 @@ void main() {
           await pumpWidgetWithSurfaceSize(
             tester,
             entry.value,
-            ShadcnApp(
-              theme: AppTheme.dark,
-              darkTheme: AppTheme.dark,
-              themeMode: ThemeMode.dark,
+            MaterialApp(
+              theme: queryaDarkMaterialTheme,
+              darkTheme: queryaDarkMaterialTheme,
+              themeMode: material.ThemeMode.dark,
+              builder: (context, child) => material.Material(child: child),
               home: material.SizedBox.expand(
                 child: ConnectionsPanel(
                   onPostgresOpenSqlWorkspace: (_,
@@ -185,10 +187,11 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
+          builder: (context, child) => material.Material(child: child),
           home: material.SizedBox.expand(
             child: ConnectionsPanel(
               skipInitialDbLoadForTest: true,
@@ -281,8 +284,9 @@ void main() {
 
     testWidgets('connect, disconnect, disconnectAll, and disconnectOthers update state', (tester) async {
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          builder: (context, child) => material.Material(child: child),
           home: material.SizedBox.expand(
             child: ConnectionsPanel(
               skipInitialDbLoadForTest: true,
@@ -372,10 +376,11 @@ void main() {
       await pumpWidgetWithSurfaceSize(
         tester,
         const material.Size(400, 600),
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
+          builder: (context, child) => material.Material(child: child),
           home: const material.SizedBox(
             width: 400,
             height: 600,
@@ -397,10 +402,11 @@ void main() {
       await pumpWidgetWithSurfaceSize(
         tester,
         const material.Size(400, 600),
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
+          builder: (context, child) => material.Material(child: child),
           home: material.SizedBox(
             width: 400,
             height: 600,
@@ -424,10 +430,11 @@ void main() {
       await pumpWidgetWithSurfaceSize(
         tester,
         const material.Size(400, 600),
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
+          builder: (context, child) => material.Material(child: child),
           home: const material.SizedBox(
             width: 400,
             height: 600,

@@ -123,7 +123,7 @@ void main() {
       expect(c.selectedThemeId, 'fixture-custom-dark');
       expect(c.selectedThemeLoadError, isNull);
       expect(
-        c.activeTheme.colorScheme.primary,
+        c.activeTheme.colors.primary,
         parseQueryaThemeColor('#38BDF8'),
       );
       expect(
@@ -142,7 +142,7 @@ void main() {
       expect(c.selectedThemeId, 'fixture-custom-dark');
       expect(c.selectedThemeLoadError, isNull);
       expect(
-        c.activeTheme.colorScheme.primary,
+        c.activeTheme.colors.primary,
         parseQueryaThemeColor('#38BDF8'),
       );
       expect(

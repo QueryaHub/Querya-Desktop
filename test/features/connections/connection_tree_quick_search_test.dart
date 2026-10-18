@@ -5,7 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
+import 'package:flutter/material.dart' show MaterialApp;
+import '../../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
@@ -47,8 +48,8 @@ void main() {
       bool cleared = false;
 
       Widget buildWidget({required int filtered, required int total}) {
-        return ShadcnApp(
-          theme: AppTheme.dark,
+        return MaterialApp(
+          theme: queryaDarkMaterialTheme,
           home: material.Scaffold(
             body: material.SizedBox(
               width: 300,
@@ -190,8 +191,9 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          builder: (context, child) => material.Material(child: child),
           home: material.SizedBox(
             width: 400,
             height: 700,
@@ -230,8 +232,9 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          builder: (context, child) => material.Material(child: child),
           home: material.SizedBox(
             width: 400,
             height: 700,
@@ -270,8 +273,9 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          builder: (context, child) => material.Material(child: child),
           home: material.SizedBox(
             width: 400,
             height: 700,

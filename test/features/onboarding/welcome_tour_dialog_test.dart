@@ -270,13 +270,13 @@ void main() {
     final boxDecoration = keycapContainer.decoration! as material.BoxDecoration;
     expect(boxDecoration.color, lightTheme.workbench.surface);
 
-    // Next -> Slide 2: Fluid Sidebar uses lightTheme.colorScheme.chart4
+    // Next -> Slide 2: Fluid Sidebar uses lightTheme.colors.chart4
     await tester.tap(find.byKey(const Key('welcome_tour_next_button')));
     await tester.pumpAndSettle();
 
     final sidebarIconFinder = find.byIcon(material.Icons.view_sidebar_rounded);
     expect(sidebarIconFinder, findsOneWidget);
     final sidebarIcon = tester.widget<material.Icon>(sidebarIconFinder);
-    expect(sidebarIcon.color, lightTheme.colorScheme.chart4);
+    expect(sidebarIcon.color, lightTheme.colors.chart4);
   });
 }

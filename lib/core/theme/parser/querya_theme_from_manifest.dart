@@ -32,7 +32,7 @@ QueryaTheme queryaThemeFromManifest(QueryaThemeManifest manifest) {
     editor = applyTokenColorsToEditor(editor, tokenColors);
   }
 
-  final colorScheme = colorSchemeFromQueryaThemeColors(
+  final colors = uiColorsFromQueryaThemeColors(
     colors: manifest.shadcnColors,
     fallback: fallback,
   );
@@ -41,7 +41,7 @@ QueryaTheme queryaThemeFromManifest(QueryaThemeManifest manifest) {
     workbench: workbench,
     editor: editor,
     brightness: brightness,
-    colorScheme: colorScheme,
+    colors: colors,
     tokenColors: tokenColors,
   );
 }

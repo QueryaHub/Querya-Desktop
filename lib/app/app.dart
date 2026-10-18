@@ -5,7 +5,7 @@ import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
 import 'package:querya_desktop/core/motion/querya_theme_motion.dart';
 import 'package:querya_desktop/core/theme/animated_querya_theme.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
+import 'package:flutter/material.dart';
 
 import 'app_lifecycle_cleanup.dart';
 import '../features/main_screen/main_screen.dart';
@@ -52,23 +52,17 @@ class QueryaApp extends StatelessWidget {
                   disableAnimations: disableAnimations,
                 );
 
-                return ShadcnApp(
+                return MaterialApp(
                   title: 'Querya',
-                  theme: themeController.lightShadcnTheme,
-                  darkTheme: themeController.darkShadcnTheme,
+                  theme: themeController.lightMaterialTheme,
+                  darkTheme: themeController.darkMaterialTheme,
                   themeMode: themeController.themeMode,
-                  materialTheme: themeController.activeMaterialTheme,
                   debugShowCheckedModeBanner: false,
-                  menuHandler: const PopoverOverlayHandler(
-                    defaultShowDuration: Duration(milliseconds: 60),
-                    defaultDismissDuration: Duration(milliseconds: 50),
-                    showCurve: Curves.easeOutCubic,
-                    dismissCurve: Curves.easeIn,
-                  ),
-                  enableThemeAnimation: themeAnimEnabled,
-                  themeAnimationDuration: themeDuration,
+                  // The Material theme follows the mode with the same
+                  // duration as the Querya tokens below.
+                  themeAnimationDuration:
+                      themeAnimEnabled ? themeDuration : Duration.zero,
                   themeAnimationCurve: themeCurve,
-                  enableScrollInterception: false,
                   // Above navigator so dialogs/overlays (SQL editor, Preferences) see tokens.
                   builder: (context, child) {
                     final mq = MediaQuery.maybeOf(context);

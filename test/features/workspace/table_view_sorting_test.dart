@@ -2,7 +2,9 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/mysql_connection.dart';
 import 'package:querya_desktop/core/database/sqlite_connection.dart';
+import 'package:querya_desktop/core/theme/querya_material_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/postgresql/postgres_table_utils.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
@@ -160,12 +162,12 @@ void main() {
       bool activeSortAscending = true;
 
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: QueryaTheme.darkDefault.toShadcnThemeData(),
+        material.MaterialApp(
+          theme: materialThemeFromQuerya(QueryaTheme.darkDefault.colors),
           home: material.Scaffold(
             body: material.StatefulBuilder(
               builder: (context, setState) {
-                final cs = Theme.of(context).colorScheme;
+                final cs = context.colors;
                 final isSorted = activeSortColumn == 'username';
                 return material.SizedBox(
                   width: 200,

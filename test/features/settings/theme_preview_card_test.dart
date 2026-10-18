@@ -57,7 +57,7 @@ void main() {
           (swatchBox.decoration as material.BoxDecoration).border as material.Border;
       expect(
         border.top.color,
-        QueryaTheme.darkDefault.colorScheme.border.withValues(alpha: 0.6),
+        QueryaTheme.darkDefault.colors.border.withValues(alpha: 0.6),
       );
     });
 

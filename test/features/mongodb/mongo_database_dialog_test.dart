@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:querya_desktop/core/theme/app_theme.dart';
+import 'package:flutter/material.dart' show MaterialApp;
+import '../../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/features/mongodb/mongo_database_dialog.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
   group('showCreateMongoDBDialog', () {
     testWidgets('dialog shows Create Database title and form', (tester) async {
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
           home: material.Builder(
             builder: (context) => material.ElevatedButton(
               onPressed: () => showCreateMongoDBDialog(context),
@@ -33,10 +33,10 @@ void main() {
     testWidgets('Cancel closes dialog and returns null', (tester) async {
       String? result;
       await tester.pumpWidget(
-        ShadcnApp(
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.dark,
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
           home: material.Builder(
             builder: (context) => material.ElevatedButton(
               onPressed: () async {

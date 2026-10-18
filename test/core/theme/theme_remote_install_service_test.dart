@@ -274,7 +274,7 @@ void main() {
       expect(result, isA<ThemeDefinitionImportSuccess>());
       expect(controller.selectedThemeId, 'fixture-custom-dark');
       expect(
-        controller.activeTheme.colorScheme.primary,
+        controller.activeTheme.colors.primary,
         parseQueryaThemeColor('#38BDF8'),
       );
     });

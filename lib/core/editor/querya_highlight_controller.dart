@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
 import 'package:syntax_highlight/syntax_highlight.dart';
 
@@ -63,7 +64,7 @@ class QueryaHighlightController extends TextEditingController {
     TextStyle? style,
     required bool withComposing,
   }) {
-    final brightness = Theme.of(context).brightness;
+    final brightness = context.colors.brightness;
     final themeConfig =
         brightness == Brightness.light ? lightThemeConfig : darkThemeConfig;
 

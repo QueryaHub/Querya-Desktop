@@ -21,7 +21,7 @@ void main() {
     for (final path in chrome) {
       final source = code(path);
       expect(source.contains('colorScheme'), isFalse,
-          reason: '$path reads Theme.colorScheme: use context.workbench.');
+          reason: '$path reads Theme.colors: use context.workbench.');
       expect(RegExp(r'Color\(0x').hasMatch(source), isFalse,
           reason: '$path has a raw colour: use a theme token.');
     }

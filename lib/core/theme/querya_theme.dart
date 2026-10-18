@@ -1,30 +1,26 @@
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
+import 'dart:ui';
 
 import 'color_contrast.dart';
 import 'parser/vscode_theme_manifest.dart';
-import 'querya_color_scheme.dart';
 import 'querya_colors.dart';
 import 'querya_ui_colors.dart';
 import 'querya_editor_theme.dart';
 import 'querya_workbench_theme.dart';
 
-/// Full Querya theme: workbench chrome + editor tokens + shadcn [ColorScheme].
+/// Full Querya theme: workbench chrome + editor tokens + the widgets' [colors].
 class QueryaTheme {
   const QueryaTheme({
     required this.workbench,
     required this.editor,
     required this.brightness,
-    required this.colorScheme,
+    required this.colors,
     this.tokenColors = const [],
   });
 
   final QueryaWorkbenchTheme workbench;
   final QueryaEditorTheme editor;
   final Brightness brightness;
-  final ColorScheme colorScheme;
-
-  /// [colorScheme] as the app's own colour type (#1730).
-  QueryaUiColors get colors => colorScheme.uiColors;
+  final QueryaUiColors colors;
 
   /// VS Code `tokenColors` for syntax highlighting (imported themes).
   final List<TokenColorRule> tokenColors;
@@ -44,18 +40,18 @@ class QueryaTheme {
     workbench: QueryaWorkbenchTheme.darkDefault,
     editor: QueryaEditorTheme.darkDefault,
     brightness: Brightness.dark,
-    colorScheme: _darkColorScheme,
+    colors: _darkColors,
   );
 
   static const QueryaTheme lightDefault = QueryaTheme(
     workbench: QueryaWorkbenchTheme.lightDefault,
     editor: QueryaEditorTheme.lightDefault,
     brightness: Brightness.light,
-    colorScheme: _lightColorScheme,
+    colors: _lightColors,
   );
 
-  /// Matches [QueryaWorkbenchTheme.darkDefault] / legacy [QueryaColorScheme].
-  static const ColorScheme _darkColorScheme = ColorScheme(
+  /// Matches [QueryaWorkbenchTheme.darkDefault].
+  static const QueryaUiColors _darkColors = QueryaUiColors(
     brightness: Brightness.dark,
     background: QueryaColors.canvas,
     foreground: Color(0xFFF8FAFC),
@@ -84,7 +80,7 @@ class QueryaTheme {
   );
 
   /// Matches [QueryaWorkbenchTheme.lightDefault].
-  static const ColorScheme _lightColorScheme = ColorScheme(
+  static const QueryaUiColors _lightColors = QueryaUiColors(
     brightness: Brightness.light,
     background: Color(0xFFFAFAFA),
     foreground: Color(0xFF0F172A),
@@ -112,14 +108,14 @@ class QueryaTheme {
     chart5: Color(0xFFE23670),
   );
 
-  /// Builds [ColorScheme] from [workbench] (for imported / overridden themes).
-  static ColorScheme colorSchemeFromWorkbench(
+  /// Builds [QueryaUiColors] from [workbench] (for imported / overridden themes).
+  static QueryaUiColors colorsFromWorkbench(
     QueryaWorkbenchTheme w, {
     required Brightness brightness,
   }) {
     final isDark = brightness == Brightness.dark;
     final fg = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
-    return ColorScheme(
+    return QueryaUiColors(
       brightness: brightness,
       background: w.canvas,
       foreground: fg,
@@ -156,14 +152,14 @@ class QueryaTheme {
     QueryaWorkbenchTheme? workbench,
     QueryaEditorTheme? editor,
     Brightness? brightness,
-    ColorScheme? colorScheme,
+    QueryaUiColors? colors,
     List<TokenColorRule>? tokenColors,
   }) {
     return QueryaTheme(
       workbench: workbench ?? this.workbench,
       editor: editor ?? this.editor,
       brightness: brightness ?? this.brightness,
-      colorScheme: colorScheme ?? this.colorScheme,
+      colors: colors ?? this.colors,
       tokenColors: tokenColors ?? this.tokenColors,
     );
   }
@@ -176,24 +172,8 @@ class QueryaTheme {
       workbench: w,
       editor: e,
       brightness: brightness,
-      colorScheme: ColorScheme.lerp(a.colorScheme, b.colorScheme, t),
+      colors: QueryaUiColors.lerp(a.colors, b.colors, t),
       tokenColors: t < 0.5 ? a.tokenColors : b.tokenColors,
-    );
-  }
-
-  ThemeData toShadcnThemeData({
-    double radius = 0.58,
-    double scaling = 1,
-    Typography? typography,
-  }) {
-    final typo = typography ?? const Typography.geist();
-    final base = brightness == Brightness.dark
-        ? ThemeData.dark(colorScheme: colorScheme)
-        : ThemeData(colorScheme: colorScheme);
-    return base.copyWith(
-      radius: () => radius,
-      scaling: () => scaling,
-      typography: () => typo,
     );
   }
 
@@ -204,12 +184,12 @@ class QueryaTheme {
           workbench == other.workbench &&
           editor == other.editor &&
           brightness == other.brightness &&
-          colorScheme == other.colorScheme &&
+          colors == other.colors &&
           _listEquals(tokenColors, other.tokenColors);
 
   @override
   int get hashCode =>
-      Object.hash(workbench, editor, brightness, colorScheme, tokenColors);
+      Object.hash(workbench, editor, brightness, colors, tokenColors);
 
   static bool _listEquals<T>(List<T> a, List<T> b) {
     if (a.length != b.length) return false;

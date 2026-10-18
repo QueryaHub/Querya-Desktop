@@ -23,12 +23,12 @@ void main() {
         destructive: destructive,
         mutedForeground: muted,
       ),
-      colorScheme: base.colorScheme.copyWith(
-        chart1: () => chart1,
-        chart2: () => chart2,
-        chart3: () => chart3,
-        chart4: () => chart4,
-        chart5: () => chart5,
+      colors: base.colors.copyWith(
+        chart1: chart1,
+        chart2: chart2,
+        chart3: chart3,
+        chart4: chart4,
+        chart5: chart5,
       ),
     );
 

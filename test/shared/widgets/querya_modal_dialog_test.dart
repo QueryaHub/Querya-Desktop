@@ -17,7 +17,7 @@ void main() {
             icon: const material.Icon(material.Icons.info_outline),
             content: const Text('Dialog Content Body'),
             actions: [
-              OutlineButton(
+              material.ElevatedButton(
                 onPressed: () => actionClicked = true,
                 child: const Text('Action Button'),
               ),

@@ -16,6 +16,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/semantics.dart' show SemanticsBinding;
+import 'package:querya_desktop/core/theme/querya_material_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
@@ -57,10 +58,9 @@ void main() {
       [for (var c = 0; c < colCount; c++) c == 0 ? '${(r * 7919) % rowCount}' : 'v${r}_$c'],
   ];
   final buffer = DataGridStagingBuffer(columns: columns, rows: rows);
-  final td = QueryaTheme.darkDefault
-      .toShadcnThemeData()
-      .copyWith(platform: () => TargetPlatform.linux);
-  runApp(ShadcnApp(
+  final td = materialThemeFromQuerya(QueryaTheme.darkDefault.colors)
+      .copyWith(platform: TargetPlatform.linux);
+  runApp(material.MaterialApp(
     theme: td,
     home: material.Scaffold(
       body: mode == 'rerun'

@@ -5,14 +5,14 @@ import 'package:querya_desktop/core/theme/querya_theme.dart';
 
 void main() {
   test('dark material theme uses light onSurface for dropdowns', () {
-    final td = materialThemeFromQuerya(QueryaTheme.darkDefault.colorScheme);
+    final td = materialThemeFromQuerya(QueryaTheme.darkDefault.colors);
     expect(td.colorScheme.brightness, material.Brightness.dark);
     expect(td.colorScheme.onSurface, const material.Color(0xFFF8FAFC));
     expect(td.textTheme.bodyLarge?.color, const material.Color(0xFFF8FAFC));
   });
 
   test('light material theme uses dark onSurface', () {
-    final td = materialThemeFromQuerya(QueryaTheme.lightDefault.colorScheme);
+    final td = materialThemeFromQuerya(QueryaTheme.lightDefault.colors);
     expect(td.colorScheme.onSurface, const material.Color(0xFF0F172A));
   });
 }
