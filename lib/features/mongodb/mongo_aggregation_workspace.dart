@@ -569,7 +569,7 @@ class _StageCardState extends material.State<_StageCard> {
     final stage = widget.stage;
     final syntaxError = validateStage(stage);
 
-    return Card(
+    return QueryaCard(
       child: material.Padding(
         padding: const material.EdgeInsets.all(12),
         child: material.Column(

@@ -314,7 +314,7 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView>
 
   material.Widget _buildChip(
       QueryaUiColors cs, ({String label, String value, material.IconData icon}) chip) {
-    return Card(
+    return QueryaCard(
       padding: const material.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: material.Row(
         children: [
@@ -361,7 +361,7 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView>
     final sorted = sizes.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    return Card(
+    return QueryaCard(
       padding: const material.EdgeInsets.all(20),
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,
@@ -459,7 +459,7 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView>
     final cs = context.colors;
     final extra = stats.extraMetrics.entries.toList();
 
-    return Card(
+    return QueryaCard(
       padding: const material.EdgeInsets.all(20),
       child: material.Column(
         crossAxisAlignment: material.CrossAxisAlignment.start,

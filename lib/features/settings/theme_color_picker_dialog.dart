@@ -7,7 +7,7 @@ Future<Color?> showThemeColorPickerDialog({
   required material.BuildContext context,
   required Color initial,
 }) async {
-  var picked = ColorDerivative.fromColor(initial);
+  var picked = initial;
 
   return showAppDialog<Color>(
     context: context,
@@ -16,8 +16,8 @@ Future<Color?> showThemeColorPickerDialog({
         title: const material.Text('Pick color'),
         content: material.SizedBox(
           width: 320,
-          height: 360,
-          child: ColorPicker(
+          height: 300,
+          child: QueryaColorPicker(
             value: picked,
             onChanged: (value) => picked = value,
           ),
@@ -31,7 +31,7 @@ Future<Color?> showThemeColorPickerDialog({
           QueryaButton.primary(
             label: 'Apply',
             onPressed: () =>
-                material.Navigator.pop(dialogContext, picked.toColor()),
+                material.Navigator.pop(dialogContext, picked),
             size: QueryaControlSize.lg,
           ),
         ],

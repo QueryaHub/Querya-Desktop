@@ -298,34 +298,36 @@ class _InterfaceScaleSliderState extends material.State<InterfaceScaleSlider> {
     return material.Row(
       children: [
         material.Expanded(
-          child: Slider(
-            value: SliderValue.single(
-              _sliderPosition(displayScale, fine: fine),
+          child: material.SliderTheme(
+            data: material.SliderTheme.of(context).copyWith(
+              activeTrackColor: cs.primary,
+              inactiveTrackColor: cs.muted,
+              thumbColor: cs.primary,
+              overlayColor: cs.primary.withValues(alpha: 0.12),
+              activeTickMarkColor: cs.primaryForeground.withValues(alpha: 0.5),
+              inactiveTickMarkColor: cs.mutedForeground.withValues(alpha: 0.5),
+              trackHeight: 4,
             ),
-            min: fine ? kMinUiScale : 0,
-            max: fine ? kMaxUiScale : (kUiScalePresets.length - 1).toDouble(),
-            divisions: fine ? _fineDivisions : kUiScalePresets.length - 1,
-            hintValue: const SliderValue.single(kDefaultUiScale),
-            onChanged: (value) {
-              final next = _scaleFromSlider(
-                value.value,
-                fine: _shiftHeld,
-              );
-              setState(() => _dragScale = next);
-            },
-            onChangeEnd: (value) {
-              final next = _scaleFromSlider(
-                value.value,
-                fine: _shiftHeld,
-              );
-              setState(() => _dragScale = null);
-              unawaited(
-                UiScaleController.instance.commitScale(
-                  next,
-                  fine: _shiftHeld,
-                ),
-              );
-            },
+            child: material.Slider(
+              value: _sliderPosition(displayScale, fine: fine),
+              min: fine ? kMinUiScale : 0,
+              max: fine ? kMaxUiScale : (kUiScalePresets.length - 1).toDouble(),
+              divisions: fine ? _fineDivisions : kUiScalePresets.length - 1,
+              onChanged: (value) {
+                final next = _scaleFromSlider(value, fine: _shiftHeld);
+                setState(() => _dragScale = next);
+              },
+              onChangeEnd: (value) {
+                final next = _scaleFromSlider(value, fine: _shiftHeld);
+                setState(() => _dragScale = null);
+                unawaited(
+                  UiScaleController.instance.commitScale(
+                    next,
+                    fine: _shiftHeld,
+                  ),
+                );
+              },
+            ),
           ),
         ),
         const material.SizedBox(width: 8),

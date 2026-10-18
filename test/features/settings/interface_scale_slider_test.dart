@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/layout/ui_scale_controller.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -20,7 +19,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('100%'), findsOneWidget);
-      expect(find.byType(Slider), findsOneWidget);
+      expect(find.byType(material.Slider), findsOneWidget);
     });
 
     test('UiScaleController.normalize snaps to presets unless fine mode', () {
