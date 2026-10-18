@@ -6,9 +6,8 @@ import 'package:querya_desktop/core/extensions/models/extension_server_stats.dar
 import 'package:querya_desktop/core/motion/polling_controller.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/util/deep_collection_equals.dart';
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 const _pollInterval = Duration(seconds: 5);
@@ -113,7 +112,7 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView>
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     if (_loading) {
       return const material.Center(
@@ -195,7 +194,7 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView>
   }
 
   material.Widget _header(material.BuildContext context) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.LayoutBuilder(
       builder: (context, constraints) {
         return material.SingleChildScrollView(
@@ -251,7 +250,7 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView>
 
   material.Widget _summaryChips(
       material.BuildContext context, ExtensionServerStats stats) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     final versionFull = stats.serverVersion ?? '—';
     final uptimeSec = stats.uptimeSeconds;
     final uptimeStr = uptimeSec == null
@@ -314,7 +313,7 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView>
   }
 
   material.Widget _buildChip(
-      shadcn.ColorScheme cs, ({String label, String value, material.IconData icon}) chip) {
+      QueryaUiColors cs, ({String label, String value, material.IconData icon}) chip) {
     return Card(
       padding: const material.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: material.Row(
@@ -356,7 +355,7 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView>
 
   material.Widget _databasesCard(
       material.BuildContext context, ExtensionServerStats stats) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     final sizes = stats.databaseSizes;
     final totalBytes = sizes.values.fold<int>(0, (a, b) => a + b);
     final sorted = sizes.entries.toList()
@@ -457,7 +456,7 @@ class _ExtensionStatsViewState extends material.State<ExtensionStatsView>
 
   material.Widget _extraMetricsCard(
       material.BuildContext context, ExtensionServerStats stats) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     final extra = stats.extraMetrics.entries.toList();
 
     return Card(

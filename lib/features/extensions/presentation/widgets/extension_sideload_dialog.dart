@@ -58,7 +58,7 @@ class _ExtensionSideloadDialogState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final fileName = p.basename(widget.archivePath);
 
     return QueryaModalDialog(

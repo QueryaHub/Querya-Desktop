@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   const migrated = <String>[
     'lib/features/connections',
+    'lib/features/extensions',
     'lib/features/mongodb',
     'lib/features/mysql',
     'lib/features/postgresql',

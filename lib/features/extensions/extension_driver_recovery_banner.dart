@@ -20,13 +20,14 @@ class ExtensionDriverRecoveryBanner extends material.StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     final theme = Theme.of(context);
+    final colors = context.colors;
     final isDark = theme.brightness == material.Brightness.dark;
 
     final bgColor = isDark
-        ? theme.colorScheme.destructive.withValues(alpha: 0.12)
-        : theme.colorScheme.destructive.withValues(alpha: 0.08);
+        ? colors.destructive.withValues(alpha: 0.12)
+        : colors.destructive.withValues(alpha: 0.08);
 
-    final borderColor = theme.colorScheme.destructive.withValues(alpha: 0.35);
+    final borderColor = colors.destructive.withValues(alpha: 0.35);
 
     return material.Container(
       margin: const material.EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -41,7 +42,7 @@ class ExtensionDriverRecoveryBanner extends material.StatelessWidget {
           material.Icon(
             material.Icons.power_off_rounded,
             size: 20,
-            color: theme.colorScheme.destructive,
+            color: colors.destructive,
           ),
           const Gap(12),
           material.Expanded(
