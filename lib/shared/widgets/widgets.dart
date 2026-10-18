@@ -42,4 +42,5 @@ export 'package:querya_desktop/core/motion/querya_animated_expand.dart';
 export 'package:querya_desktop/core/motion/querya_fade_slide.dart';
 export 'package:querya_desktop/core/theme/querya_theme_scope.dart'
     show QueryaThemeContext;
-export 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+export 'package:gap/gap.dart';
+export 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, MaxGap, SliverGap, TextExtension;

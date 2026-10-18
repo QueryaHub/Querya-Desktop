@@ -1,8 +1,8 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/querya_drag_settle.dart';
 import 'package:querya_desktop/core/layout/querya_split_handle.dart';
 import 'package:querya_desktop/core/motion/querya_spring.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 /// Counts full rebuilds of [VerticalSplitPane]'s body (cache misses) — should
 /// only fire when the pane's height or its top/bottom/fraction/etc. inputs

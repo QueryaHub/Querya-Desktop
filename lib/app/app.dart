@@ -5,7 +5,7 @@ import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
 import 'package:querya_desktop/core/motion/querya_theme_motion.dart';
 import 'package:querya_desktop/core/theme/animated_querya_theme.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 import 'app_lifecycle_cleanup.dart';
 import '../features/main_screen/main_screen.dart';

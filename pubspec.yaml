@@ -16,6 +16,8 @@ dependencies:
   crypto: ^3.0.6
   refresh_rate: ^2.0.1
   shadcn_flutter: ^0.0.52
+  # Spacing widget; shadcn_flutter re-exported it, now taken directly (#1729).
+  gap: ^3.0.1
   bitsdojo_window: ^0.1.6
   path: ^1.9.0
   path_provider: ^2.1.5

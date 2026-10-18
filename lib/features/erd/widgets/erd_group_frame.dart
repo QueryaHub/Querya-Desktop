@@ -4,7 +4,7 @@ import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/erd/erd_layout.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 /// A group's frame on the canvas: a tinted box that takes no pointer, and its
 /// title, which drags the whole group and has the group's menu.

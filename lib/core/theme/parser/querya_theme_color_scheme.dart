@@ -1,7 +1,7 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/foundation.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 import '../querya_theme.dart';
 import 'color_parser.dart';

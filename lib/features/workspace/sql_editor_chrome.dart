@@ -2,7 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/theme/querya_editor_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_workbench_theme.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 /// Outer chrome for SQL editors and the results under them: one rounded card
 /// with a border.

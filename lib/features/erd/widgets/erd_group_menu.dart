@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 /// Group entries of a card's menu: group it (with the marked tables), add it
 /// to a group, take it out of its group.
