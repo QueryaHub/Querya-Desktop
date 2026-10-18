@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
-import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/features/redis/redis_keys_view.dart';
 
 import '../../support/querya_theme_test_shell.dart';
+import '../../support/redis_connection_test_fake.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

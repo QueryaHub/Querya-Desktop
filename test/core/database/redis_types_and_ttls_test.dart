@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
-import 'package:querya_desktop/core/database/redis_connection.dart';
+import '../../support/redis_connection_test_fake.dart';
 
 /// Counts outbound commands to prove [typesAndTtls] fires TYPE+TTL without
 /// awaiting between keys (true pipeline enqueue).

@@ -10,6 +10,7 @@ import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
+import 'package:querya_desktop/core/database/redis_reply.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:redis/redis.dart' as redis;
 import 'package:querya_desktop/core/util/log_ignored.dart';
@@ -400,25 +401,38 @@ class RedisConnection with SshTunnelHost {
     }
   }
 
+  /// A command with typed arguments, its reply parsed once (#1571).
+  ///
+  /// Each argument is a `String`, `int`, `double`, `Uint8List` or
+  /// [RedisBulkValue] (a key or value that may not be UTF-8); anything else is
+  /// an [ArgumentError] here and not a malformed command on the wire.
+  Future<RedisReply> command(List<Object> args) async =>
+      RedisReply.from(await sendCommand([for (final a in args) _commandArg(a)]));
+
+  static Object _commandArg(Object a) => switch (a) {
+        RedisBulkValue() => a.commandArg,
+        Uint8List() => redis.RedisBulk(a),
+        String() || int() || double() || redis.RedisBulk() => a,
+        _ => throw ArgumentError.value(
+            a, 'args', 'not a Redis command argument (${a.runtimeType})'),
+      };
+
   /// SELECT database index; later reconnects come back to it too.
   Future<void> selectDatabase(int db) async {
-    await sendCommand(['SELECT', db]);
+    await command(['SELECT', db]);
     database = db;
   }
 
   /// DBSIZE — number of keys in the currently selected database.
   Future<int> dbSize() async {
-    final result = await sendCommand(['DBSIZE']);
-    return redisReplyInt(result);
+    return (await command(['DBSIZE'])).asInt();
   }
 
   /// CONFIG GET databases — max number of databases.
   Future<int> getMaxDatabases() async {
     try {
-      final result = await sendCommand(['CONFIG', 'GET', 'databases']);
-      if (result is List && result.length >= 2) {
-        return redisReplyInt(result[1], 16);
-      }
+      final reply = (await command(['CONFIG', 'GET', 'databases'])).asArray();
+      if (reply.length >= 2) return reply[1].asInt();
     } catch (e) {
       debugPrint('RedisConnection.getMaxDatabases: $e');
       // Some Redis instances don't allow CONFIG; fall back.
@@ -433,31 +447,42 @@ class RedisConnection with SshTunnelHost {
     String? match,
     int count = 100,
   }) async {
-    final args = <dynamic>['SCAN', cursor];
+    final args = <Object>['SCAN', cursor];
     if (match != null && match.isNotEmpty) {
       args.addAll(['MATCH', match]);
     }
     args.addAll(['COUNT', count]);
-    final result = await sendCommand(args);
-    if (result is List && result.length == 2) {
-      final nextCursor = redisReplyInt(result[0]);
-      final keys =
-          (result[1] as List?)?.map(RedisBulkValue.fromReply).toList() ?? [];
-      return (nextCursor, keys);
-    }
-    return (0, <RedisBulkValue>[]);
+    return _cursorAndBulks(await command(args));
   }
+
+  /// The cursor and the bulk strings of a SCAN / SSCAN reply.
+  static (int, List<RedisBulkValue>) _cursorAndBulks(RedisReply reply) {
+    final parts = reply.asArray();
+    if (parts.length != 2) {
+      throw RedisProtocolException(
+          'a scan reply has 2 parts, got ${parts.length}');
+    }
+    return (
+      parts[0].asInt(),
+      [for (final e in parts[1].asArray()) e.asBulk()],
+    );
+  }
+
+  /// Field / value pairs of an HGETALL or HSCAN array.
+  static Map<RedisBulkValue, RedisBulkValue> _pairs(List<RedisReply> items) => {
+        for (var i = 0; i + 1 < items.length; i += 2)
+          items[i].asBulk(): items[i + 1].asBulk(),
+      };
 
   /// TYPE key.
   Future<String> keyType(Object key) async {
-    final result = await sendCommand(['TYPE', redisCommandArg(key)]);
-    return RedisBulkValue.fromReply(result).text ?? 'none';
+    final reply = await command(['TYPE', key]);
+    return reply.asText() ?? 'none';
   }
 
   /// TTL key (returns -1 if no expiry, -2 if missing).
   Future<int> ttl(Object key) async {
-    final result = await sendCommand(['TTL', redisCommandArg(key)]);
-    return redisReplyInt(result, -1);
+    return (await command(['TTL', key])).asInt();
   }
 
   /// Pipelined TYPE + TTL for a SCAN batch.
@@ -477,15 +502,15 @@ class RedisConnection with SshTunnelHost {
     try {
       final typeFutures = <Future<String>>[
         for (final key in keys)
-          sendCommand(['TYPE', key.commandArg]).then(
-            (v) => RedisBulkValue.fromReply(v).text ?? 'none',
+          command(['TYPE', key]).then(
+            (v) => v.asText() ?? 'none',
             onError: (_) => 'unknown',
           ),
       ];
       final ttlFutures = <Future<int>>[
         for (final key in keys)
-          sendCommand(['TTL', key.commandArg]).then(
-            (v) => redisReplyInt(v, -1),
+          command(['TTL', key]).then(
+            (v) => v.asInt(),
             onError: (_) => -1,
           ),
       ];
@@ -501,9 +526,7 @@ class RedisConnection with SshTunnelHost {
 
   /// GET. Returns null for a missing key. Non-UTF-8 values keep raw bytes.
   Future<RedisBulkValue?> get(Object key) async {
-    final result = await sendCommand(['GET', redisCommandArg(key)]);
-    if (result == null) return null;
-    return RedisBulkValue.fromReply(result);
+    return (await command(['GET', key])).asBulkOrNull();
   }
 
   /// SET key value [EX seconds].
@@ -556,15 +579,7 @@ class RedisConnection with SshTunnelHost {
 
   /// HGETALL key.
   Future<Map<RedisBulkValue, RedisBulkValue>> hgetall(Object key) async {
-    final result = await sendCommand(['HGETALL', redisCommandArg(key)]);
-    final map = <RedisBulkValue, RedisBulkValue>{};
-    if (result is List) {
-      for (var i = 0; i + 1 < result.length; i += 2) {
-        map[RedisBulkValue.fromReply(result[i])] =
-            RedisBulkValue.fromReply(result[i + 1]);
-      }
-    }
-    return map;
+    return _pairs((await command(['HGETALL', key])).asArray());
   }
 
   /// HSCAN key cursor [COUNT count]. Returns (nextCursor, fields).
@@ -573,27 +588,18 @@ class RedisConnection with SshTunnelHost {
     int cursor = 0,
     int count = redisCollectionPageSize,
   }) async {
-    final result = await sendCommand(
-        ['HSCAN', redisCommandArg(key), cursor, 'COUNT', count]);
-    if (result is List && result.length == 2) {
-      final nextCursor = redisReplyInt(result[0]);
-      final map = <RedisBulkValue, RedisBulkValue>{};
-      final pairs = result[1];
-      if (pairs is List) {
-        for (var i = 0; i + 1 < pairs.length; i += 2) {
-          map[RedisBulkValue.fromReply(pairs[i])] =
-              RedisBulkValue.fromReply(pairs[i + 1]);
-        }
-      }
-      return (nextCursor, map);
+    final parts =
+        (await command(['HSCAN', key, cursor, 'COUNT', count])).asArray();
+    if (parts.length != 2) {
+      throw RedisProtocolException(
+          'a scan reply has 2 parts, got ${parts.length}');
     }
-    return (0, <RedisBulkValue, RedisBulkValue>{});
+    return (parts[0].asInt(), _pairs(parts[1].asArray()));
   }
 
   /// HLEN key.
   Future<int> hlen(Object key) async {
-    final result = await sendCommand(['HLEN', redisCommandArg(key)]);
-    return redisReplyInt(result);
+    return (await command(['HLEN', key])).asInt();
   }
 
   /// HSET key field value.
@@ -610,18 +616,13 @@ class RedisConnection with SshTunnelHost {
 
   /// LRANGE key start stop.
   Future<List<RedisBulkValue>> lrange(Object key, int start, int stop) async {
-    final result =
-        await sendCommand(['LRANGE', redisCommandArg(key), start, stop]);
-    if (result is List) {
-      return result.map(RedisBulkValue.fromReply).toList();
-    }
-    return [];
+    final reply = await command(['LRANGE', key, start, stop]);
+    return [for (final e in reply.asArray()) e.asBulk()];
   }
 
   /// LLEN key.
   Future<int> llen(Object key) async {
-    final result = await sendCommand(['LLEN', redisCommandArg(key)]);
-    return redisReplyInt(result);
+    return (await command(['LLEN', key])).asInt();
   }
 
   /// RPUSH key value.
@@ -632,12 +633,7 @@ class RedisConnection with SshTunnelHost {
 
   /// LINDEX key index.
   Future<RedisBulkValue?> lindex(Object key, int index) async {
-    final result =
-        await sendCommand(['LINDEX', redisCommandArg(key), index]);
-    if (result == null || _isRedisNil(result)) {
-      return null;
-    }
-    return RedisBulkValue.fromReply(result);
+    return (await command(['LINDEX', key, index])).asBulkOrNull();
   }
 
   /// LSET key index value.
@@ -649,18 +645,13 @@ class RedisConnection with SshTunnelHost {
   /// LREM key count element.
   Future<int> lrem(Object key, int count, Object element) async {
     _assertWritable();
-    final result = await sendCommand(
-        ['LREM', redisCommandArg(key), count, redisCommandArg(element)]);
-    return redisReplyInt(result);
+    return (await command(['LREM', key, count, element])).asInt();
   }
 
   /// SMEMBERS key.
   Future<List<RedisBulkValue>> smembers(Object key) async {
-    final result = await sendCommand(['SMEMBERS', redisCommandArg(key)]);
-    if (result is List) {
-      return result.map(RedisBulkValue.fromReply).toList();
-    }
-    return [];
+    final reply = await command(['SMEMBERS', key]);
+    return [for (final e in reply.asArray()) e.asBulk()];
   }
 
   /// SSCAN key cursor [COUNT count]. Returns (nextCursor, members).
@@ -669,21 +660,13 @@ class RedisConnection with SshTunnelHost {
     int cursor = 0,
     int count = redisCollectionPageSize,
   }) async {
-    final result = await sendCommand(
-        ['SSCAN', redisCommandArg(key), cursor, 'COUNT', count]);
-    if (result is List && result.length == 2) {
-      final nextCursor = redisReplyInt(result[0]);
-      final members =
-          (result[1] as List?)?.map(RedisBulkValue.fromReply).toList() ?? [];
-      return (nextCursor, members);
-    }
-    return (0, <RedisBulkValue>[]);
+    return _cursorAndBulks(
+        await command(['SSCAN', key, cursor, 'COUNT', count]));
   }
 
   /// SCARD key.
   Future<int> scard(Object key) async {
-    final result = await sendCommand(['SCARD', redisCommandArg(key)]);
-    return redisReplyInt(result);
+    return (await command(['SCARD', key])).asInt();
   }
 
   /// SADD key member.
@@ -701,24 +684,17 @@ class RedisConnection with SshTunnelHost {
   /// ZRANGE key start stop WITHSCORES → list of (member, score).
   Future<List<(RedisBulkValue, double)>> zrangeWithScores(
       Object key, int start, int stop) async {
-    final result = await sendCommand(
-        ['ZRANGE', redisCommandArg(key), start, stop, 'WITHSCORES']);
-    final list = <(RedisBulkValue, double)>[];
-    if (result is List) {
-      for (var i = 0; i + 1 < result.length; i += 2) {
-        list.add((
-          RedisBulkValue.fromReply(result[i]),
-          redisReplyDouble(result[i + 1]),
-        ));
-      }
-    }
-    return list;
+    final items =
+        (await command(['ZRANGE', key, start, stop, 'WITHSCORES'])).asArray();
+    return [
+      for (var i = 0; i + 1 < items.length; i += 2)
+        (items[i].asBulk(), items[i + 1].asDouble()),
+    ];
   }
 
   /// ZCARD key.
   Future<int> zcard(Object key) async {
-    final result = await sendCommand(['ZCARD', redisCommandArg(key)]);
-    return redisReplyInt(result);
+    return (await command(['ZCARD', key])).asInt();
   }
 
   /// ZADD key score member.
@@ -736,8 +712,7 @@ class RedisConnection with SshTunnelHost {
   /// DEL key.
   Future<int> del(Object key) async {
     _assertWritable();
-    final result = await sendCommand(['DEL', redisCommandArg(key)]);
-    return redisReplyInt(result);
+    return (await command(['DEL', key])).asInt();
   }
 
   /// False once the server answered `UNLINK` with an unknown command (< 4.0).
@@ -758,7 +733,7 @@ class RedisConnection with SshTunnelHost {
       for (var i = 0; i < list.length; i += chunkSize)
         [
           for (final key in list.sublist(i, min(i + chunkSize, list.length)))
-            redisCommandArg(key),
+            key,
         ],
     ];
 
@@ -766,11 +741,11 @@ class RedisConnection with SshTunnelHost {
     var total = 0;
     var verb = _unlinkSupported == false ? 'DEL' : 'UNLINK';
     try {
-      total += redisReplyInt(await sendCommand([verb, ...chunks.first]));
+      total += (await command([verb, ...chunks.first])).asInt();
     } catch (e) {
       if (verb != 'UNLINK' || !_isUnknownCommand(e)) rethrow;
       verb = 'DEL';
-      total += redisReplyInt(await sendCommand([verb, ...chunks.first]));
+      total += (await command([verb, ...chunks.first])).asInt();
     }
     _unlinkSupported ??= verb == 'UNLINK';
     if (chunks.length == 1) return total;
@@ -782,8 +757,8 @@ class RedisConnection with SshTunnelHost {
     try {
       final replies = await Future.wait([
         for (final chunk in chunks.skip(1))
-          sendCommand([verb, ...chunk]).then<int>(
-            (reply) => redisReplyInt(reply),
+          command([verb, ...chunk]).then<int>(
+            (reply) => reply.asInt(),
             onError: (Object e, StackTrace st) {
               firstError ??= e;
               firstStack ??= st;
@@ -815,15 +790,12 @@ class RedisConnection with SshTunnelHost {
   /// RENAMENX old new. Returns 1 if key was renamed, 0 if newKey already exists.
   Future<int> renamenx(Object oldKey, String newKey) async {
     _assertWritable();
-    final result =
-        await sendCommand(['RENAMENX', redisCommandArg(oldKey), newKey]);
-    return redisReplyInt(result);
+    return (await command(['RENAMENX', oldKey, newKey])).asInt();
   }
 
   /// EXISTS key. Returns 1 if key exists, 0 if missing.
   Future<int> exists(Object key) async {
-    final result = await sendCommand(['EXISTS', redisCommandArg(key)]);
-    return redisReplyInt(result);
+    return (await command(['EXISTS', key])).asInt();
   }
 
   /// EXPIRE key seconds.
@@ -855,292 +827,6 @@ class RedisConnection with SshTunnelHost {
       default:
         return 0;
     }
-  }
-}
-
-/// In-memory stub for widget tests (no socket). Handles SELECT, DBSIZE, SCAN,
-/// TYPE, TTL used by [RedisKeysView].
-class RedisConnectionTestFake extends RedisConnection {
-  RedisConnectionTestFake({
-    this.firstScanKeys = const ['alpha', 'beta'],
-    this.secondScanKeys = const <String>[],
-    this.dbSizeResult = 2,
-    this.getResult,
-    List<dynamic>? listItems,
-    this.llenResult,
-    this.hashFirstPage = const <String, String>{},
-    this.hashSecondPage = const <String, String>{},
-    this.hlenResult,
-    this.setFirstPage = const <String>[],
-    this.setSecondPage = const <String>[],
-    this.scardResult,
-    this.zsetItems = const <(String, double)>[],
-    this.zcardResult,
-    this.typeResult = 'string',
-    this.failType = false,
-    this.getBytesResult,
-    this.binaryScanKeys = const <List<int>>[],
-    this.unlinkUnsupported = false,
-  })  : listItems =
-            listItems != null ? List<dynamic>.from(listItems) : <dynamic>[],
-        super(
-          id: -1,
-          name: 'test-fake',
-          host: 'localhost',
-          port: 6379,
-        );
-
-  final List<String> firstScanKeys;
-  final List<String> secondScanKeys;
-  final int dbSizeResult;
-  final String? getResult;
-  final List<dynamic> listItems;
-  final int? llenResult;
-  final Map<String, String> hashFirstPage;
-  final Map<String, String> hashSecondPage;
-  final int? hlenResult;
-  final List<String> setFirstPage;
-  final List<String> setSecondPage;
-  final int? scardResult;
-  final List<(String, double)> zsetItems;
-  final int? zcardResult;
-  final String typeResult;
-  final bool failType;
-  final List<int>? getBytesResult;
-  final List<List<int>> binaryScanKeys;
-
-  /// Answers `UNLINK` like a server before Redis 4.0.
-  final bool unlinkUnsupported;
-  final List<String> sentCommands = [];
-
-  bool _firstScanDone = false;
-  bool _firstHscanDone = false;
-  bool _firstSscanDone = false;
-
-  @override
-  bool get isConnected => _isConnected;
-
-  @override
-  Future<void> connect() async {
-    _isConnected = true;
-    _conn = null;
-    _command = null;
-  }
-
-  @override
-  Future<void> disconnect() async {
-    _isConnected = false;
-    final c = _conn;
-    _conn = null;
-    _command = null;
-    if (c != null) {
-      try {
-        await c.close();
-      } catch (e) {
-        logIgnored('redis_connection', e);
-      }
-    }
-  }
-
-  @override
-  Future<dynamic> sendCommand(List<dynamic> args) async {
-    if (!_isConnected) {
-      throw StateError('Not connected to Redis');
-    }
-    final op = args.first.toString().toUpperCase();
-    sentCommands.add(op);
-    switch (op) {
-      case 'SELECT':
-        return 'OK';
-      case 'DBSIZE':
-        return dbSizeResult;
-      case 'SCAN':
-        final cursor = int.tryParse(args[1].toString()) ?? 0;
-        List<Object> keysFor(List<String> named) =>
-            [...named, ...binaryScanKeys];
-        if (cursor == 0 && !_firstScanDone) {
-          _firstScanDone = true;
-          final next = secondScanKeys.isNotEmpty ? 1 : 0;
-          return [next, keysFor(firstScanKeys)];
-        }
-        if (cursor == 1 && secondScanKeys.isNotEmpty) {
-          return [0, keysFor(secondScanKeys)];
-        }
-        return [0, <Object>[]];
-      case 'TYPE':
-        if (failType) {
-          throw StateError('TYPE failed');
-        }
-        return typeResult;
-      case 'TTL':
-        return -1;
-      case 'GET':
-        if (getBytesResult != null) return getBytesResult;
-        if (typeResult != 'string') {
-          throw StateError(
-            'WRONGTYPE Operation against a key holding the wrong kind of value',
-          );
-        }
-        return getResult;
-      case 'SET':
-        if (typeResult != 'string') {
-          throw StateError('SET refused: key is $typeResult');
-        }
-        return 'OK';
-      case 'HGETALL':
-      case 'SMEMBERS':
-        throw StateError('$op is unbounded; use a paged command');
-      case 'HLEN':
-        return hlenResult ?? hashFirstPage.length + hashSecondPage.length;
-      case 'LLEN':
-        return llenResult ?? listItems.length;
-      case 'SCARD':
-        return scardResult ?? setFirstPage.length + setSecondPage.length;
-      case 'ZCARD':
-        return zcardResult ?? zsetItems.length;
-      case 'LRANGE':
-        return _sliceList(listItems, args);
-      case 'ZRANGE':
-        final stop = int.tryParse(args[3].toString()) ?? -1;
-        if (stop < 0) {
-          throw StateError('unbounded ZRANGE');
-        }
-        final start = int.tryParse(args[2].toString()) ?? 0;
-        if (start >= zsetItems.length || start > stop) return <dynamic>[];
-        final end = (stop + 1).clamp(0, zsetItems.length);
-        final out = <dynamic>[];
-        for (final (member, score) in zsetItems.sublist(start, end)) {
-          out.add(member);
-          out.add(score);
-        }
-        return out;
-      case 'HSCAN':
-        return _pagedPairs(
-          cursor: int.tryParse(args[2].toString()) ?? 0,
-          first: hashFirstPage,
-          second: hashSecondPage,
-          firstDone: _firstHscanDone,
-          markFirst: () => _firstHscanDone = true,
-        );
-      case 'SSCAN':
-        final cursor = int.tryParse(args[2].toString()) ?? 0;
-        if (cursor == 0 && !_firstSscanDone) {
-          _firstSscanDone = true;
-          final next = setSecondPage.isNotEmpty ? 1 : 0;
-          return [next, setFirstPage];
-        }
-        if (cursor == 1 && setSecondPage.isNotEmpty) {
-          return [0, setSecondPage];
-        }
-        return [0, <String>[]];
-      case 'READONLY':
-      case 'READWRITE':
-        return 'OK';
-      case 'EXISTS':
-        final target = args[1].toString();
-        final allKeys = [...firstScanKeys, ...secondScanKeys];
-        return allKeys.contains(target) ? 1 : 0;
-      case 'RENAME':
-        return 'OK';
-      case 'RENAMENX':
-        final target = args[2].toString();
-        final allKeys = [...firstScanKeys, ...secondScanKeys];
-        return allKeys.contains(target) ? 0 : 1;
-      case 'RPUSH':
-        listItems.add(args[2].toString());
-        return 'OK';
-      case 'LINDEX':
-        final lindexIdx = int.tryParse(args[2].toString()) ?? 0;
-        if (lindexIdx >= 0 && lindexIdx < listItems.length) {
-          return listItems[lindexIdx];
-        }
-        return null;
-      case 'LSET':
-        final idx = int.tryParse(args[2].toString()) ?? 0;
-        final val = args[3].toString();
-        if (idx >= 0 && idx < listItems.length) {
-          listItems[idx] = val;
-        }
-        return 'OK';
-      case 'LREM':
-        final count = int.tryParse(args[2].toString()) ?? 0;
-        final val = args[3].toString();
-        var removed = 0;
-        if (count == 0) {
-          removed = listItems.where((e) => e == val).length;
-          listItems.removeWhere((e) => e == val);
-        } else if (count > 0) {
-          for (var i = 0; i < count; i++) {
-            final idx = listItems.indexOf(val);
-            if (idx != -1) {
-              listItems.removeAt(idx);
-              removed++;
-            }
-          }
-        } else {
-          for (var i = 0; i < count.abs(); i++) {
-            final idx = listItems.lastIndexOf(val);
-            if (idx != -1) {
-              listItems.removeAt(idx);
-              removed++;
-            }
-          }
-        }
-        return removed;
-      case 'UNLINK' when unlinkUnsupported:
-        throw Exception("ERR unknown command 'UNLINK'");
-      case 'DEL' || 'UNLINK':
-        final allKeys = [...firstScanKeys, ...secondScanKeys];
-        var count = 0;
-        for (var i = 1; i < args.length; i++) {
-          final target = args[i].toString();
-          if (allKeys.contains(target)) {
-            count++;
-          }
-        }
-        return count;
-      default:
-        return null;
-    }
-  }
-
-  List<dynamic> _sliceList(List<dynamic> items, List<dynamic> args) {
-    if (items.isEmpty) return const [];
-    final start = int.tryParse(args[2].toString()) ?? 0;
-    var stop = int.tryParse(args[3].toString()) ?? -1;
-    if (stop < 0) {
-      throw StateError('unbounded LRANGE');
-    }
-    if (start >= items.length || start > stop) return const [];
-    final end = (stop + 1).clamp(0, items.length);
-    return items.sublist(start, end);
-  }
-
-  List<dynamic> _pagedPairs({
-    required int cursor,
-    required Map<String, String> first,
-    required Map<String, String> second,
-    required bool firstDone,
-    required void Function() markFirst,
-  }) {
-    List<String> flatten(Map<String, String> map) {
-      final out = <String>[];
-      map.forEach((k, v) {
-        out.add(k);
-        out.add(v);
-      });
-      return out;
-    }
-
-    if (cursor == 0 && !firstDone) {
-      markFirst();
-      final next = second.isNotEmpty ? 1 : 0;
-      return [next, flatten(first)];
-    }
-    if (cursor == 1 && second.isNotEmpty) {
-      return [0, flatten(second)];
-    }
-    return [0, <String>[]];
   }
 }
 

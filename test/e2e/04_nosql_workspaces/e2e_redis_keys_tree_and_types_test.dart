@@ -7,6 +7,7 @@ import 'package:querya_desktop/features/redis/redis_keys_view.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import '../../support/querya_theme_test_shell.dart';
+import '../../support/redis_connection_test_fake.dart';
 
 const _timeout = Timeout(Duration(seconds: 60));
 

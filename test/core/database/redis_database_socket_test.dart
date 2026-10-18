@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import '../../support/redis_connection_test_fake.dart';
 
 /// A RESP server that answers `PING` and `SELECT` and records every command.
 class _RecordingRedis {
