@@ -8,6 +8,7 @@ import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
 import 'package:querya_desktop/core/storage/app_data_root.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
+import 'package:querya_desktop/core/storage/update_backup.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _dbName = 'querya.db';
@@ -38,6 +39,36 @@ String? _normalizeHistoryDatabaseName(String? databaseName) {
   final t = databaseName?.trim();
   if (t == null || t.isEmpty) return null;
   return t;
+}
+
+/// The local database was written by a newer Querya Desktop: its schema
+/// version is above the one this build knows (#1497).
+///
+/// Opening it would have let sqflite write the older version number into it
+/// and carry on with tables it does not understand. The open is refused
+/// instead, inside the open transaction, so nothing in the file changes.
+class LocalDbNewerSchemaException implements Exception {
+  const LocalDbNewerSchemaException({
+    required this.found,
+    required this.supported,
+    required this.path,
+  });
+
+  /// Schema version stored in the file.
+  final int found;
+
+  /// Highest schema version this build reads.
+  final int supported;
+
+  final String path;
+
+  @override
+  String toString() =>
+      'The local data in $path was written by a newer version of Querya '
+      'Desktop (data format $found; this version reads up to $supported). '
+      'It has not been changed. Install the newer version again, or restore '
+      'a copy made before the update (querya.db.pre-<from>-<to>.bak in the '
+      'same folder).';
 }
 
 /// Local SQLite database for folders and connections.
@@ -84,6 +115,13 @@ class LocalDb {
         version: _dbVersion,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
+        // A newer schema: refuse, so sqflite does not stamp the old version
+        // on it (the open transaction rolls back).
+        onDowngrade: (db, found, supported) => throw LocalDbNewerSchemaException(
+          found: found,
+          supported: supported,
+          path: _cachedDbPath!,
+        ),
         onOpen: (db) async {
           await db.execute('PRAGMA foreign_keys = ON');
           await db.execute('PRAGMA journal_mode = WAL');
@@ -914,6 +952,21 @@ class LocalDb {
         await lockFile.delete();
       } catch (_) {}
     }
+  }
+
+  /// Copies `querya.db` to `querya.db.pre-<from>-<to>.bak` before an in-app
+  /// update and keeps the newest [UpdateBackup.keep] copies (#1497). Closes
+  /// the database first; the next query opens it again.
+  Future<String> backupBeforeUpdate({
+    required String fromVersion,
+    required String toVersion,
+  }) async {
+    await close();
+    return UpdateBackup.create(
+      dbPath: await databasePath(),
+      fromVersion: fromVersion,
+      toVersion: toVersion,
+    );
   }
 
   /// Creates a timestamped backup copy of `querya.db` (and any sidecar files)

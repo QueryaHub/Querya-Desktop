@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
+import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/unsaved_work_registry.dart';
 import 'package:querya_desktop/core/updater/app_updater_service.dart';
 import 'package:querya_desktop/core/updater/sha256_checksums.dart';
@@ -87,6 +88,59 @@ Future<bool?> showUnsavedUpdateRestartDialog(material.BuildContext context) {
   );
 }
 
+/// The local database could not be copied before the update (#1497): install
+/// anyway, or cancel.
+Future<bool?> showUpdateBackupFailedDialog(
+  material.BuildContext context,
+  String error,
+) {
+  return showAppDialog<bool>(
+    context: context,
+    builder: (ctx) {
+      return QueryaDialogCard(
+        constraints: const material.BoxConstraints(maxWidth: 440),
+        child: material.Padding(
+          padding: const material.EdgeInsets.all(20),
+          child: material.Column(
+            mainAxisSize: material.MainAxisSize.min,
+            crossAxisAlignment: material.CrossAxisAlignment.start,
+            children: [
+              const Text('Could not back up local data').semiBold().large(),
+              const Gap(8),
+              Text(
+                'Querya Desktop copies its local data (connections, history, '
+                'settings) before an update, so you can go back if the new '
+                'version changes it. The copy failed: $error',
+              ).muted().small(),
+              const Gap(20),
+              material.Align(
+                alignment: material.Alignment.centerRight,
+                child: material.Wrap(
+                  alignment: material.WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    QueryaButton.ghost(
+                      label: 'Cancel',
+                      onPressed: () => material.Navigator.of(ctx).pop(false),
+                      size: QueryaControlSize.lg,
+                    ),
+                    QueryaButton.destructive(
+                      label: 'Install without a copy',
+                      onPressed: () => material.Navigator.of(ctx).pop(true),
+                      size: QueryaControlSize.lg,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
 /// Update check / download / install pane. Test hooks are optional overrides.
 class UpdateDialogContent extends material.StatefulWidget {
   const UpdateDialogContent({
@@ -100,6 +154,7 @@ class UpdateDialogContent extends material.StatefulWidget {
     this.selectAsset,
     this.download,
     this.install,
+    this.backupLocalData,
     this.confirmRestartIfUnsaved,
     this.showCopyToast = true,
   });
@@ -114,6 +169,11 @@ class UpdateDialogContent extends material.StatefulWidget {
   final Future<File> Function(UpdateAsset asset, UpdateManifest manifest)?
       download;
   final Future<void> Function(File file)? install;
+
+  /// Copies the local database before installing; defaults to
+  /// [LocalDb.backupBeforeUpdate].
+  final Future<void> Function(String fromVersion, String toVersion)?
+      backupLocalData;
   final Future<bool?> Function(material.BuildContext context)?
       confirmRestartIfUnsaved;
   final bool showCopyToast;
@@ -269,6 +329,24 @@ class UpdateDialogContentState extends material.State<UpdateDialogContent> {
         confirmed = await showUnsavedUpdateRestartDialog(context);
       }
       if (!mounted || confirmed != true) return;
+    }
+
+    // A copy of the local database first: the new version may change its
+    // schema, and an older one cannot read it back (#1497).
+    final from = _currentVersion.isEmpty ? 'unknown' : _currentVersion;
+    final to = _manifest?.version ?? 'unknown';
+    // A test that replaces [install] and not this hook skips the copy.
+    final backup = widget.backupLocalData ??
+        (widget.install == null
+            ? (String f, String t) =>
+                LocalDb.instance.backupBeforeUpdate(fromVersion: f, toVersion: t)
+            : null);
+    try {
+      if (backup != null) await backup(from, to);
+    } catch (e) {
+      if (!mounted) return;
+      final proceed = await showUpdateBackupFailedDialog(context, '$e');
+      if (!mounted || proceed != true) return;
     }
 
     try {

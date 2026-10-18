@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as p;
 import 'package:querya_desktop/core/platform/macos_sandbox.dart';
 
@@ -113,6 +114,21 @@ class UpdateInstallContext {
     }
     return null;
   }
+
+  /// Installed by a package manager (Snap, Flatpak, AUR, `.deb`, `.rpm`):
+  /// it brings the updates, and they are always stable releases, so the
+  /// Release channel has no effect there (#1497).
+  bool get isPackageManagerInstall =>
+      isSnap || isFlatpak || linuxSystemPackageManager != null;
+
+  /// Forces [currentIsPackageManagerInstall] in tests; null detects.
+  @visibleForTesting
+  static bool? debugPackageManagerInstall;
+
+  /// [isPackageManagerInstall] for this process.
+  static bool get currentIsPackageManagerInstall =>
+      debugPackageManagerInstall ??
+      UpdateInstallContext.current().isPackageManagerInstall;
 
   bool get isManagedPackage =>
       isSnap ||

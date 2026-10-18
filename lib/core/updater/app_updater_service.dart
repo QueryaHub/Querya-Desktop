@@ -48,7 +48,11 @@ class AppUpdaterService {
         throw AppUpdaterException('Invalid current app version: $currentRaw');
       }
 
-      final channel = await _settings.getUpdateChannel();
+      // A package install only ever gets stable releases from its package
+      // manager, so it is not told about betas it cannot install (#1497).
+      final channel = UpdateInstallContext.currentIsPackageManagerInstall
+          ? UpdateChannel.stable
+          : await _settings.getUpdateChannel();
       final manifest = await _releasesClient.fetchLatest(channel: channel);
       final candidateVersion = UpdateVersion.tryParse(manifest.version);
       if (candidateVersion == null) {

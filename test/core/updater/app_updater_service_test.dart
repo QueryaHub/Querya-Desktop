@@ -11,6 +11,7 @@ import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/updater/app_updater_service.dart';
 import 'package:querya_desktop/core/updater/github_releases_client.dart';
+import 'package:querya_desktop/core/updater/installers/update_install_context.dart';
 import 'package:querya_desktop/core/updater/sha256_checksums.dart';
 import 'package:querya_desktop/core/updater/update_manifest.dart';
 
@@ -151,6 +152,32 @@ void main() {
 
       final result = await service.checkForUpdates();
       expect(result.availableUpdate?.version, '0.5.0-beta.1');
+      service.dispose();
+    });
+
+    test('a package install reads releases/latest even on the Beta channel (#1497)',
+        () async {
+      await AppSettings.instance.setUpdateChannel(UpdateChannel.dev);
+      UpdateInstallContext.debugPackageManagerInstall = true;
+      addTearDown(() => UpdateInstallContext.debugPackageManagerInstall = null);
+
+      final client = MockClient((request) async {
+        expect(request.url.toString(), kGitHubReleasesLatestUrl);
+        return http.Response(
+          jsonEncode(_sampleRelease(version: '0.5.1')),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final service = AppUpdaterService(
+        releasesClient: GitHubReleasesClient(httpClient: client),
+        downloadClient: client,
+        packageInfoProvider: () async => _packageInfo('0.4.9'),
+      );
+
+      final result = await service.checkForUpdates();
+      expect(result.availableUpdate?.version, '0.5.1');
       service.dispose();
     });
 

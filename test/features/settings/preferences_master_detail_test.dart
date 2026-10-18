@@ -7,6 +7,7 @@ import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
+import 'package:querya_desktop/core/updater/installers/update_install_context.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
@@ -172,6 +173,32 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
       expect(position(PreferencesCategory.shortcuts).pixels, 100);
+    });
+
+    testWidgets('the release channel is usable on a portable install (#1497)',
+        (tester) async {
+      await tester.pumpWidget(buildTestApp());
+      await tester.tap(find.text('Open Preferences'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const material.ValueKey('release_channel_row')),
+          findsOneWidget);
+      expect(find.textContaining('Updates come from your package manager'),
+          findsNothing);
+    });
+
+    testWidgets('on a package install the channel row says why it does nothing (#1497)',
+        (tester) async {
+      UpdateInstallContext.debugPackageManagerInstall = true;
+      addTearDown(() => UpdateInstallContext.debugPackageManagerInstall = null);
+
+      await tester.pumpWidget(buildTestApp());
+      await tester.tap(find.text('Open Preferences'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Updates come from your package manager'),
+          findsOneWidget);
+      expect(find.text('Stable (Recommended)'), findsOneWidget);
     });
 
     testWidgets('search bar filters preferences and updates matches',
