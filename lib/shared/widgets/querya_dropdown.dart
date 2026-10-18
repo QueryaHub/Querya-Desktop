@@ -211,7 +211,7 @@ class _QueryaDropdownState<T> extends material.State<QueryaDropdown<T>> {
       item: item,
       selected: item.value == widget.value,
       enabled: widget.enabled && item.enabled,
-      colorScheme: cs,
+      colors: cs,
       compact: widget.compact,
       size: size,
       onPick: () {
@@ -503,7 +503,7 @@ class _QueryaDropdownMenuItem<T> extends material.StatefulWidget {
     required this.item,
     required this.selected,
     required this.enabled,
-    required this.colorScheme,
+    required this.colors,
     required this.compact,
     required this.size,
     required this.onPick,
@@ -512,7 +512,7 @@ class _QueryaDropdownMenuItem<T> extends material.StatefulWidget {
   final QueryaDropdownItem<T> item;
   final bool selected;
   final bool enabled;
-  final QueryaUiColors colorScheme;
+  final QueryaUiColors colors;
   final bool compact;
   final QueryaControlSize size;
   final material.VoidCallback onPick;
@@ -545,7 +545,7 @@ class _QueryaDropdownMenuItemState<T>
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = widget.colorScheme;
+    final cs = widget.colors;
     final bg = (_hovered || _focused)
         ? cs.accent.withValues(alpha: 0.14)
         : widget.selected

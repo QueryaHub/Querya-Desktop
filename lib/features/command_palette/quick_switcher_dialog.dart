@@ -171,7 +171,6 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final hits = _hits;
     final selectedIndex =
         hits.isEmpty ? 0 : _selected.clamp(0, hits.length - 1);
@@ -209,7 +208,7 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
                 ),
               ),
               const QueryaDivider(),
-              Expanded(child: _body(theme.colorScheme, hits, selectedIndex)),
+              Expanded(child: _body(hits, selectedIndex)),
             ],
           ),
         ),
@@ -218,7 +217,6 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
   }
 
   Widget _body(
-    ColorScheme colors,
     List<QueryaSchemaObject> hits,
     int selectedIndex,
   ) {
@@ -276,7 +274,7 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: active
-                  ? colors.primary.withValues(alpha: 0.12)
+                  ? context.colors.primary.withValues(alpha: 0.12)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(6),
             ),

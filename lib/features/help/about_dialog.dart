@@ -31,7 +31,7 @@ class _AboutDialogContentState extends material.State<_AboutDialogContent> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
+    final colors = context.colors;
     final wb = context.workbench;
 
     return QueryaDialogCard(
@@ -40,7 +40,7 @@ class _AboutDialogContentState extends material.State<_AboutDialogContent> {
         maxWidth: 420,
         minWidth: 320,
       ),
-      borderColor: theme.muted,
+      borderColor: colors.muted,
       child: material.Column(
         mainAxisSize: material.MainAxisSize.min,
         children: [

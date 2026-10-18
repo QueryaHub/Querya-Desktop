@@ -106,7 +106,7 @@ class QueryaBadge extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = context.queryaTheme.colorScheme;
+    final cs = context.colors;
     final workbench = QueryaThemeScope.maybeOf(context)?.workbench;
     final palette = context.semanticPalette;
 

@@ -41,7 +41,7 @@ class QueryaStatusBar extends material.StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     final wb = context.workbench;
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final isMac = Platform.isMacOS;
     final environment = activeConnection?.environment;
 
@@ -114,7 +114,7 @@ class QueryaStatusBar extends material.StatelessWidget {
                       style: material.TextStyle(
                         fontSize: 11,
                         fontWeight: material.FontWeight.w500,
-                        color: theme.colorScheme.foreground,
+                        color: colors.foreground,
                       ),
                     ),
                   ),

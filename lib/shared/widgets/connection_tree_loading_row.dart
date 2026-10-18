@@ -43,10 +43,7 @@ class ConnectionTreeLoadingRow extends material.StatelessWidget {
             label,
             style: material.DefaultTextStyle.of(context).style.copyWith(
                   fontSize: 12,
-                  color: QueryaThemeScope.maybeOf(context)
-                          ?.workbench
-                          .mutedForeground ??
-                      material.Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: context.workbench.mutedForeground,
                 ),
           ),
         ],

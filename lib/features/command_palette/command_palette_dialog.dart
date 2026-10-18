@@ -156,7 +156,7 @@ class _CommandPaletteDialogState extends State<CommandPaletteDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final hits = _hits;
     final selectedIndex =
         hits.isEmpty ? 0 : _selected.clamp(0, hits.length - 1);
@@ -238,7 +238,7 @@ class _CommandPaletteDialogState extends State<CommandPaletteDialog> {
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 color: active
-                                    ? theme.colorScheme.primary
+                                    ? colors.primary
                                         .withValues(alpha: 0.12)
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(6),

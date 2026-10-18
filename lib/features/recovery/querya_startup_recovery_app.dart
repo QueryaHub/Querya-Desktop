@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/app/app.dart';
 import 'package:querya_desktop/core/storage/app_data_root.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/core/theme/theme_controller.dart';
 import 'package:querya_desktop/core/ui/querya_icons.dart';
@@ -124,8 +125,7 @@ class _QueryaStartupRecoveryAppState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final themeData = ThemeController.instance.darkShadcnTheme;
-    final colorScheme = themeData.colorScheme;
+    final colors = QueryaTheme.darkDefault.colors;
 
     return ShadcnApp(
       title: 'Querya - Startup Recovery',
@@ -134,14 +134,14 @@ class _QueryaStartupRecoveryAppState
       themeMode: ThemeMode.dark,
       debugShowCheckedModeBanner: false,
       home: material.Scaffold(
-        backgroundColor: colorScheme.background,
+        backgroundColor: colors.background,
         body: material.Center(
           child: material.SingleChildScrollView(
             padding: const material.EdgeInsets.all(32),
             child: material.ConstrainedBox(
               constraints: const material.BoxConstraints(maxWidth: 640),
               child: QueryaDialogCard(
-                borderColor: colorScheme.destructive,
+                borderColor: colors.destructive,
                 child: material.Padding(
                   padding: const material.EdgeInsets.all(28),
                   child: material.Column(
@@ -153,7 +153,7 @@ class _QueryaStartupRecoveryAppState
                           material.Icon(
                             QueryaIcons.treeError,
                             size: 32,
-                            color: colorScheme.destructive,
+                            color: colors.destructive,
                           ),
                           const material.SizedBox(width: 12),
                           const material.Expanded(
@@ -174,10 +174,10 @@ class _QueryaStartupRecoveryAppState
                         width: double.infinity,
                         padding: const material.EdgeInsets.all(12),
                         decoration: material.BoxDecoration(
-                          color: colorScheme.muted.withOpacity(0.3),
+                          color: colors.muted.withOpacity(0.3),
                           borderRadius: material.BorderRadius.circular(6),
                           border: material.Border.all(
-                            color: colorScheme.border,
+                            color: colors.border,
                           ),
                         ),
                         child: material.SelectableText(
@@ -197,8 +197,8 @@ class _QueryaStartupRecoveryAppState
                           padding: const material.EdgeInsets.all(10),
                           decoration: material.BoxDecoration(
                             color: (_isErrorStatus
-                                    ? colorScheme.destructive
-                                    : colorScheme.primary)
+                                    ? colors.destructive
+                                    : colors.primary)
                                 .withOpacity(0.15),
                             borderRadius: material.BorderRadius.circular(6),
                           ),
@@ -206,8 +206,8 @@ class _QueryaStartupRecoveryAppState
                             _statusMessage!,
                             style: material.TextStyle(
                               color: _isErrorStatus
-                                  ? colorScheme.destructive
-                                  : colorScheme.primary,
+                                  ? colors.destructive
+                                  : colors.primary,
                               fontSize: 13,
                               fontWeight: material.FontWeight.w500,
                             ),
