@@ -35,14 +35,11 @@ import 'package:querya_desktop/features/erd/widgets/erd_relation_painter.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_search_panel.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_status_body.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_table_menu.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_toolbar.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_views_menu.dart';
 import 'package:querya_desktop/features/erd/widgets/erd_table_card.dart';
-import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
-import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
-import 'package:querya_desktop/shared/widgets/querya_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_spinner.dart';
-import 'package:querya_desktop/shared/widgets/querya_tab_strip.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 // Moved out of this file (#1362); re-exported for existing importers.
@@ -1512,108 +1509,31 @@ class _ErdViewState extends material.State<ErdView>
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
-        material.Container(
-          decoration: SqlEditorChrome.sqlToolbarDecoration(context),
-          padding: const material.EdgeInsets.all(8),
-          child: material.LayoutBuilder(
-            builder: (context, constraints) {
-              // Below ~1100 px the labels of Note, Auto layout and the hidden
-              // tables button give way to icons (the tooltips keep the names)
-              // so the toolbar stays on one row.
-              final compact = constraints.maxWidth < 1100;
-              return QueryaControlScope(
-            size: QueryaControlSize.md,
-            child: material.Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: material.WrapCrossAlignment.center,
-            children: [
-              QueryaButton.secondary(
-                key: const material.ValueKey('erd_refresh'),
-                label: 'Refresh',
-                icon: material.Icons.refresh_rounded,
-                onPressed: _loading ? null : _load,
-              ),
-              // Detail level for every card; a card collapsed by hand stays
-              // collapsed (#1278).
-              material.IgnorePointer(
-                ignoring: !ready,
-                child: material.Opacity(
-                  opacity: ready ? 1 : 0.5,
-                  child: material.Tooltip(
-                    message: 'Table names only, key columns, or every column',
-                    child: QueryaTabStrip(
-                      key: const material.ValueKey('erd_detail'),
-                      labels: const ['Names', 'Keys', 'All'],
-                      selectedIndex: ErdDetail.values.indexOf(_c.detail),
-                      onSelected: (i) {
-                        if (ErdDetail.values[i] == _c.detail) return;
-                        setState(() => _c.detail = ErdDetail.values[i]);
-                        _reflow();
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              // Also with every table hidden: a view may be that empty, and
-              // the way out is another view.
-              if (_persists &&
+        ErdToolbar(
+          ready: ready,
+          loading: _loading,
+          detail: _c.detail,
+          markedCount: _c.marked.length,
+          hiddenCount: _c.hidden.length,
+          viewsMenu: _persists &&
                   !_loading &&
                   _error == null &&
-                  (_schema?.tables.isNotEmpty ?? false))
-                _viewsMenu(),
-              QueryaButton.secondary(
-                key: const material.ValueKey('erd_add_note'),
-                compact: compact,
-                label: 'Note',
-                icon: material.Icons.sticky_note_2_outlined,
-                tooltip: 'Add a sticky note to the diagram',
-                onPressed: ready ? () => unawaited(_addNote()) : null,
-              ),
-              if (_c.marked.isNotEmpty)
-                QueryaButton.secondary(
-                  key: const material.ValueKey('erd_group_marked'),
-                compact: compact,
-                  label: 'Group ${_c.marked.length} '
-                      '${_c.marked.length == 1 ? 'table' : 'tables'}',
-                  icon: material.Icons.folder_open_rounded,
-                  tooltip: 'Shift / Ctrl + click marks more tables',
-                  onPressed: () => unawaited(_newGroup({..._c.marked})),
-                ),
-              if (_c.hidden.isNotEmpty)
-                QueryaButton.secondary(
-                  key: const material.ValueKey('erd_show_all'),
-                compact: compact,
-                  label: 'Show ${_c.hidden.length} hidden',
-                  icon: material.Icons.visibility_outlined,
-                  onPressed: _showAllTables,
-                ),
-              QueryaButton.secondary(
-                key: const material.ValueKey('erd_auto_layout'),
-                compact: compact,
-                label: 'Auto layout',
-                icon: material.Icons.auto_fix_high_rounded,
-                tooltip: 'Arrange the tables again (undoes manual moves)',
-                onPressed: ready ? _autoLayout : null,
-              ),
-              material.IgnorePointer(
-                ignoring: !ready,
-                child: material.Opacity(
-                  opacity: ready ? 1 : 0.5,
-                  child: ErdExportMenu(
-                    onSelected: (action) {
-                      if (schema != null && layout != null) {
-                        _export(action, schema, layout);
-                      }
-                    },
-                  ),
-                ),
-              ),
-            ],
-            ),
-              );
-            },
-          ),
+                  (_schema?.tables.isNotEmpty ?? false)
+              ? _viewsMenu()
+              : null,
+          onRefresh: _load,
+          onDetail: (d) {
+            if (d == _c.detail) return;
+            setState(() => _c.detail = d);
+            _reflow();
+          },
+          onAddNote: () => unawaited(_addNote()),
+          onGroupMarked: () => unawaited(_newGroup({..._c.marked})),
+          onShowHidden: _showAllTables,
+          onAutoLayout: _autoLayout,
+          onExport: (action) {
+            if (schema != null && layout != null) _export(action, schema, layout);
+          },
         ),
         material.Expanded(child: material.ClipRect(child: body)),
       ],
