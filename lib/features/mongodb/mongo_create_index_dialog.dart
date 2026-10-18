@@ -189,7 +189,7 @@ class _MongoCreateIndexDialogState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     return QueryaModalDialog(
       title: const Text('Create Index'),

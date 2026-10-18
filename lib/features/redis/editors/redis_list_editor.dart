@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 /// Editor for a Redis list: RPUSH add bar plus an indexed item list with
@@ -17,7 +16,7 @@ class RedisListEditor extends material.StatefulWidget {
     required this.onPush,
     required this.onSet,
     required this.onRemove,
-    required this.colorScheme,
+    required this.colors,
     required this.shadcnCs,
     this.footer,
   });
@@ -32,8 +31,8 @@ class RedisListEditor extends material.StatefulWidget {
     RedisBulkValue? expectedCurrent,
   }) onSet;
   final void Function(int index, RedisBulkValue item) onRemove;
-  final ColorScheme colorScheme;
-  final shadcn.ColorScheme shadcnCs;
+  final QueryaUiColors colors;
+  final QueryaUiColors shadcnCs;
   final material.Widget? footer;
 
   @override
@@ -112,7 +111,7 @@ class _RedisListEditorState extends material.State<RedisListEditor> {
                     onDelete: widget.isReadOnly
                         ? null
                         : () => widget.onRemove(i, items[i]),
-                    colorScheme: widget.colorScheme,
+                    colors: widget.colors,
                     shadcnCs: widget.shadcnCs,
                   ),
                 ),
@@ -196,7 +195,7 @@ class RedisIndexedValueRow extends StatelessWidget {
     this.isBinary = false,
     this.onEdit,
     this.onDelete,
-    required this.colorScheme,
+    required this.colors,
     required this.shadcnCs,
   });
 
@@ -205,18 +204,18 @@ class RedisIndexedValueRow extends StatelessWidget {
   final bool isBinary;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
-  final ColorScheme colorScheme;
-  final shadcn.ColorScheme shadcnCs;
+  final QueryaUiColors colors;
+  final QueryaUiColors shadcnCs;
 
   @override
   material.Widget build(material.BuildContext context) {
     return material.Container(
       padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: material.BoxDecoration(
-        color: colorScheme.card,
+        color: colors.card,
         borderRadius: material.BorderRadius.circular(6),
         border: material.Border.all(
-            color: colorScheme.border.withValues(alpha: 0.3)),
+            color: colors.border.withValues(alpha: 0.3)),
       ),
       child: material.Row(
         children: [
@@ -239,7 +238,7 @@ class RedisIndexedValueRow extends StatelessWidget {
                 fontSize: 12,
                 fontFamily: QueryaTypography.mono,
                 fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
-                color: colorScheme.foreground,
+                color: colors.foreground,
               ),
             ),
           ),

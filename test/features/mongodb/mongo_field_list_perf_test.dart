@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/mongodb/mongo_documents_view.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -23,11 +22,11 @@ void main() {
         queryaThemeTestShell(
           child: material.Builder(
             builder: (context) {
-              final scs = shadcn.Theme.of(context).colorScheme;
+              final scs = context.colors;
               return material.Scaffold(
                 body: MongoFieldList(
                   document: doc,
-                  colorScheme: scs,
+                  colors: scs,
                   shadcnCs: scs,
                   onInspectField: (k) => inspectedKey = k,
                 ),
@@ -66,11 +65,11 @@ void main() {
         queryaThemeTestShell(
           child: material.Builder(
             builder: (context) {
-              final scs = shadcn.Theme.of(context).colorScheme;
+              final scs = context.colors;
               return material.Scaffold(
                 body: MongoFieldList(
                   document: doc,
-                  colorScheme: scs,
+                  colors: scs,
                   shadcnCs: scs,
                   onInspectField: (_) {},
                 ),

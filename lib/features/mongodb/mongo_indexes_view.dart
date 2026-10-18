@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
@@ -188,7 +189,7 @@ class _MongoIndexesViewState extends material.State<MongoIndexesView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     return material.Container(
       color: cs.background,
@@ -263,7 +264,7 @@ class _MongoIndexesViewState extends material.State<MongoIndexesView> {
     );
   }
 
-  material.Widget _buildHeader(ColorScheme cs) {
+  material.Widget _buildHeader(QueryaUiColors cs) {
     return material.Container(
       padding: const material.EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: cs.card,
@@ -336,7 +337,7 @@ class _IndexCard extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     return Card(
       child: material.Padding(

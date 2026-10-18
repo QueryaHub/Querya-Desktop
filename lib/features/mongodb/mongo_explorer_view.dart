@@ -7,8 +7,6 @@ import 'package:querya_desktop/core/motion/querya_switching_body.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/unsaved_work_guard.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 
 import 'mongo_aggregation_workspace.dart';
 import 'mongo_collections_view.dart';
@@ -303,7 +301,7 @@ class _MongoExplorerViewState extends material.State<MongoExplorerView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     // Loading state
     if (_connecting) {
@@ -513,7 +511,7 @@ class _BreadcrumbBar extends StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.Container(
       constraints: const material.BoxConstraints(minHeight: 44),
       padding: const material.EdgeInsets.symmetric(horizontal: 16),
@@ -599,7 +597,7 @@ class _CrumbChip extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     final child = isLast
         ? Text(label).semiBold().small()
         : Text(label,

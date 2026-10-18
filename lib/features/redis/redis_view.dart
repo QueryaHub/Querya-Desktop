@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/motion/polling_controller.dart';
 import 'package:querya_desktop/core/util/deep_collection_equals.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
@@ -9,8 +10,6 @@ import 'package:querya_desktop/core/database/redis_info.dart';
 import 'package:querya_desktop/core/database/redis_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 const _pollInterval = Duration(seconds: 3);
@@ -215,7 +214,7 @@ class _RedisViewState extends material.State<RedisView>
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     return PollStaleOverlay(
       status: polling.status,
@@ -239,7 +238,7 @@ class _RedisViewState extends material.State<RedisView>
   }
 
   material.Widget _buildBody(
-      material.BuildContext context, shadcn.ColorScheme cs) {
+      material.BuildContext context, QueryaUiColors cs) {
     if (_loading) {
       return const material.Center(
         child: QueryaSpinner(
@@ -405,7 +404,7 @@ class _RedisViewState extends material.State<RedisView>
   }
 
   material.Widget _header(material.BuildContext context) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
@@ -529,7 +528,7 @@ class _RedisViewState extends material.State<RedisView>
 
   material.Widget _summaryChips(
       material.BuildContext context, RedisInfoSections info) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     final version = sectionValue(info, 'Server', 'redis_version') ?? '—';
     final uptime = _formatUptime(info);
     final clients = sectionInt(info, 'Clients', 'connected_clients') ?? 0;
@@ -608,7 +607,7 @@ class _RedisViewState extends material.State<RedisView>
     double? minHeight,
     bool stretchBody = false,
   }) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.Container(
       width: double.infinity,
       constraints: minHeight != null
@@ -864,7 +863,7 @@ class _RedisViewState extends material.State<RedisView>
 
   material.Widget _metricRow(
       material.BuildContext context, String label, String value) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.Padding(
       padding: const material.EdgeInsets.symmetric(vertical: 6),
       child: material.Row(

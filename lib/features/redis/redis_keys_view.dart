@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
@@ -6,8 +7,6 @@ import 'package:querya_desktop/core/theme/querya_semantic_palette.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 
 import 'redis_key_tree_engine.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
@@ -296,7 +295,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     if (_loading && _keys.isEmpty) {
       return const material.Center(
@@ -337,7 +336,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
         cacheExtent: 400,
         itemCount: _keys.length + (_hasMore ? 1 : 0),
         itemBuilder: (context, i) {
-          final shadcnCs = shadcn.Theme.of(context).colorScheme;
+          final shadcnCs = context.colors;
           if (i >= _keys.length) {
             return material.Padding(
               padding: const material.EdgeInsets.only(top: 12),
@@ -354,7 +353,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
             padding: EdgeInsets.only(top: i > 0 ? 4 : 0),
             child: _KeyTile(
               keyInfo: _keys[i],
-              colorScheme: cs,
+              colors: cs,
               shadcnCs: shadcnCs,
               palette: context.semanticPalette,
               onTap: () => widget.onKeyTap?.call(_keys[i].name, _keys[i].type),
@@ -372,7 +371,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
         cacheExtent: 400,
         itemCount: visibleItems.length + (_hasMore ? 1 : 0),
         itemBuilder: (context, i) {
-          final shadcnCs = shadcn.Theme.of(context).colorScheme;
+          final shadcnCs = context.colors;
           if (i >= visibleItems.length) {
             return material.Padding(
               padding: const material.EdgeInsets.only(top: 12),
@@ -393,7 +392,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
                 folder: item.folder,
                 isExpanded: item.isExpanded,
                 depth: item.depth,
-                colorScheme: cs,
+                colors: cs,
                 shadcnCs: shadcnCs,
                 palette: context.semanticPalette,
                 onToggle: () {
@@ -417,7 +416,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
                 keyInfo: item.leaf.keyInfo,
                 displayName: item.leaf.name,
                 indent: 16.0 * item.depth,
-                colorScheme: cs,
+                colors: cs,
                 shadcnCs: shadcnCs,
                 palette: context.semanticPalette,
                 onTap: () => widget.onKeyTap?.call(
@@ -447,8 +446,8 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
     );
   }
 
-  Widget _buildFilterBar(ColorScheme cs) {
-    final shadcnCs = shadcn.Theme.of(context).colorScheme;
+  Widget _buildFilterBar(QueryaUiColors cs) {
+    final shadcnCs = context.colors;
     return material.Container(
       padding:
           const material.EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -593,7 +592,7 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
     );
   }
 
-  Widget _buildErrorBanner(ColorScheme cs) {
+  Widget _buildErrorBanner(QueryaUiColors cs) {
     return material.Container(
       padding: const material.EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: cs.destructive.withValues(alpha: 0.1),
@@ -618,8 +617,8 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
     );
   }
 
-  Widget _buildStatusBar(ColorScheme cs) {
-    final shadcnCs = shadcn.Theme.of(context).colorScheme;
+  Widget _buildStatusBar(QueryaUiColors cs) {
+    final shadcnCs = context.colors;
     return material.Container(
       constraints: const material.BoxConstraints(minHeight: 44),
       padding: const material.EdgeInsets.symmetric(horizontal: 16),
@@ -692,7 +691,7 @@ class _FolderTile extends material.StatelessWidget {
     required this.folder,
     required this.isExpanded,
     required this.depth,
-    required this.colorScheme,
+    required this.colors,
     required this.shadcnCs,
     required this.palette,
     required this.onToggle,
@@ -702,15 +701,15 @@ class _FolderTile extends material.StatelessWidget {
   final RedisKeyFolderNode folder;
   final bool isExpanded;
   final int depth;
-  final ColorScheme colorScheme;
-  final shadcn.ColorScheme shadcnCs;
+  final QueryaUiColors colors;
+  final QueryaUiColors shadcnCs;
   final QueryaSemanticPalette palette;
   final material.VoidCallback onToggle;
   final material.VoidCallback? onDelete;
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = colorScheme;
+    final cs = colors;
     final indent = 16.0 * depth;
 
     return material.Material(
@@ -800,7 +799,7 @@ onPressed: onDelete,
 class _KeyTile extends material.StatelessWidget {
   const _KeyTile({
     required this.keyInfo,
-    required this.colorScheme,
+    required this.colors,
     required this.shadcnCs,
     required this.palette,
     required this.onTap,
@@ -810,8 +809,8 @@ class _KeyTile extends material.StatelessWidget {
   });
 
   final RedisKeyInfo keyInfo;
-  final ColorScheme colorScheme;
-  final shadcn.ColorScheme shadcnCs;
+  final QueryaUiColors colors;
+  final QueryaUiColors shadcnCs;
   final QueryaSemanticPalette palette;
   final material.VoidCallback onTap;
   final material.VoidCallback? onDelete;
@@ -863,7 +862,7 @@ class _KeyTile extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = colorScheme;
+    final cs = colors;
     final ki = keyInfo;
     final typeCol = _typeColor(ki.type, palette);
 

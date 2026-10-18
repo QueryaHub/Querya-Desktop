@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 /// Editor for a Redis sorted set: ZADD add bar plus a scored member list.
@@ -15,7 +14,7 @@ class RedisZsetEditor extends material.StatefulWidget {
     required this.isReadOnly,
     required this.onAdd,
     required this.onRemove,
-    required this.colorScheme,
+    required this.colors,
     required this.shadcnCs,
     this.footer,
   });
@@ -25,8 +24,8 @@ class RedisZsetEditor extends material.StatefulWidget {
   final bool isReadOnly;
   final void Function(String member, double score) onAdd;
   final void Function(RedisBulkValue member) onRemove;
-  final ColorScheme colorScheme;
-  final shadcn.ColorScheme shadcnCs;
+  final QueryaUiColors colors;
+  final QueryaUiColors shadcnCs;
   final material.Widget? footer;
 
   @override
@@ -100,7 +99,7 @@ class _RedisZsetEditorState extends material.State<RedisZsetEditor> {
                       onDelete: widget.isReadOnly
                           ? null
                           : () => widget.onRemove(member),
-                      colorScheme: widget.colorScheme,
+                      colors: widget.colors,
                       shadcnCs: widget.shadcnCs,
                     );
                   },
@@ -118,25 +117,25 @@ class RedisScoredMemberRow extends StatelessWidget {
     required this.member,
     required this.score,
     this.onDelete,
-    required this.colorScheme,
+    required this.colors,
     required this.shadcnCs,
   });
 
   final String member;
   final double score;
   final VoidCallback? onDelete;
-  final ColorScheme colorScheme;
-  final shadcn.ColorScheme shadcnCs;
+  final QueryaUiColors colors;
+  final QueryaUiColors shadcnCs;
 
   @override
   material.Widget build(material.BuildContext context) {
     return material.Container(
       padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: material.BoxDecoration(
-        color: colorScheme.card,
+        color: colors.card,
         borderRadius: material.BorderRadius.circular(6),
         border: material.Border.all(
-            color: colorScheme.border.withValues(alpha: 0.3)),
+            color: colors.border.withValues(alpha: 0.3)),
       ),
       child: material.Row(
         children: [
@@ -164,7 +163,7 @@ class RedisScoredMemberRow extends StatelessWidget {
                 fontSize: 12,
                 fontFamily: QueryaTypography.mono,
                 fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
-                color: colorScheme.foreground,
+                color: colors.foreground,
               ),
             ),
           ),

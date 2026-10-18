@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
@@ -581,7 +582,7 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     return material.Container(
       color: cs.card,
@@ -787,7 +788,7 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
     );
   }
 
-  Widget _buildEntryItem(RedisCliEntry entry, ColorScheme cs) {
+  Widget _buildEntryItem(RedisCliEntry entry, QueryaUiColors cs) {
     return material.Container(
       margin: const material.EdgeInsets.only(bottom: 10),
       padding: const material.EdgeInsets.all(8),

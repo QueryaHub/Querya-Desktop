@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -14,14 +15,14 @@ class RedisStringEditor extends material.StatelessWidget {
     required this.controller,
     required this.isReadOnly,
     required this.onSave,
-    required this.colorScheme,
+    required this.colors,
   });
 
   final RedisBulkValue? value;
   final material.TextEditingController controller;
   final bool isReadOnly;
   final VoidCallback onSave;
-  final ColorScheme colorScheme;
+  final QueryaUiColors colors;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -82,7 +83,7 @@ class RedisStringEditor extends material.StatelessWidget {
           constraints: const material.BoxConstraints(minHeight: 200),
           decoration: material.BoxDecoration(
             border: material.Border.all(
-                color: colorScheme.border.withValues(alpha: 0.3)),
+                color: colors.border.withValues(alpha: 0.3)),
             borderRadius: material.BorderRadius.circular(8),
           ),
           child: material.TextField(
