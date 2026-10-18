@@ -1345,50 +1345,58 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
           ),
         ],
       ),
-      bottom: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (session.planRoot != null)
-            material.Padding(
-              padding: const material.EdgeInsets.fromLTRB(8, 6, 8, 6),
-              child: material.Align(
-                alignment: material.Alignment.centerLeft,
-                child: material.SizedBox(
-                  width: 200,
-                  child: QueryaTabStrip(
-                    labels: const ['Plan', 'Text'],
-                    selectedIndex: session.planAsTree ? 0 : 1,
-                    onSelected: (i) => setState(() => session.planAsTree = i == 0),
+      bottom: material.Padding(
+        // The results sit in a card like the editor above them.
+        padding: const material.EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: SqlEditorChrome(
+          background: context.workbench.surface,
+          showFocus: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (session.planRoot != null)
+                material.Padding(
+                  padding: const material.EdgeInsets.fromLTRB(8, 6, 8, 6),
+                  child: material.Align(
+                    alignment: material.Alignment.centerLeft,
+                    child: material.SizedBox(
+                      width: 200,
+                      child: QueryaTabStrip(
+                        labels: const ['Plan', 'Text'],
+                        selectedIndex: session.planAsTree ? 0 : 1,
+                        onSelected: (i) => setState(() => session.planAsTree = i == 0),
+                      ),
+                    ),
                   ),
                 ),
+              Expanded(
+                child: session.planRoot != null && session.planAsTree
+                    ? PlanTreeView(root: session.planRoot!)
+                    : ResultsTab(
+                  columns: session.columns,
+                  rows: session.rows,
+                  errorMessage: session.error,
+                  isLoading: session.running,
+                  affectedRows: session.affectedRows,
+                  statusLine: session.statusLine,
+                  elapsed: session.elapsed,
+                  stagingBuffer: session.stagingBuffer,
+                  columnDataTypes: session.resultGridColumnDataTypes,
+                  onApplyChanges: widget.isReadOnly ||
+                          !sqlResultGridSaveEnabled(
+                            sql: session.lastExecutedSql,
+                            resultColumns: session.columns,
+                            primaryKeys: session.resultGridPrimaryKeys,
+                          )
+                      ? null
+                      : () => applyStagedChanges(session),
+                  isSaving: session.savingChanges,
+                  errorAction: widget.errorActionBuilder?.call(context, session),
+                ),
               ),
-            ),
-          Expanded(
-            child: session.planRoot != null && session.planAsTree
-                ? PlanTreeView(root: session.planRoot!)
-                : ResultsTab(
-              columns: session.columns,
-              rows: session.rows,
-              errorMessage: session.error,
-              isLoading: session.running,
-              affectedRows: session.affectedRows,
-              statusLine: session.statusLine,
-              elapsed: session.elapsed,
-              stagingBuffer: session.stagingBuffer,
-              columnDataTypes: session.resultGridColumnDataTypes,
-              onApplyChanges: widget.isReadOnly ||
-                      !sqlResultGridSaveEnabled(
-                        sql: session.lastExecutedSql,
-                        resultColumns: session.columns,
-                        primaryKeys: session.resultGridPrimaryKeys,
-                      )
-                  ? null
-                  : () => applyStagedChanges(session),
-              isSaving: session.savingChanges,
-              errorAction: widget.errorActionBuilder?.call(context, session),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

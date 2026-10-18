@@ -26,6 +26,20 @@ void main() {
     expect(find.text('UTF-8'), findsNothing);
   });
 
+  testWidgets('the row and column counts say one, not 1 rows (#1558)',
+      (tester) async {
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: const material.Scaffold(
+          body: QueryaStatusBar(rowCount: 1, columnCount: 1),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('1 row, 1 col'), findsOneWidget);
+  });
+
   testWidgets('QueryaStatusBar renders active connection and read-only mode',
       (tester) async {
     final conn = ConnectionRow(

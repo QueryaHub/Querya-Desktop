@@ -242,7 +242,8 @@ class QueryaStatusBar extends material.StatelessWidget {
                 ),
                 const Gap(3),
                 material.Text(
-                  '$rowCount rows${columnCount != null ? ", $columnCount cols" : ""}',
+                  '$rowCount ${rowCount == 1 ? 'row' : 'rows'}'
+                  '${columnCount != null ? ", $columnCount ${columnCount == 1 ? 'col' : 'cols'}" : ""}',
                   style: material.TextStyle(
                     fontSize: 10,
                     fontFamily: QueryaTypography.mono,

@@ -11,7 +11,7 @@ import '../../support/querya_theme_test_shell.dart';
 
 void main() {
   group('SqlEditorChrome.inlineFieldDecoration', () {
-    test('uses editor background and workbench accent glow', () {
+    test('uses editor background and workbench accent glow (dialog fields)', () {
       const editor = QueryaEditorTheme(
         background: Color(0xFF111111),
         foreground: Color(0xFFFFFFFF),
@@ -128,15 +128,81 @@ void main() {
         const Color(0xFF112233).withValues(alpha: 0.5),
       );
 
-      final outerGlow = containers
+      // No glow: one framed card (#1558).
+      final shadows = containers
           .map((c) => c.decoration)
           .whereType<material.BoxDecoration>()
-          .expand((d) => d.boxShadow ?? const <material.BoxShadow>[])
-          .map((s) => s.color)
-          .whereType<Color>()
-          .firstWhere(
-              (c) => c == const Color(0xFF00FFEE).withValues(alpha: 0.1));
-      expect(outerGlow, const Color(0xFF00FFEE).withValues(alpha: 0.1));
+          .expand((d) => d.boxShadow ?? const <material.BoxShadow>[]);
+      expect(shadows, isEmpty);
+    });
+
+    testWidgets('the border takes the accent while the editor has the keyboard',
+        (tester) async {
+      final focus = FocusNode();
+      addTearDown(focus.dispose);
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          data: QueryaTheme.darkDefault,
+          child: material.SizedBox(
+            width: 320,
+            height: 200,
+            child: SqlEditorChrome(
+              child: Focus(focusNode: focus, child: const material.SizedBox.expand()),
+            ),
+          ),
+        ),
+      );
+
+      Color borderColor() {
+        final c = tester.widgetList<material.Container>(find.descendant(
+          of: find.byType(SqlEditorChrome),
+          matching: find.byType(material.Container),
+        )).firstWhere((c) => c.decoration is material.BoxDecoration &&
+            (c.decoration! as material.BoxDecoration).border != null);
+        return ((c.decoration! as material.BoxDecoration).border! as Border)
+            .top
+            .color;
+      }
+
+      final idle = borderColor();
+      focus.requestFocus();
+      await tester.pump();
+      final focused = borderColor();
+      expect(focused,
+          QueryaTheme.darkDefault.workbench.accent.withValues(alpha: 0.6));
+      expect(idle, isNot(focused));
+    });
+
+    testWidgets('a card with nothing to type in keeps its border', (tester) async {
+      final focus = FocusNode();
+      addTearDown(focus.dispose);
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          data: QueryaTheme.darkDefault,
+          child: material.SizedBox(
+            width: 320,
+            height: 200,
+            child: SqlEditorChrome(
+              showFocus: false,
+              background: const Color(0xFF123456),
+              child: Focus(focusNode: focus, child: const material.SizedBox.expand()),
+            ),
+          ),
+        ),
+      );
+      focus.requestFocus();
+      await tester.pump();
+      final c = tester.widgetList<material.Container>(find.descendant(
+        of: find.byType(SqlEditorChrome),
+        matching: find.byType(material.Container),
+      )).firstWhere((c) => c.decoration is material.BoxDecoration &&
+          (c.decoration! as material.BoxDecoration).border != null);
+      final d = c.decoration! as material.BoxDecoration;
+      expect(d.color, const Color(0xFF123456));
+      expect(
+        (d.border! as Border).top.color,
+        isNot(QueryaTheme.darkDefault.workbench.accent.withValues(alpha: 0.6)),
+      );
     });
   });
 
