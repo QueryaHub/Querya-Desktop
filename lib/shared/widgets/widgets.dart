@@ -38,6 +38,8 @@ export 'querya_search_field.dart';
 export 'querya_spinner.dart';
 export 'querya_text.dart';
 export 'querya_text_field.dart';
+export 'querya_card.dart';
+export 'querya_color_picker.dart';
 export 'tree_load_error.dart';
 export 'package:querya_desktop/core/motion/querya_motion.dart';
 export 'package:querya_desktop/core/motion/querya_motion_context.dart';

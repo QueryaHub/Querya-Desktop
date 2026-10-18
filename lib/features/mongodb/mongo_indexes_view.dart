@@ -339,7 +339,7 @@ class _IndexCard extends material.StatelessWidget {
   material.Widget build(material.BuildContext context) {
     final cs = context.colors;
 
-    return Card(
+    return QueryaCard(
       child: material.Padding(
         padding: const material.EdgeInsets.all(14),
         child: material.Row(
