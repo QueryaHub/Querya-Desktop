@@ -496,13 +496,9 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
                   const material.Text('WHERE ').semiBold().small(),
                   const Gap(8),
                   material.Expanded(
-                    child: material.TextField(
+                    child: QueryaTextField(
                       controller: _filterController,
-                      decoration: const material.InputDecoration(
-                        hintText: "e.g. id > 100 AND status = 'active'",
-                        isDense: true,
-                        border: material.OutlineInputBorder(),
-                      ),
+                      placeholder: "e.g. id > 100 AND status = 'active'",
                       onSubmitted: (_) {
                         final st = _genericKey.currentState;
                         if (st != null) _applyFilter(st);

@@ -97,23 +97,21 @@ class _ThemeRemoteInstallDialogState
               ),
             ],
             const material.SizedBox(height: 12),
-            material.TextField(
+            const Text('Theme URL').small().semiBold(),
+            const Gap(6),
+            QueryaTextField(
               controller: _urlController,
-              decoration: const material.InputDecoration(
-                labelText: 'Theme URL',
-                hintText: 'https://example.com/themes/my-theme.json',
-              ),
+              placeholder: 'https://example.com/themes/my-theme.json',
               keyboardType: material.TextInputType.url,
               autocorrect: false,
               onChanged: (_) => setState(() => _validationError = null),
             ),
             const material.SizedBox(height: 12),
-            material.TextField(
+            const Text('SHA-256 checksum (optional)').small().semiBold(),
+            const Gap(6),
+            QueryaTextField(
               controller: _checksumController,
-              decoration: const material.InputDecoration(
-                labelText: 'SHA-256 checksum (optional)',
-                hintText: 'hex digest or ?sha256= on URL',
-              ),
+              placeholder: 'hex digest or ?sha256= on URL',
               autocorrect: false,
             ),
             if (_validationError != null) ...[

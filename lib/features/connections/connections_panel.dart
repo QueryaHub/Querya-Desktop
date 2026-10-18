@@ -58,9 +58,6 @@ import 'package:flutter/material.dart' as material
         ClampingScrollPhysics,
         CallbackShortcuts,
         SingleActivator,
-        TextField,
-        InputDecoration,
-        InputBorder,
         TextEditingController,
         FocusNode;
 import 'package:flutter/services.dart'
@@ -255,23 +252,15 @@ class TreeObjectFilterBar extends material.StatelessWidget {
             ),
             const Gap(5),
             material.Expanded(
-              child: material.TextField(
+              child: QueryaTextField(
+ framed: false,
                 controller: controller,
                 onChanged: onChanged,
                 style: material.TextStyle(
                   fontSize: 11,
                   color: colors.foreground,
                 ),
-                decoration: material.InputDecoration(
-                  hintText: hintText,
-                  hintStyle: material.TextStyle(
-                    fontSize: 11,
-                    color: colors.mutedForeground.withValues(alpha: 0.6),
-                  ),
-                  border: material.InputBorder.none,
-                  isDense: true,
-                  contentPadding: material.EdgeInsets.zero,
-                ),
+                placeholder: hintText,
               ),
             ),
             if (isFiltered) ...[
@@ -1228,7 +1217,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                       ),
                       const Gap(6),
                       material.Expanded(
-                        child: material.TextField(
+                        child: QueryaTextField(
+ framed: false,
                           controller: _searchController,
                           focusNode: _searchFocusNode,
                           onChanged: (val) => _searchDebouncer.run(() {
@@ -1238,17 +1228,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                             fontSize: 12,
                             color: colors.foreground,
                           ),
-                          decoration: material.InputDecoration(
-                            hintText: 'Filter connections... (Ctrl+F)',
-                            hintStyle: material.TextStyle(
-                              fontSize: 12,
-                              color: colors.mutedForeground
-                                  .withValues(alpha: 0.6),
-                            ),
-                            border: material.InputBorder.none,
-                            isDense: true,
-                            contentPadding: material.EdgeInsets.zero,
-                          ),
+                          placeholder: 'Filter connections… (Ctrl+F)',
                         ),
                       ),
                       material.ValueListenableBuilder<material.TextEditingValue>(

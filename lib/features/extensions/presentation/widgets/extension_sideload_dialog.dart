@@ -103,12 +103,11 @@ class _ExtensionSideloadDialogState
               ),
             ),
             const material.SizedBox(height: 12),
-            material.TextField(
+            const Text('SHA-256 checksum (optional)').small().semiBold(),
+            const Gap(6),
+            QueryaTextField(
               controller: _checksumController,
-              decoration: const material.InputDecoration(
-                labelText: 'SHA-256 checksum (optional)',
-                hintText: '64-character hex digest from publisher',
-              ),
+              placeholder: '64-character hex digest from publisher',
               autocorrect: false,
             ),
           ],

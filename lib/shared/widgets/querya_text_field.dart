@@ -40,6 +40,9 @@ class QueryaTextField extends material.StatefulWidget {
     this.style,
     this.textAlignVertical,
     this.framed = true,
+    this.textAlign = material.TextAlign.start,
+    this.autocorrect = true,
+    this.contentPadding,
   });
 
   final material.TextEditingController? controller;
@@ -79,6 +82,11 @@ class QueryaTextField extends material.StatefulWidget {
   /// False for a field inside a frame of its own (an editor card): no fill,
   /// border or padding.
   final bool framed;
+  final material.TextAlign textAlign;
+  final bool autocorrect;
+
+  /// Replaces the padding between the border and the text.
+  final material.EdgeInsetsGeometry? contentPadding;
 
   @override
   material.State<QueryaTextField> createState() => _QueryaTextFieldState();
@@ -161,6 +169,8 @@ class _QueryaTextFieldState extends material.State<QueryaTextField> {
       enabled: widget.enabled,
       readOnly: widget.readOnly,
       obscureText: widget.obscureText && !_revealed,
+      autocorrect: widget.autocorrect,
+      textAlign: widget.textAlign,
       maxLines: widget.expands ? null : (widget.obscureText ? 1 : widget.maxLines),
       minLines: widget.expands ? null : widget.minLines,
       expands: widget.expands,
@@ -178,19 +188,21 @@ class _QueryaTextFieldState extends material.State<QueryaTextField> {
       cursorColor: cs.primary,
       decoration: material.InputDecoration(
         hintText: widget.placeholder,
-        hintStyle: material.TextStyle(fontSize: fontSize, color: muted),
+        hintStyle: material.TextStyle(
+            fontSize: widget.style?.fontSize ?? fontSize, color: muted),
         isDense: true,
         border: material.InputBorder.none,
         enabledBorder: material.InputBorder.none,
         focusedBorder: material.InputBorder.none,
         disabledBorder: material.InputBorder.none,
         errorBorder: material.InputBorder.none,
-        contentPadding: widget.framed
-            ? material.EdgeInsets.symmetric(
-                vertical: _multiline ? 8 : 0,
-                horizontal: widget.leading == null ? 10 : 0,
-              )
-            : material.EdgeInsets.zero,
+        contentPadding: widget.contentPadding ??
+            (widget.framed
+                ? material.EdgeInsets.symmetric(
+                    vertical: _multiline ? 8 : 0,
+                    horizontal: widget.leading == null ? 10 : 0,
+                  )
+                : material.EdgeInsets.zero),
       ),
     );
 

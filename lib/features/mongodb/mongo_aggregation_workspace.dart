@@ -649,22 +649,21 @@ class _StageCardState extends material.State<_StageCard> {
                 borderRadius: material.BorderRadius.circular(6),
                 color: cs.background,
               ),
-              child: material.TextField(
-                controller: _textController,
-                maxLines: null,
-                minLines: 3,
-                style: const material.TextStyle(
-                  fontFamily: QueryaTypography.mono,
-                  fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
-                  fontSize: 12.5,
-                  height: 1.4,
+              child: material.Padding(
+                padding: const material.EdgeInsets.all(10),
+                child: QueryaTextField(
+                  framed: false,
+                  controller: _textController,
+                  maxLines: null,
+                  minLines: 3,
+                  style: const material.TextStyle(
+                    fontFamily: QueryaTypography.mono,
+                    fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
+                    fontSize: 12.5,
+                    height: 1.4,
+                  ),
+                  onChanged: widget.onQueryChanged,
                 ),
-                decoration: const material.InputDecoration(
-                  isDense: true,
-                  border: material.InputBorder.none,
-                  contentPadding: material.EdgeInsets.all(10),
-                ),
-                onChanged: widget.onQueryChanged,
               ),
             ),
             if (syntaxError != null) ...[

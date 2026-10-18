@@ -226,18 +226,9 @@ class _MongoCreateIndexDialogState
               children: [
                 material.Expanded(
                   flex: 3,
-                  child: material.TextField(
+                  child: QueryaTextField(
                     controller: _fields[i].controller,
-                    decoration: const material.InputDecoration(
-                      hintText: 'Field name (e.g. email)',
-                      isDense: true,
-                      border: material.OutlineInputBorder(),
-                      contentPadding: material.EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                    ),
-                    style: const material.TextStyle(fontSize: 13),
+                    placeholder: 'Field name (e.g. email)',
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
@@ -337,36 +328,20 @@ class _MongoCreateIndexDialogState
           ),
           const Gap(8),
           // TTL
-          material.TextField(
+          const Text('TTL: expire after seconds (optional)').small().semiBold(),
+          const Gap(6),
+          QueryaTextField(
             controller: _ttlController,
             keyboardType: material.TextInputType.number,
-            decoration: const material.InputDecoration(
-              labelText: 'TTL: Expire After Seconds (optional)',
-              hintText: 'e.g. 86400 (24 hours)',
-              isDense: true,
-              border: material.OutlineInputBorder(),
-              contentPadding: material.EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 8,
-              ),
-            ),
-            style: const material.TextStyle(fontSize: 13),
+            placeholder: 'e.g. 86400 (24 hours)',
           ),
           const Gap(12),
           // Index Name
-          material.TextField(
+          const Text('Index name (optional)').small().semiBold(),
+          const Gap(6),
+          QueryaTextField(
             controller: _nameController,
-            decoration: material.InputDecoration(
-              labelText: 'Index Name (optional)',
-              hintText: _computedIndexName(),
-              isDense: true,
-              border: const material.OutlineInputBorder(),
-              contentPadding: const material.EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 8,
-              ),
-            ),
-            style: const material.TextStyle(fontSize: 13),
+            placeholder: _computedIndexName(),
           ),
         ],
       ),

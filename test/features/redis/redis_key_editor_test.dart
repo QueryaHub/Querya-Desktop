@@ -297,7 +297,7 @@ void main() {
 
     expect(find.text('Rename Key'), findsOneWidget);
     // Enter new key name
-    final textField = find.byType(QueryaTextField);
+    final textField = find.byType(QueryaTextField).last; // the dialog, over the editor
     await tester.enterText(textField, 'session:renamed');
     await tester.pumpAndSettle();
 
@@ -332,7 +332,7 @@ void main() {
     await tester.tap(find.byTooltip('Rename key'));
     await tester.pumpAndSettle();
 
-    final textField = find.byType(QueryaTextField);
+    final textField = find.byType(QueryaTextField).last; // the dialog, over the editor
     await tester.enterText(textField, 'session:exists');
     await tester.pumpAndSettle();
 
@@ -353,7 +353,7 @@ void main() {
     await tester.tap(find.byTooltip('Rename key'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(QueryaTextField), 'session:exists');
+    await tester.enterText(find.byType(QueryaTextField).last, 'session:exists');
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Rename'));

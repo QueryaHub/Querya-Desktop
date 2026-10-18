@@ -537,28 +537,15 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
                 material.SizedBox(
                   width: 36,
                   height: 28,
-                  child: material.TextField(
+                  child: QueryaTextField(
                     controller: _delimiterController,
+                    size: QueryaControlSize.sm,
                     textAlign: material.TextAlign.center,
+                    contentPadding: material.EdgeInsets.zero,
                     style: const material.TextStyle(
-                      fontSize: 13,
                       fontFamily: QueryaTypography.mono,
                       fontFamilyFallback:
                           QueryaTypography.monoFontFamilyFallback,
-                    ),
-                    decoration: material.InputDecoration(
-                      contentPadding: material.EdgeInsets.zero,
-                      isDense: true,
-                      border: material.OutlineInputBorder(
-                        borderRadius: material.BorderRadius.circular(6),
-                        borderSide: material.BorderSide(
-                          color: cs.border.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      focusedBorder: material.OutlineInputBorder(
-                        borderRadius: material.BorderRadius.circular(6),
-                        borderSide: material.BorderSide(color: cs.primary),
-                      ),
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
