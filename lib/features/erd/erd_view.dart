@@ -260,7 +260,7 @@ class _ErdViewState extends material.State<ErdView>
           ..clear()
           ..addAll(stored.views);
         _c.activeView = stored.activeView;
-        final view = _viewById(_c.activeView);
+        final view = _c.viewById(_c.activeView);
         if (view != null) {
           saved = view.asLayout(
               {for (final t in schema.tables) t.name}, stored.headerColors);
@@ -271,7 +271,7 @@ class _ErdViewState extends material.State<ErdView>
         _c.neighbours = ErdLayoutEngine.neighbourMap(schema);
         _c.junctions = ErdLayoutEngine.junctionMap(schema);
         _c.pickedRelation = null;
-        if (saved != null) _applyState(saved, colours: true);
+        if (saved != null) _c.applyState(saved, colours: true);
         _c.marked.clear();
         _setLayout(ErdLayoutEngine.withSaved(_compute(_visibleOf(schema)), saved));
         _loading = false;
@@ -314,30 +314,6 @@ class _ErdViewState extends material.State<ErdView>
     }
   }
 
-  /// The state of the diagram a [ErdSavedLayout] holds: what is collapsed
-  /// and hidden, the detail, groups and notes. Header colours belong to the
-  /// diagram, so a view switch leaves them ([colours] false).
-  void _applyState(ErdSavedLayout s, {required bool colours}) {
-    _c.collapsed
-      ..clear()
-      ..addAll(s.collapsed);
-    _c.hidden
-      ..clear()
-      ..addAll(s.hidden);
-    _c.detail = s.detail;
-    if (colours) {
-      _c.headerColors
-        ..clear()
-        ..addAll(s.headerColors);
-    }
-    _c.groups
-      ..clear()
-      ..addAll(s.groups);
-    _c.notes
-      ..clear()
-      ..addAll(s.notes);
-  }
-
   /// Layout with cards measured in this view's fonts and text scale.
   ErdLayout _compute(ErdSchema schema) {
     final measure = ErdCardMeasure(
@@ -346,27 +322,7 @@ class _ErdViewState extends material.State<ErdView>
     );
     return ErdLayout.compute(schema,
         measure: measure.width,
-        groups: [for (final g in _allGroups()) g.tables]);
-  }
-
-  /// The user's groups, then one per schema for the tables in none when the
-  /// diagram spans several schemas.
-  List<ErdGroup> _allGroups() {
-    final schema = _schema;
-    if (schema == null) return List.of(_c.groups);
-    return [
-      ..._c.groups,
-      ...erdSchemaGroups([for (final t in schema.tables) t.name], _c.groups),
-    ];
-  }
-
-  ErdGroup? _groupOf(String table) => ErdGroupOps.groupOf(_c.groups, table);
-
-  void _replaceGroups(List<ErdGroup> groups) {
-    final next = List.of(groups);
-    _c.groups
-      ..clear()
-      ..addAll(next);
+        groups: [for (final g in _c.allGroups(_schema)) g.tables]);
   }
 
   /// Asks for a name and groups [tables], taking them out of other groups.
@@ -376,17 +332,16 @@ class _ErdViewState extends material.State<ErdView>
     final text = await showErdGroupDialog(context,
         title: 'New group', action: 'Create', name: 'Group $n');
     if (text == null || !mounted) return;
+    late final String id;
     setState(() {
-      _replaceGroups(ErdGroupOps.withNewGroup(
-        _c.groups,
+      id = _c.createGroup(
         tables: tables,
         tableNames: [for (final t in _schema?.tables ?? const <ErdTable>[]) t.name],
         name: text.name,
         note: text.note,
-      ));
-      _c.marked.clear();
+      );
     });
-    _gatherIfCovering(_c.groups.last.id);
+    _gatherIfCovering(id);
     _scheduleSave();
   }
 
@@ -400,7 +355,7 @@ class _ErdViewState extends material.State<ErdView>
     if (!layout.frameCoversOthers(tables)) return;
     setState(() {
       _setLayout(layout.gather(tables));
-      _followTables(layout);
+      _c.followTables(layout, _layout);
     });
     showAppToast(
       context: context,
@@ -410,10 +365,7 @@ class _ErdViewState extends material.State<ErdView>
   }
 
   void _addToGroup(String id, Set<String> tables) {
-    setState(() {
-      _replaceGroups(ErdGroupOps.addTables(_c.groups, id, tables));
-      if (_c.groups.any((g) => g.id == id)) _c.marked.clear();
-    });
+    setState(() => _c.addToGroup(id, tables));
     _gatherIfCovering(id);
     _scheduleSave();
   }
@@ -430,19 +382,18 @@ class _ErdViewState extends material.State<ErdView>
   }
 
   void _updateGroup(String id, ErdGroup Function(ErdGroup) change) {
-    final i = _c.groups.indexWhere((g) => g.id == id);
-    if (i < 0) return;
-    setState(() => _c.groups[i] = change(_c.groups[i]));
-    _scheduleSave();
+    var found = false;
+    setState(() => found = _c.updateGroup(id, change));
+    if (found) _scheduleSave();
   }
 
   void _ungroup(String id) {
-    setState(() => _c.groups.removeWhere((g) => g.id == id));
+    setState(() => _c.ungroup(id));
     _scheduleSave();
   }
 
   void _removeFromGroup(String table) {
-    setState(() => _replaceGroups(ErdGroupOps.ungroupTables(_c.groups, {table})));
+    setState(() => _c.removeFromGroup(table));
     _scheduleSave();
   }
 
@@ -452,9 +403,7 @@ class _ErdViewState extends material.State<ErdView>
     final keys = HardwareKeyboard.instance;
     if (keys.isShiftPressed || keys.isControlPressed || keys.isMetaPressed) {
       _canvasFocus.requestFocus();
-      setState(() {
-        if (!_c.marked.remove(table)) _c.marked.add(table);
-      });
+      setState(() => _c.toggleMarked(table));
       return;
     }
     if (_c.marked.isNotEmpty) setState(_c.marked.clear);
@@ -471,7 +420,7 @@ class _ErdViewState extends material.State<ErdView>
       _c.selected = null;
       _c.pickedRelation = null;
       _c.marked.clear();
-      _applyState(target, colours: false);
+      _c.applyState(target, colours: false);
       _setLayout(ErdLayoutEngine.withSaved(_compute(_visibleOf(schema)), target));
     });
     _syncFocus();
@@ -500,7 +449,7 @@ class _ErdViewState extends material.State<ErdView>
       _showState(null, _c.base);
       return;
     }
-    final view = _viewById(id);
+    final view = _c.viewById(id);
     if (view == null) return;
     _showState(
         id,
@@ -516,18 +465,15 @@ class _ErdViewState extends material.State<ErdView>
         action: 'Save',
         name: 'View ${_c.views.length + 1}');
     if (name == null || !mounted) return;
-    final fromAll = _viewById(_c.activeView) == null;
+    final fromAll = _c.viewById(_c.activeView) == null;
     _captureCurrent();
     // The tables hidden by hand now belong to the view; All tables shows
     // every table, always.
     if (fromAll) _c.base = _c.base.showingAll();
-    var n = 1;
-    while (_c.views.any((v) => v.id == 'v$n')) {
-      n++;
-    }
+    final id = _c.nextViewId();
     setState(() {
       _c.views.add(ErdSavedView(
-        id: 'v$n',
+        id: id,
         name: name,
         tables: {
           for (final t in schema.tables)
@@ -535,45 +481,28 @@ class _ErdViewState extends material.State<ErdView>
         },
         layout: _current(),
       ));
-      _c.activeView = 'v$n';
+      _c.activeView = id;
     });
     _scheduleSave();
   }
 
   Future<void> _renameView() async {
-    final view = _viewById(_c.activeView);
+    final view = _c.viewById(_c.activeView);
     if (view == null) return;
     final name = await showErdViewNameDialog(context,
         title: 'Rename view', action: 'Rename', name: view.name);
     if (name == null || !mounted) return;
-    final i = _c.views.indexWhere((v) => v.id == view.id);
-    if (i < 0) return;
-    setState(() => _c.views[i] = _c.views[i].copyWith(name: name));
-    _scheduleSave();
+    var found = false;
+    setState(() => found = _c.renameView(view.id, name));
+    if (found) _scheduleSave();
   }
 
   /// Deletes the active view and goes back to *All tables*.
   void _deleteView() {
     final id = _c.activeView;
     if (id == null) return;
-    _c.views.removeWhere((v) => v.id == id);
+    _c.removeView(id);
     _showState(null, _c.base);
-  }
-
-  /// Moves the notes attached to a table by what the table moved, from
-  /// [before] to the current layout.
-  void _followTables(ErdLayout before) {
-    final after = _layout;
-    if (after == null || _c.notes.every((n) => n.attachedTo == null)) return;
-    for (var i = 0; i < _c.notes.length; i++) {
-      final t = _c.notes[i].attachedTo;
-      if (t == null) continue;
-      final a = before.positions[t], b = after.positions[t];
-      if (a == null || b == null || a == b) continue;
-      final d = b - a;
-      _c.notes[i] = _c.notes[i]
-          .copyWith(x: _c.notes[i].x + d.dx, y: _c.notes[i].y + d.dy);
-    }
   }
 
   /// Canvas point at the middle of what the viewport shows.
@@ -592,7 +521,7 @@ class _ErdViewState extends material.State<ErdView>
     if (text == null || !mounted) return;
     final note =
         ErdNoteOps.create(_c.notes, text: text, centre: _viewCentre());
-    setState(() => _c.notes.add(note));
+    setState(() => _c.addNote(note));
     _scheduleSave();
   }
 
@@ -604,29 +533,22 @@ class _ErdViewState extends material.State<ErdView>
   }
 
   void _updateNote(String id, ErdNote Function(ErdNote) change) {
-    final i = _c.notes.indexWhere((n) => n.id == id);
-    if (i < 0) return;
-    setState(() => _c.notes[i] = change(_c.notes[i]));
-    _scheduleSave();
+    var found = false;
+    setState(() => found = _c.updateNote(id, change));
+    if (found) _scheduleSave();
   }
 
   void _deleteNote(String id) {
-    setState(() => _c.notes.removeWhere((n) => n.id == id));
+    setState(() => _c.deleteNote(id));
     _scheduleSave();
   }
 
   void _noteDragMove(String id, material.Offset screenDelta) {
-    final i = _c.notes.indexWhere((n) => n.id == id);
-    if (i < 0) return;
-    final moved = ErdNoteOps.moved(_c.notes[i], screenDelta, _scale);
-    setState(() => _c.notes[i] = moved);
+    setState(() => _c.moveNote(id, screenDelta, _scale));
   }
 
   void _noteResize(String id, material.Offset screenDelta) {
-    final i = _c.notes.indexWhere((n) => n.id == id);
-    if (i < 0) return;
-    final resized = ErdNoteOps.resized(_c.notes[i], screenDelta, _scale);
-    setState(() => _c.notes[i] = resized);
+    setState(() => _c.resizeNote(id, screenDelta, _scale));
   }
 
   /// The table nearest to a note's middle, to attach it to.
@@ -635,16 +557,6 @@ class _ErdViewState extends material.State<ErdView>
     final schema = _schema;
     if (layout == null || schema == null) return null;
     return ErdNoteOps.nearestTable(n, layout, _visibleOf(schema));
-  }
-
-  /// Canvas size: the cards and every note.
-  material.Size _canvasSize(ErdLayout layout) {
-    var w = layout.size.width, h = layout.size.height;
-    for (final n in _c.notes) {
-      w = max(w, n.x + n.width + ErdLayout.margin);
-      h = max(h, n.y + n.height + ErdLayout.margin);
-    }
-    return material.Size(w, h);
   }
 
   /// Tint of a note without a colour over the canvas, on screen and in the
@@ -695,7 +607,7 @@ class _ErdViewState extends material.State<ErdView>
         for (final t in group.tables)
           if (layout.positions[t] case final p?) t: p + delta,
       });
-      _followTables(layout);
+      _c.followTables(layout, _layout);
     });
     _scheduleRoutes();
   }
@@ -766,13 +678,6 @@ class _ErdViewState extends material.State<ErdView>
     );
   }
 
-  ErdSavedView? _viewById(String? id) {
-    for (final v in _c.views) {
-      if (v.id == id) return v;
-    }
-    return null;
-  }
-
   Future<void> _saveNow() async {
     final layout = _layout;
     if (!_persists || layout == null) return;
@@ -820,7 +725,7 @@ class _ErdViewState extends material.State<ErdView>
       _setLayout(arrange || current == null
           ? computed
           : ErdLayoutEngine.withSaved(computed, ErdSavedLayout(positions: current.positions)));
-      if (current != null) _followTables(current);
+      if (current != null) _c.followTables(current, _layout);
     });
     _scheduleSave();
   }
@@ -828,19 +733,12 @@ class _ErdViewState extends material.State<ErdView>
   void _autoLayout() => _reflow(arrange: true);
 
   void _toggleCollapsed(String table) {
-    setState(() {
-      if (!_c.collapsed.remove(table)) _c.collapsed.add(table);
-    });
+    setState(() => _c.toggleCollapsed(table));
     _reflow();
   }
 
   void _hide(String table) {
-    setState(() {
-      _c.hidden.add(table);
-      _c.marked.remove(table);
-      // A pick on a hidden table would leave every card faded.
-      if (_c.selected == table) _c.selected = null;
-    });
+    setState(() => _c.hide(table));
     _syncFocus();
     _reflow();
   }
@@ -865,7 +763,7 @@ class _ErdViewState extends material.State<ErdView>
     setState(() {
       _layout =
           layout.withPosition(table, layout.positions[table]! + delta);
-      _followTables(layout);
+      _c.followTables(layout, _layout);
     });
     _scheduleRoutes();
   }
@@ -926,7 +824,7 @@ class _ErdViewState extends material.State<ErdView>
     final vs = _viewportSize();
     if (layout == null || vs == null) return;
     // The cards and every note: a note placed away from the cards counts.
-    final size = _canvasSize(layout);
+    final size = _c.canvasSize(layout);
     final s = ErdLayout.fitScale(size, vs);
     final floor = min(_minScale, s);
     if (floor != _zoomFloor) setState(() => _zoomFloor = floor);
@@ -968,14 +866,8 @@ class _ErdViewState extends material.State<ErdView>
   /// the zoom and search shortcuts work after a click anywhere on it.
   void _clearSelection() {
     _canvasFocus.requestFocus();
-    if (_c.selected == null && _c.pickedRelation == null && _c.marked.isEmpty) {
-      return;
-    }
-    setState(() {
-      _c.selected = null;
-      _c.pickedRelation = null;
-      _c.marked.clear();
-    });
+    if (!_c.clearPicks()) return;
+    setState(() {});
     _edgeTipNotifier.value = null;
     _syncFocus();
   }
@@ -989,10 +881,7 @@ class _ErdViewState extends material.State<ErdView>
       return;
     }
     _canvasFocus.requestFocus();
-    setState(() {
-      _c.pickedRelation = hit;
-      _c.selected = null;
-    });
+    setState(() => _c.pickRelation(hit));
     _edgeTipNotifier.value = (hit, p);
     _syncFocus();
   }
@@ -1000,10 +889,7 @@ class _ErdViewState extends material.State<ErdView>
   /// A click on a card picks it.
   void _pick(String name) {
     _canvasFocus.requestFocus();
-    setState(() {
-      _c.selected = name;
-      _c.pickedRelation = null;
-    });
+    setState(() => _c.pick(name));
     _edgeTipNotifier.value = null;
     _syncFocus();
   }
@@ -1014,31 +900,26 @@ class _ErdViewState extends material.State<ErdView>
         .addPostFrameCallback((_) => _searchFocus.requestFocus());
   }
 
-  /// Escape: closes the search when it is open, else clears the pick. One
-  /// Esc never does both, so closing the search keeps the table found.
+  /// Escape: one step per press (see [ErdViewController.escape]); closing
+  /// the search keeps the table found.
   void _escape() {
-    if (_c.searchOpen) {
-      _searchController.clear();
-      setState(() {
-        _c.searchOpen = false;
-        _c.query = '';
-      });
-      _canvasFocus.requestFocus();
-      return;
-    }
-    if (_c.pickedRelation != null) {
-      setState(() => _c.pickedRelation = null);
-      _edgeTipNotifier.value = null;
-      _syncFocus();
-      return;
-    }
-    if (_c.marked.isNotEmpty) {
-      setState(_c.marked.clear);
-      return;
-    }
-    if (_c.selected != null) {
-      setState(() => _c.selected = null);
-      _syncFocus();
+    final step = _c.escape();
+    switch (step) {
+      case ErdEscape.closedSearch:
+        _searchController.clear();
+        setState(() {});
+        _canvasFocus.requestFocus();
+      case ErdEscape.droppedRelation:
+        setState(() {});
+        _edgeTipNotifier.value = null;
+        _syncFocus();
+      case ErdEscape.clearedMarks:
+        setState(() {});
+      case ErdEscape.clearedPick:
+        setState(() {});
+        _syncFocus();
+      case ErdEscape.nothing:
+        break;
     }
   }
 
@@ -1067,26 +948,10 @@ class _ErdViewState extends material.State<ErdView>
     return out;
   }
 
-  /// The table the diagram focuses: the dragged one, then the picked one, then
-  /// the one under the mouse.
-  String? _currentFocus() => _c.dragging ?? _c.selected ?? _hovered.value;
+  String? _currentFocus() => _c.currentFocus(_hovered.value);
 
-  ErdCardFocus _cardFocusFor(String table, String? focus) {
-    final p = _c.pickedRelation;
-    if (p != null) {
-      final on = table == p.fromTable || table == p.toTable;
-      final column = table == p.fromTable
-          ? p.fromColumn
-          : (table == p.toTable ? p.toColumn : null);
-      return (highlighted: on, faded: !on, column: column);
-    }
-    final highlighted = ErdLayoutEngine.isFocusedIn(_c.neighbours, focus, table);
-    return (
-      highlighted: highlighted,
-      faded: _c.selected != null && !highlighted,
-      column: null,
-    );
-  }
+  ErdCardFocus _cardFocusFor(String table, String? focus) =>
+      _c.cardFocusFor(table, focus);
 
   /// The notifier of card [table], made on first use with its current focus.
   material.ValueNotifier<ErdCardFocus> _cardState(String table) =>
@@ -1130,13 +995,7 @@ class _ErdViewState extends material.State<ErdView>
   }
 
   void _setHeaderColor(String table, String? slot) {
-    setState(() {
-      if (slot == null) {
-        _c.headerColors.remove(table);
-      } else {
-        _c.headerColors[table] = slot;
-      }
-    });
+    setState(() => _c.setHeaderColor(table, slot));
     _scheduleSave();
   }
 
@@ -1153,7 +1012,7 @@ class _ErdViewState extends material.State<ErdView>
   /// commands to save, rename and delete one.
   material.Widget _viewsMenu() => ErdViewsMenu(
         views: _c.views,
-        active: _viewById(_c.activeView),
+        active: _c.viewById(_c.activeView),
         onShowAll: () => _switchView(null),
         onSwitch: _switchView,
         onNew: () => unawaited(_newView()),
@@ -1165,7 +1024,7 @@ class _ErdViewState extends material.State<ErdView>
   /// it to a group, take it out of its group.
   List<MenuItem> _groupMenu(String table) {
     final tables = {..._c.marked, table};
-    final current = _groupOf(table);
+    final current = _c.groupOf(table);
     return [
       MenuButton(
         key: material.ValueKey('erd_menu_group_$table'),
@@ -1212,7 +1071,7 @@ class _ErdViewState extends material.State<ErdView>
   /// Group frames for the SVG: the screen's tint over the export background.
   List<ErdSvgGroup> _svgGroups(ErdLayout layout, String backgroundHex) =>
       ErdExportData.groups(
-        _allGroups(),
+        _c.allGroups(_schema),
         layout,
         backgroundHex,
         slotColor: _slotColor,
@@ -1271,7 +1130,7 @@ class _ErdViewState extends material.State<ErdView>
   material.Color slotColor(String slot) => _slotColor(slot);
 
   @override
-  material.Size canvasSize(ErdLayout layout) => _canvasSize(layout);
+  material.Size canvasSize(ErdLayout layout) => _c.canvasSize(layout);
 
   @override
   ErdSvgColors currentThemeColors() => _svgColors();
@@ -1553,8 +1412,8 @@ class _ErdViewState extends material.State<ErdView>
                   key: _boundaryKey,
                   child: material.Container(
                     color: wb.surface,
-                    width: _canvasSize(layout).width,
-                    height: _canvasSize(layout).height,
+                    width: _c.canvasSize(layout).width,
+                    height: _c.canvasSize(layout).height,
                     child: material.GestureDetector(
                       // A tap on an edge picks its relation, elsewhere it clears
                       // the selection (#1281).
@@ -1573,7 +1432,7 @@ class _ErdViewState extends material.State<ErdView>
                             ),
                           ),
                           // Group frames under the edges and cards (#1282).
-                          for (final g in _allGroups())
+                          for (final g in _c.allGroups(_schema))
                             ..._groupFrame(g, layout),
                           material.Positioned.fill(
                             child: material.ValueListenableBuilder<String?>(
