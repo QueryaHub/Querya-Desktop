@@ -1004,6 +1004,64 @@ void main() {
       expect(erdCardBuilds, lessThanOrEqualTo(3));
     });
 
+    testWidgets('a diagram of many tables mounts its cards over several frames',
+        (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      final big = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+          return SqlExecutionResult(rows: [
+            for (var i = 0; i < 100; i++) ['t$i', 'id', 'INTEGER', '1'],
+          ]);
+        }
+        return const SqlExecutionResult();
+      });
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+            source: SqlErdSource(delegate: big, dialect: SqlDialect.sqlite)),
+      ));
+      int cards() => find
+          .byWidgetPredicate((w) =>
+              w.key is material.ValueKey<String> &&
+              (w.key! as material.ValueKey<String>).value.startsWith('erd_table_t'))
+          .evaluate()
+          .length;
+      await t.pump();
+      await t.pump();
+      expect(cards(), inInclusiveRange(1, 99),
+          reason: 'the first frame does not carry every card');
+      for (var i = 0; i < 10; i++) {
+        await t.pump();
+      }
+      expect(cards(), 100);
+    });
+
+    testWidgets('picking a table rebuilds only the cards whose look changes',
+        (t) async {
+      await t.binding.setSurfaceSize(const material.Size(1200, 800));
+      final wide = FakeSqlExecutionDelegate(onExecute: (sql) {
+        if (_unfiltered(sql) == ErdCatalog.columnsSql(SqlDialect.sqlite)) {
+          return SqlExecutionResult(rows: [
+            for (var i = 0; i < 20; i++) ['t$i', 'id', 'INTEGER', '1'],
+          ]);
+        }
+        return const SqlExecutionResult();
+      });
+      await t.pumpWidget(queryaThemeTestShell(
+        child: ErdView(
+            source: SqlErdSource(delegate: wide, dialect: SqlDialect.sqlite)),
+      ));
+      await t.pump();
+      await t.pump();
+      await t.pump();
+
+      erdCardBuilds = 0;
+      await t.tap(find.byKey(const material.ValueKey('erd_table_t5')));
+      await t.pump();
+      expect(erdCardBuilds, greaterThan(0));
+      expect(erdCardBuilds, lessThan(20),
+          reason: 'the diagram rebuilt, the cards that did not change did not');
+    });
+
     testWidgets('Copy Mermaid puts the diagram on the clipboard', (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       String? copied;
