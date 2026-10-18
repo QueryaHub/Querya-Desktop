@@ -8,6 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   const migrated = <String>[
     'lib/features/connections',
+    'lib/features/mongodb',
+    'lib/features/redis',
   ];
 
   final banned = RegExp(r'\bcolorScheme\b|\bTheme\.of\(|\bColorScheme\b');

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
@@ -160,7 +161,7 @@ class _MongoDocumentsTableViewState extends State<MongoDocumentsTableView> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     if (widget.documents.isEmpty || _gridData.columns.isEmpty) {
       return material.Center(

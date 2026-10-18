@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
 import 'package:querya_desktop/core/database/redis_info.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 /// Shows all Redis databases (db0–dbN) with key counts.
@@ -95,8 +94,8 @@ class _RedisDatabasesViewState extends material.State<RedisDatabasesView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final shadcnCs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
+    final shadcnCs = context.colors;
 
     if (_loading) {
       return const material.Center(
@@ -186,7 +185,7 @@ class _RedisDatabasesViewState extends material.State<RedisDatabasesView> {
                   for (final db in dbsWithData)
                     _DatabaseTile(
                       db: db,
-                      colorScheme: cs,
+                      colors: cs,
                       shadcnCs: shadcnCs,
                       onTap: () => widget.onDatabaseTap?.call(db.index),
                     ),
@@ -200,7 +199,7 @@ class _RedisDatabasesViewState extends material.State<RedisDatabasesView> {
                   for (final db in dbsEmpty)
                     _DatabaseTile(
                       db: db,
-                      colorScheme: cs,
+                      colors: cs,
                       shadcnCs: shadcnCs,
                       onTap: () => widget.onDatabaseTap?.call(db.index),
                     ),
@@ -235,19 +234,19 @@ class _DbInfo {
 class _DatabaseTile extends material.StatelessWidget {
   const _DatabaseTile({
     required this.db,
-    required this.colorScheme,
+    required this.colors,
     required this.shadcnCs,
     required this.onTap,
   });
 
   final _DbInfo db;
-  final ColorScheme colorScheme;
-  final shadcn.ColorScheme shadcnCs;
+  final QueryaUiColors colors;
+  final QueryaUiColors shadcnCs;
   final material.VoidCallback onTap;
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = colorScheme;
+    final cs = colors;
     final db = this.db;
 
     return material.Material(

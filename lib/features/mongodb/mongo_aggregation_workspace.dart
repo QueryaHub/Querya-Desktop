@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
@@ -206,7 +207,7 @@ class _MongoAggregationWorkspaceState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     return material.Container(
       color: cs.background,
@@ -260,7 +261,7 @@ class _MongoAggregationWorkspaceState
     );
   }
 
-  material.Widget _buildActionBar(ColorScheme cs) {
+  material.Widget _buildActionBar(QueryaUiColors cs) {
     final enabledCount = _stages.where((s) => s.isEnabled).length;
 
     return material.Container(
@@ -329,7 +330,7 @@ class _MongoAggregationWorkspaceState
     );
   }
 
-  material.Widget _buildStagesPane(ColorScheme cs) {
+  material.Widget _buildStagesPane(QueryaUiColors cs) {
     return material.Container(
       color: cs.card.withValues(alpha: 0.35),
       child: material.Column(
@@ -386,7 +387,7 @@ class _MongoAggregationWorkspaceState
     );
   }
 
-  material.Widget _buildResultsPane(ColorScheme cs) {
+  material.Widget _buildResultsPane(QueryaUiColors cs) {
     final title = _executedUpToStageIndex == null
         ? 'Pipeline Results'
         : 'Results after Stage #${_executedUpToStageIndex! + 1} (${_stages[_executedUpToStageIndex!].operator})';
@@ -564,7 +565,7 @@ class _StageCardState extends material.State<_StageCard> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final stage = widget.stage;
     final syntaxError = validateStage(stage);
 
@@ -761,7 +762,7 @@ class _ExportDialogState extends material.State<_ExportDialog> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final code = _generateCode();
 
     return QueryaModalDialog(

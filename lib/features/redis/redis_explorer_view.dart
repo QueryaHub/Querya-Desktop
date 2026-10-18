@@ -7,8 +7,6 @@ import 'package:querya_desktop/core/database/redis_service.dart';
 import 'package:querya_desktop/core/motion/querya_switching_body.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 
 import 'redis_keys_view.dart';
 import 'redis_key_editor.dart';
@@ -259,7 +257,7 @@ class _RedisExplorerViewState extends material.State<RedisExplorerView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     // Loading state
     if (_connecting) {
@@ -444,7 +442,7 @@ class _BreadcrumbBar extends StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.Container(
       constraints: const material.BoxConstraints(minHeight: 44),
       padding: const material.EdgeInsets.symmetric(horizontal: 16),
@@ -565,7 +563,7 @@ class _CrumbChip extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     final child = isLast
         ? Text(label).semiBold().small()
         : Text(label,

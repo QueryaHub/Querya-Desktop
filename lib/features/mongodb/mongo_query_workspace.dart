@@ -2,6 +2,7 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/editor/querya_code_editor.dart';
 import 'package:querya_desktop/core/editor/querya_code_language.dart';
@@ -220,7 +221,7 @@ class _MongoQueryWorkspaceState extends material.State<MongoQueryWorkspace> {
     await showAppDialog<void>(
       context: context,
       builder: (ctx) {
-        final cs = Theme.of(ctx).colorScheme;
+        final cs = ctx.colors;
         return QueryaModalDialog(
           title: const Text('MQL Query History'),
           description: Text('${widget.database} — recent queries'),
@@ -287,8 +288,7 @@ class _MongoQueryWorkspaceState extends material.State<MongoQueryWorkspace> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = context.colors;
     final tab = _activeTab;
 
     return material.CallbackShortcuts(
@@ -349,7 +349,7 @@ class _MongoQueryWorkspaceState extends material.State<MongoQueryWorkspace> {
     );
   }
 
-  material.Widget _buildTopBar(ColorScheme cs) {
+  material.Widget _buildTopBar(QueryaUiColors cs) {
     return material.Container(
       padding: const material.EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: cs.card,
@@ -399,7 +399,7 @@ class _MongoQueryWorkspaceState extends material.State<MongoQueryWorkspace> {
     );
   }
 
-  material.Widget _buildTabStrip(ColorScheme cs) {
+  material.Widget _buildTabStrip(QueryaUiColors cs) {
     return material.Container(
       height: 38,
       padding: const material.EdgeInsets.symmetric(horizontal: 8),
@@ -415,7 +415,7 @@ class _MongoQueryWorkspaceState extends material.State<MongoQueryWorkspace> {
     );
   }
 
-  material.Widget _buildResultBar(ColorScheme cs, _QueryTabSession tab) {
+  material.Widget _buildResultBar(QueryaUiColors cs, _QueryTabSession tab) {
     return material.Container(
       padding: const material.EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       color: cs.card,
@@ -466,7 +466,7 @@ class _MongoQueryWorkspaceState extends material.State<MongoQueryWorkspace> {
     );
   }
 
-  material.Widget _buildResultsView(ColorScheme cs, _QueryTabSession tab) {
+  material.Widget _buildResultsView(QueryaUiColors cs, _QueryTabSession tab) {
     if (tab.isLoading) {
       return const material.Center(
         child: QueryaSpinner(

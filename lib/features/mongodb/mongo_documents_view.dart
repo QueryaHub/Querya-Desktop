@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
@@ -15,8 +16,6 @@ import 'package:querya_desktop/features/mongodb/mongo_field_codec.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/features/workspace/grid_cell_popover_inspector.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 const _defaultLimit = 25;
@@ -369,7 +368,7 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     if (_loading && _documents.isEmpty) {
       return const material.Center(
@@ -425,11 +424,11 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
                       itemCount: _documents.length,
                       separatorBuilder: (_, __) => const Gap(8),
                       itemBuilder: (context, i) {
-                        final shadcnCs = shadcn.Theme.of(context).colorScheme;
+                        final shadcnCs = context.colors;
                         return _DocumentCard(
                           document: _documents[i],
                           index: _skip + i,
-                          colorScheme: cs,
+                          colors: cs,
                           shadcnCs: shadcnCs,
                           onView: () =>
                               widget.onDocumentTap?.call(_documents[i]),
@@ -447,8 +446,8 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
     );
   }
 
-  Widget _buildFilterBar(ColorScheme cs) {
-    final shadcnCs = shadcn.Theme.of(context).colorScheme;
+  Widget _buildFilterBar(QueryaUiColors cs) {
+    final shadcnCs = context.colors;
     return material.Container(
       padding:
           const material.EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -572,7 +571,7 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
     );
   }
 
-  Widget _buildErrorBanner(ColorScheme cs) {
+  Widget _buildErrorBanner(QueryaUiColors cs) {
     return material.Container(
       padding: const material.EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: cs.destructive.withValues(alpha: 0.1),
@@ -597,8 +596,8 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
     );
   }
 
-  Widget _buildPaginationBar(ColorScheme cs) {
-    final shadcnCs = shadcn.Theme.of(context).colorScheme;
+  Widget _buildPaginationBar(QueryaUiColors cs) {
+    final shadcnCs = context.colors;
     final currentPage = (_skip / _limit).floor() + 1;
     final total = _totalCount;
     final shown = _skip + _documents.length;
@@ -667,7 +666,7 @@ class _DocumentCard extends StatefulWidget {
   const _DocumentCard({
     required this.document,
     required this.index,
-    required this.colorScheme,
+    required this.colors,
     required this.shadcnCs,
     required this.onView,
     required this.onDelete,
@@ -676,8 +675,8 @@ class _DocumentCard extends StatefulWidget {
 
   final Map<String, dynamic> document;
   final int index;
-  final ColorScheme colorScheme;
-  final shadcn.ColorScheme shadcnCs;
+  final QueryaUiColors colors;
+  final QueryaUiColors shadcnCs;
   final VoidCallback onView;
   final VoidCallback onDelete;
   final ValueChanged<String> onInspectField;
@@ -710,7 +709,7 @@ class _DocumentCardState extends State<_DocumentCard> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = widget.colorScheme;
+    final cs = widget.colors;
     final scs = widget.shadcnCs;
     final idStr = widget.document['_id']?.toString() ?? '—';
 
@@ -788,7 +787,7 @@ class _DocumentCardState extends State<_DocumentCard> {
               child: _expanded
                   ? MongoFieldList(
                       document: widget.document,
-                      colorScheme: cs,
+                      colors: cs,
                       shadcnCs: scs,
                       onInspectField: widget.onInspectField,
                     )
@@ -823,14 +822,14 @@ class MongoFieldList extends StatelessWidget {
   const MongoFieldList({
     super.key,
     required this.document,
-    required this.colorScheme,
+    required this.colors,
     required this.shadcnCs,
     required this.onInspectField,
   });
 
   final Map<String, dynamic> document;
-  final ColorScheme colorScheme;
-  final shadcn.ColorScheme shadcnCs;
+  final QueryaUiColors colors;
+  final QueryaUiColors shadcnCs;
   final ValueChanged<String> onInspectField;
 
   Widget _buildFieldRow(String key) {
@@ -856,7 +855,7 @@ class MongoFieldList extends StatelessWidget {
                   fontFamily: QueryaTypography.mono,
                   fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
                   fontWeight: material.FontWeight.w600,
-                  color: colorScheme.foreground,
+                  color: colors.foreground,
                 ),
               ),
             ),
@@ -888,7 +887,7 @@ class MongoFieldList extends StatelessWidget {
 
   Widget _buildDivider() => QueryaDivider(
         height: 1,
-        color: colorScheme.border.withValues(alpha: 0.2),
+        color: colors.border.withValues(alpha: 0.2),
       );
 
   @override
@@ -897,10 +896,10 @@ class MongoFieldList extends StatelessWidget {
     if (fields.isEmpty) return const material.SizedBox.shrink();
 
     final decoration = material.BoxDecoration(
-      color: colorScheme.muted.withValues(alpha: 0.15),
+      color: colors.muted.withValues(alpha: 0.15),
       borderRadius: material.BorderRadius.circular(6),
       border: material.Border.all(
-        color: colorScheme.border.withValues(alpha: 0.3),
+        color: colors.border.withValues(alpha: 0.3),
       ),
     );
 

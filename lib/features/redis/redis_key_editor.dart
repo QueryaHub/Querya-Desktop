@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/core/database/redis_connection.dart';
@@ -10,8 +11,6 @@ import 'package:querya_desktop/features/redis/editors/redis_string_editor.dart';
 import 'package:querya_desktop/features/redis/editors/redis_zset_editor.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 /// Viewer / editor for a single Redis key. Type-aware: string, hash,
@@ -618,8 +617,8 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final shadcnCs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
+    final shadcnCs = context.colors;
     final palette = context.semanticPalette;
 
     if (_loading) {
@@ -705,7 +704,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     );
   }
 
-  Widget _buildHeader(ColorScheme cs, shadcn.ColorScheme scs) {
+  Widget _buildHeader(QueryaUiColors cs, QueryaUiColors scs) {
     final typeCol = _typeColor(_effectiveType);
     return material.Container(
       padding:
@@ -834,7 +833,7 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     );
   }
 
-  Widget _buildContent(ColorScheme cs, shadcn.ColorScheme scs) {
+  Widget _buildContent(QueryaUiColors cs, QueryaUiColors scs) {
     switch (_effectiveType) {
       case 'string':
         return _buildStringEditor(cs);
@@ -871,30 +870,30 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
 
   // ─── Type editors ───────────────────────────────────────────────────────
 
-  Widget _buildStringEditor(ColorScheme cs) {
+  Widget _buildStringEditor(QueryaUiColors cs) {
     return RedisStringEditor(
       value: _stringValue,
       controller: _stringController,
       isReadOnly: widget.isReadOnly,
       onSave: _saveString,
-      colorScheme: cs,
+      colors: cs,
     );
   }
 
-  Widget _buildHashEditor(ColorScheme cs, shadcn.ColorScheme scs) {
+  Widget _buildHashEditor(QueryaUiColors cs, QueryaUiColors scs) {
     return RedisHashEditor(
       heading: _collectionHeading('Hash fields'),
       entries: _hashValue.entries.toList(),
       isReadOnly: widget.isReadOnly,
       onSet: _hashSet,
       onDelete: _hashDel,
-      colorScheme: cs,
+      colors: cs,
       shadcnCs: scs,
       footer: _hasMore ? _loadMoreTile() : null,
     );
   }
 
-  Widget _buildListEditor(ColorScheme cs, shadcn.ColorScheme scs) {
+  Widget _buildListEditor(QueryaUiColors cs, QueryaUiColors scs) {
     return RedisListEditor(
       heading: _collectionHeading('List items'),
       items: _listValue,
@@ -902,33 +901,33 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       onPush: _listPush,
       onSet: _listSet,
       onRemove: _listRemove,
-      colorScheme: cs,
+      colors: cs,
       shadcnCs: scs,
       footer: _hasMore ? _loadMoreTile() : null,
     );
   }
 
-  Widget _buildSetEditor(ColorScheme cs, shadcn.ColorScheme scs) {
+  Widget _buildSetEditor(QueryaUiColors cs, QueryaUiColors scs) {
     return RedisSetEditor(
       heading: _collectionHeading('Set members'),
       members: _setValue,
       isReadOnly: widget.isReadOnly,
       onAdd: _setAdd,
       onRemove: _setRemove,
-      colorScheme: cs,
+      colors: cs,
       shadcnCs: scs,
       footer: _hasMore ? _loadMoreTile() : null,
     );
   }
 
-  Widget _buildZsetEditor(ColorScheme cs, shadcn.ColorScheme scs) {
+  Widget _buildZsetEditor(QueryaUiColors cs, QueryaUiColors scs) {
     return RedisZsetEditor(
       heading: _collectionHeading('Sorted set'),
       members: _zsetValue,
       isReadOnly: widget.isReadOnly,
       onAdd: _zsetAdd,
       onRemove: _zsetRemove,
-      colorScheme: cs,
+      colors: cs,
       shadcnCs: scs,
       footer: _hasMore ? _loadMoreTile() : null,
     );

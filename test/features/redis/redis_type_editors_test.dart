@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/features/redis/editors/redis_hash_editor.dart';
 import 'package:querya_desktop/features/redis/editors/redis_list_editor.dart';
@@ -19,7 +21,7 @@ final _binary = RedisBulkValue.fromReply(Uint8List.fromList([0xff, 0xfe, 0x01]))
 
 Future<void> _pump(
   WidgetTester tester,
-  material.Widget Function(shadcn.ColorScheme cs) editor,
+  material.Widget Function(QueryaUiColors cs) editor,
 ) async {
   await tester.pumpWidget(
     queryaThemeTestShell(
@@ -29,7 +31,7 @@ Future<void> _pump(
           height: 600,
           child: material.Builder(
             builder: (context) =>
-                editor(shadcn.Theme.of(context).colorScheme),
+                editor(context.colors),
           ),
         ),
       ),
@@ -57,7 +59,7 @@ void main() {
           controller: controller,
           isReadOnly: false,
           onSave: () => saved++,
-          colorScheme: cs,
+          colors: cs,
         ),
       );
 
@@ -79,7 +81,7 @@ void main() {
           controller: controller,
           isReadOnly: false,
           onSave: () {},
-          colorScheme: cs,
+          colors: cs,
         ),
       );
       await tester.enterText(find.byType(material.TextField), 'changed');
@@ -98,7 +100,7 @@ void main() {
           controller: controller,
           isReadOnly: true,
           onSave: () {},
-          colorScheme: cs,
+          colors: cs,
         ),
       );
 
@@ -121,7 +123,7 @@ void main() {
           controller: controller,
           isReadOnly: false,
           onSave: () {},
-          colorScheme: cs,
+          colors: cs,
         ),
       );
 
@@ -155,7 +157,7 @@ void main() {
             isReadOnly: readOnly,
             onSet: onSet ?? (_, __) {},
             onDelete: onDelete ?? (_) {},
-            colorScheme: cs,
+            colors: cs,
             shadcnCs: cs,
             footer: footer,
           ),
@@ -253,7 +255,7 @@ void main() {
             onPush: onPush ?? (_) {},
             onSet: onSet ?? (_, __, {expectedCurrent}) async {},
             onRemove: onRemove ?? (_, __) {},
-            colorScheme: cs,
+            colors: cs,
             shadcnCs: cs,
           ),
         );
@@ -388,7 +390,7 @@ void main() {
             isReadOnly: readOnly,
             onAdd: onAdd ?? (_) {},
             onRemove: onRemove ?? (_) {},
-            colorScheme: cs,
+            colors: cs,
             shadcnCs: cs,
           ),
         );
@@ -456,7 +458,7 @@ void main() {
             isReadOnly: readOnly,
             onAdd: onAdd ?? (_, __) {},
             onRemove: onRemove ?? (_) {},
-            colorScheme: cs,
+            colors: cs,
             shadcnCs: cs,
           ),
         );

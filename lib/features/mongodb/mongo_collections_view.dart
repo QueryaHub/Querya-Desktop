@@ -1,6 +1,7 @@
 import 'dart:math' show min;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/actions/querya_schema_object.dart';
 import 'package:querya_desktop/core/actions/querya_schema_object_cache.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
@@ -8,8 +9,6 @@ import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/features/workspace/destructive_query_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 /// Displays the list of collections in a MongoDB database.
@@ -214,7 +213,7 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     if (_loading) {
       return const material.Center(
@@ -259,8 +258,8 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
     );
   }
 
-  Widget _buildCard(ColorScheme cs) {
-    final shadcnCs = shadcn.Theme.of(context).colorScheme;
+  Widget _buildCard(QueryaUiColors cs) {
+    final shadcnCs = context.colors;
     return material.Container(
       decoration: material.BoxDecoration(
         color: cs.card,
@@ -369,7 +368,7 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
                     itemBuilder: (context, i) {
                       return _CollectionRow(
                         collection: _collections[i],
-                        colorScheme: cs,
+                        colors: cs,
                         onView: () =>
                             widget.onCollectionTap?.call(_collections[i].name),
                         onDrop: () => _dropCollection(_collections[i].name),
@@ -388,19 +387,19 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
 class _CollectionRow extends StatelessWidget {
   const _CollectionRow({
     required this.collection,
-    required this.colorScheme,
+    required this.colors,
     required this.onView,
     required this.onDrop,
   });
 
   final _CollectionInfo collection;
-  final ColorScheme colorScheme;
+  final QueryaUiColors colors;
   final VoidCallback onView;
   final VoidCallback onDrop;
 
   @override
   Widget build(BuildContext context) {
-    final cs = colorScheme;
+    final cs = colors;
     return material.Material(
       color: Colors.transparent,
       child: material.InkWell(

@@ -1,14 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/motion/polling_controller.dart';
 import 'package:querya_desktop/core/util/deep_collection_equals.dart';
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
 import 'package:querya_desktop/core/database/mongodb_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 const _defaultAutoRefresh = Duration(seconds: 3);
@@ -196,7 +195,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView>
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     return PollStaleOverlay(
       status: polling.status,
@@ -220,7 +219,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView>
   }
 
   material.Widget _buildBody(
-      material.BuildContext context, shadcn.ColorScheme cs) {
+      material.BuildContext context, QueryaUiColors cs) {
     if (_loading) {
       return const material.Center(
         child: QueryaSpinner(
@@ -358,7 +357,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView>
   }
 
   material.Widget _header(material.BuildContext context) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     final last = _lastFetchedAt;
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
@@ -486,7 +485,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView>
 
   material.Widget _summaryChips(
       material.BuildContext context, Map<String, dynamic> status) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     final version = _getString(status, 'version') ?? '—';
     final uptime = _formatUptime(_getInt(status, 'uptime') ?? 0);
     final connections = _getNestedInt(status, 'connections', 'current') ?? 0;
@@ -565,7 +564,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView>
     double? minHeight,
     bool stretchBody = false,
   }) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.Container(
       width: double.infinity,
       constraints: minHeight != null
@@ -759,7 +758,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView>
 
   material.Widget _metricRow(
       material.BuildContext context, String label, String value) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.Padding(
       padding: const material.EdgeInsets.symmetric(vertical: 6),
       child: material.Row(

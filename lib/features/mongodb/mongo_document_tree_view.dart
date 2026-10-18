@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/theme/querya_semantic_palette.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
@@ -170,7 +171,7 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     if (widget.documents.isEmpty) {
       return material.Center(
@@ -256,7 +257,7 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
   Widget _buildDocumentNode(
     int docIndex,
     Map<String, dynamic> doc,
-    ColorScheme cs,
+    QueryaUiColors cs,
   ) {
     final docNodeId = 'doc_$docIndex';
     final isExpanded = _expandedNodeIds.contains(docNodeId);
@@ -404,7 +405,7 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
     required Object keyOrIndex,
     required Object? value,
     required int depth,
-    required ColorScheme cs,
+    required QueryaUiColors cs,
   }) {
     final currentPath = appendJsonPath(parentPath, keyOrIndex);
     final nodeId = 'doc_${docIndex}_$currentPath';
@@ -519,7 +520,7 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
     required bool isExpanded,
     required String jsonPath,
     required Object rawSubtree,
-    required ColorScheme cs,
+    required QueryaUiColors cs,
     required VoidCallback onToggle,
     required bool matchesSearch,
   }) {
@@ -598,7 +599,7 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
     required Object? value,
     required String jsonPath,
     required Map<String, dynamic> rootDoc,
-    required ColorScheme cs,
+    required QueryaUiColors cs,
   }) {
     final keyLabel = keyOrIndex is int ? '[$keyOrIndex]' : keyOrIndex.toString();
     final valueDisplay = _formatLeafDisplay(value);
@@ -711,7 +712,7 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
 
   Color _leafValueColor(
     Object? value,
-    ColorScheme cs,
+    QueryaUiColors cs,
     QueryaSemanticPalette palette,
   ) {
     if (value == null) return palette.muted;
