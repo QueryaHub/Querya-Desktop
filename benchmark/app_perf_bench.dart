@@ -270,7 +270,10 @@ Future<void> _runAll() async {
     throw StateError('the 200-table script failed: ${ddlSession.error}');
   }
   await _scenario('erd_open_200', () async {
-    await _tap(_byKey('open_diagram_tab'));
+    // Not a tap on the toolbar button: with seven query tabs open the tab bar
+    // is full and the button is pushed out of the 1280x720 window, so the tap
+    // landed on a tab and the diagram never opened (#1546).
+    ws.openDiagramTab();
     await _waitFor(() => ws.activeSession.isDiagram as bool, 'the Diagram tab',
         onTimeout: () => _dumpErdState(ws));
     await _waitFor(
