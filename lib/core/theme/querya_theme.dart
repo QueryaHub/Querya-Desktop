@@ -2,13 +2,11 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 import 'color_contrast.dart';
 import 'parser/vscode_theme_manifest.dart';
+import 'querya_color_scheme.dart';
 import 'querya_colors.dart';
+import 'querya_ui_colors.dart';
 import 'querya_editor_theme.dart';
 import 'querya_workbench_theme.dart';
-
-/// The type of [QueryaTheme.colorScheme], nameable by widgets that must not
-/// import the UI library behind it.
-typedef QueryaThemeColorScheme = ColorScheme;
 
 /// Full Querya theme: workbench chrome + editor tokens + shadcn [ColorScheme].
 class QueryaTheme {
@@ -24,6 +22,9 @@ class QueryaTheme {
   final QueryaEditorTheme editor;
   final Brightness brightness;
   final ColorScheme colorScheme;
+
+  /// [colorScheme] as the app's own colour type (#1730).
+  QueryaUiColors get colors => colorScheme.uiColors;
 
   /// VS Code `tokenColors` for syntax highlighting (imported themes).
   final List<TokenColorRule> tokenColors;
