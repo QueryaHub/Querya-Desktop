@@ -11,6 +11,8 @@ import 'package:querya_desktop/features/mongodb/mongo_documents_json_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_documents_table_view.dart';
 import 'package:querya_desktop/features/mongodb/mongo_query_executor.dart';
 import 'package:querya_desktop/features/mongodb/mql_parser.dart';
+import 'package:querya_desktop/core/database/query_error_text.dart';
+import 'package:querya_desktop/shared/widgets/query_error_view.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
@@ -499,15 +501,7 @@ class _MongoQueryWorkspaceState extends material.State<MongoQueryWorkspace> {
               ],
             ),
             const Gap(8),
-            material.SelectableText(
-              tab.error!,
-              style: material.TextStyle(
-                color: cs.destructive,
-                fontFamily: QueryaTypography.mono,
-                fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
-                fontSize: 12.5,
-              ),
-            ),
+            QueryErrorView(error: QueryErrorText.parse(tab.error!), inline: true),
           ],
         ),
       );

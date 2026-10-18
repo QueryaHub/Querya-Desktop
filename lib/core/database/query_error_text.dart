@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:postgres/postgres.dart' show ServerException;
+
 /// A failed query as the results pane shows it (#1557): one readable line,
 /// and the driver's text without the statement the app wrapped around the
 /// user's SQL.
@@ -69,4 +73,41 @@ class QueryErrorText {
 
   static String _cap(String s) =>
       s.length <= _maxSummary ? s : '${s.substring(0, _maxSummary)}…';
+
+  /// `SELECT * FROM (\n` the wrapper puts before the user's SQL.
+  static const _wrapperPrefix = 'SELECT * FROM (\n';
+
+  // SQLite: `Causing statement (at position 29): ...`, a byte offset into the
+  // statement the driver prepared.
+  static final _sqlitePosition = RegExp(r'\(at position (\d+)\)');
+
+  /// Where in [sql], the text that was sent, the error is: a 0-based offset in
+  /// characters, or null when the driver does not say (MySQL) or the place is
+  /// not in [sql].
+  ///
+  /// PostgreSQL gives a 1-based character position in the statement; SQLite a
+  /// byte offset in the statement it prepared, which is the user's SQL inside
+  /// the app's wrapper when [sql] is a query (#1144), so the wrapper's prefix
+  /// is taken off. The row limit the app appends comes after the text, so it
+  /// does not move anything.
+  static int? offsetIn(Object error, String sql) {
+    if (error is ServerException) return offsetOfPgPosition(error.position, sql);
+    final text = error.toString();
+    final m = _sqlitePosition.firstMatch(text);
+    if (m == null) return null;
+    var bytes = int.parse(m[1]!);
+    if (text.contains(_wrapperPrefix)) bytes -= _wrapperPrefix.length;
+    if (bytes < 0) return null;
+    final encoded = utf8.encode(sql);
+    if (bytes > encoded.length) return null;
+    return utf8.decode(encoded.sublist(0, bytes), allowMalformed: true).length;
+  }
+
+  /// The offset in [sql] of a PostgreSQL `position` (1-based, in characters),
+  /// or null when there is none or it lies outside [sql].
+  static int? offsetOfPgPosition(int? position, String sql) {
+    if (position == null) return null;
+    final offset = position - 1;
+    return offset >= 0 && offset <= sql.length ? offset : null;
+  }
 }

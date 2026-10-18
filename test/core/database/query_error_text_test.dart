@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/query_error_text.dart';
 
 void main() {
+  _positionTests();
   group('QueryErrorText (#1557)', () {
     // The example from the issue, as sqflite_common_ffi prints it.
     const sqlite =
@@ -68,6 +69,54 @@ void main() {
       final e = QueryErrorText.parse(long);
       expect(e.summary.length, lessThan(320));
       expect(e.detail, long);
+    });
+  });
+}
+
+void _positionTests() {
+  group('where the error is in the user\'s SQL (#1557)', () {
+    String sqliteError(String wrappedSql, int at) =>
+        'SqliteFfiException(sqlite_error: 1, , SqliteException(1): while '
+        'preparing statement, no such column: x, SQL logic error (code 1)\n'
+        '  Causing statement (at position $at): $wrappedSql})';
+
+    test('SQLite: the wrapper prefix is taken off', () {
+      const sql = 'SELECT a, nope FROM t';
+      final error = sqliteError('SELECT * FROM (\n$sql\n)\nLIMIT 5000', 16 + 10);
+      expect(QueryErrorText.offsetIn(error, sql), 10);
+      expect(sql.substring(10, 14), 'nope');
+    });
+
+    test('SQLite: without the wrapper the offset is the position', () {
+      const sql = 'UPDATE t SET nope = 1';
+      final error = sqliteError(sql, 13);
+      expect(QueryErrorText.offsetIn(error, sql), 13);
+    });
+
+    test('SQLite counts bytes, the editor counts characters', () {
+      const sql = "SELECT 'héllo', nope FROM t";
+      // `é` is two bytes: `nope` starts at character 16, byte 17.
+      final error = sqliteError('SELECT * FROM (\n$sql\n)', 16 + 17);
+      expect(QueryErrorText.offsetIn(error, sql), 16);
+      expect(sql.substring(16, 20), 'nope');
+    });
+
+    test('a position outside the text, or none, gives no offset', () {
+      expect(QueryErrorText.offsetIn(sqliteError('SELECT 1', 500), 'SELECT 1'),
+          isNull);
+      expect(
+          QueryErrorText.offsetIn(
+              Exception('MySQLServerException [1064]: syntax error'), 'SELECT'),
+          isNull);
+    });
+
+    test('PostgreSQL positions are 1-based characters', () {
+      const sql = 'SELECT nope FROM t';
+      expect(QueryErrorText.offsetOfPgPosition(8, sql), 7);
+      expect(sql.substring(7, 11), 'nope');
+      expect(QueryErrorText.offsetOfPgPosition(null, sql), isNull);
+      expect(QueryErrorText.offsetOfPgPosition(0, sql), isNull);
+      expect(QueryErrorText.offsetOfPgPosition(99, sql), isNull);
     });
   });
 }
