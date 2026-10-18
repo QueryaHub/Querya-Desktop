@@ -77,11 +77,11 @@ class _ErdViewNameDialogState extends material.State<_ErdViewNameDialog> {
                     .muted()
                     .small(),
                 const material.SizedBox(height: 16),
-                TextField(
+                QueryaTextField(
                   key: const material.ValueKey('erd_view_name'),
                   controller: _name,
                   autofocus: true,
-                  placeholder: const Text('View name'),
+                  placeholder: 'View name',
                   onSubmitted: (_) => _submit(),
                 ),
               ],

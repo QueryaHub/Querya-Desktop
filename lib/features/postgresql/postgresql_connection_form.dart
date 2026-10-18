@@ -431,10 +431,10 @@ class _PostgresConnectionFormContentState
         material.Row(
           children: [
             material.Expanded(
-              child: TextField(
+              child: QueryaTextField(
                 key: Key(label),
                 controller: controller,
-                placeholder: const Text('/path/to/file.pem'),
+                placeholder: '/path/to/file.pem',
                 onChanged: (_) => _syncUriSslParams(),
               ),
             ),
@@ -549,9 +549,9 @@ class _PostgresConnectionFormContentState
                       // Connection Name
                       const Text('Connection Name').small().semiBold(),
                       const Gap(8),
-                      TextField(
+                      QueryaTextField(
                         controller: _nameController,
-                        placeholder: const Text('My PostgreSQL Server'),
+                        placeholder: 'My PostgreSQL Server',
                       ),
                       const Gap(16),
                       const Text('Connection URI (optional)').small().semiBold(),
@@ -566,11 +566,9 @@ class _PostgresConnectionFormContentState
                         '(seconds). If sslmode is omitted, Use SSL/TLS below applies.',
                       ).muted().small(),
                       const Gap(8),
-                      TextField(
+                      QueryaTextField(
                         controller: _connectionStringController,
-                        placeholder: const Text(
-                          'postgresql://user:pass@host:5432/dbname?sslmode=require',
-                        ),
+                        placeholder: 'postgresql://user:pass@host:5432/dbname?sslmode=require',
                       ),
                       const Gap(16),
                       ConnectionHostPortSection(

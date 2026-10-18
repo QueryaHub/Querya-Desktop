@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/app_theme.dart';
 import 'package:querya_desktop/features/postgresql/postgresql_connection_form.dart';
@@ -116,10 +117,7 @@ void main() {
       await tester.enterText(
         find.byWidgetPredicate(
           (w) =>
-              w is TextField &&
-              w.placeholder is Text &&
-              (w.placeholder as Text).data ==
-                  'postgresql://user:pass@host:5432/dbname?sslmode=require',
+              w is QueryaTextField && w.placeholder == 'postgresql://user:pass@host:5432/dbname?sslmode=require',
         ),
         'postgresql://u:p@remote.example.com:5433/db',
       );
@@ -156,10 +154,7 @@ void main() {
       await tester.enterText(
         find.byWidgetPredicate(
           (w) =>
-              w is TextField &&
-              w.placeholder is Text &&
-              (w.placeholder as Text).data ==
-                  'postgresql://user:pass@host:5432/dbname?sslmode=require',
+              w is QueryaTextField && w.placeholder == 'postgresql://user:pass@host:5432/dbname?sslmode=require',
         ),
         'postgresql://u:p@remote.example.com:5433/db',
       );
@@ -184,13 +179,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final uriField = tester.widget<TextField>(
+      final uriField = tester.widget<QueryaTextField>(
         find.byWidgetPredicate(
           (w) =>
-              w is TextField &&
-              w.placeholder is Text &&
-              (w.placeholder as Text).data ==
-                  'postgresql://user:pass@host:5432/dbname?sslmode=require',
+              w is QueryaTextField && w.placeholder == 'postgresql://user:pass@host:5432/dbname?sslmode=require',
         ),
       );
       expect(uriField.controller?.text, contains('sslrootcert'));
@@ -223,9 +215,7 @@ void main() {
       await tester.enterText(
         find.byWidgetPredicate(
           (w) =>
-              w is TextField &&
-              w.placeholder is Text &&
-              (w.placeholder as Text).data == 'My PostgreSQL Server',
+              w is QueryaTextField && w.placeholder == 'My PostgreSQL Server',
         ),
         'Cert PG',
       );
@@ -233,9 +223,7 @@ void main() {
         find
             .byWidgetPredicate(
               (w) =>
-                  w is TextField &&
-                  w.placeholder is Text &&
-                  (w.placeholder as Text).data == 'localhost',
+                  w is QueryaTextField && w.placeholder == 'localhost',
             )
             .first,
         'pg.example.com',
@@ -244,9 +232,7 @@ void main() {
         find
             .byWidgetPredicate(
               (w) =>
-                  w is TextField &&
-                  w.placeholder is Text &&
-                  (w.placeholder as Text).data == 'postgres',
+                  w is QueryaTextField && w.placeholder == 'postgres',
             )
             .first,
         'appdb',
@@ -255,9 +241,7 @@ void main() {
         find
             .byWidgetPredicate(
               (w) =>
-                  w is TextField &&
-                  w.placeholder is Text &&
-                  (w.placeholder as Text).data == 'postgres',
+                  w is QueryaTextField && w.placeholder == 'postgres',
             )
             .last,
         'admin',
@@ -265,9 +249,7 @@ void main() {
       await tester.enterText(
         find.byWidgetPredicate(
           (w) =>
-              w is TextField &&
-              w.placeholder is Text &&
-              (w.placeholder as Text).data == 'Password',
+              w is QueryaTextField && w.placeholder == 'Password',
         ),
         'secret',
       );

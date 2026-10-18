@@ -251,9 +251,9 @@ class _SqliteConnectionFormContentState
                         // Connection Name
                         const Text('Connection name').small().semiBold(),
                         const Gap(8),
-                        TextField(
+                        QueryaTextField(
                           controller: _nameController,
-                          placeholder: const Text('e.g. Local Cache'),
+                          placeholder: 'e.g. Local Cache',
                         ),
                         if (_nameTouched && _nameController.text.trim().isEmpty) ...[
                           const Gap(4),
@@ -277,9 +277,9 @@ class _SqliteConnectionFormContentState
                         material.Row(
                           children: [
                             material.Expanded(
-                              child: TextField(
+                              child: QueryaTextField(
                                 controller: _pathController,
-                                placeholder: const Text('/path/to/database.db'),
+                                placeholder: '/path/to/database.db',
                               ),
                             ),
                             const Gap(10),

@@ -53,9 +53,9 @@ class _RedisSetEditorState extends material.State<RedisSetEditor> {
           material.Row(
             children: [
               material.Expanded(
-                child: TextField(
+                child: QueryaTextField(
                   controller: _valueController,
-                  placeholder: const Text('New member'),
+                  placeholder: 'New member',
                 ),
               ),
               const Gap(8),

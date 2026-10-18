@@ -349,9 +349,9 @@ class _RedisConnectionFormContentState
                     children: [
                       const Text('Connection Name').small().semiBold(),
                       const Gap(8),
-                      TextField(
+                      QueryaTextField(
                       controller: _nameController,
-                      placeholder: const Text('My Redis Server'),
+                      placeholder: 'My Redis Server',
                     ),
                     const Gap(16),
                     const Text('Connection URI (optional)').small().semiBold(),
@@ -361,9 +361,9 @@ class _RedisConnectionFormContentState
                       'sslcert, sslkey.',
                     ).muted().small(),
                     const Gap(8),
-                    TextField(
+                    QueryaTextField(
                       controller: _connectionStringController,
-                      placeholder: const Text('rediss://user:pass@host:6379'),
+                      placeholder: 'rediss://user:pass@host:6379',
                     ),
                     const Gap(16),
                     material.Row(
@@ -377,9 +377,9 @@ class _RedisConnectionFormContentState
                             children: [
                               const Text('Host').small().semiBold(),
                               const Gap(8),
-                              TextField(
+                              QueryaTextField(
                                 controller: _hostController,
-                                placeholder: const Text('localhost'),
+                                placeholder: 'localhost',
                               ),
                             ],
                           ),
@@ -394,9 +394,9 @@ class _RedisConnectionFormContentState
                             children: [
                               const Text('Port').small().semiBold(),
                               const Gap(8),
-                              TextField(
+                              QueryaTextField(
                                 controller: _portController,
-                                placeholder: const Text('6379'),
+                                placeholder: '6379',
                               ),
                             ],
                           ),
@@ -408,10 +408,9 @@ class _RedisConnectionFormContentState
                         .small()
                         .semiBold(),
                     const Gap(8),
-                    TextField(
+                    QueryaTextField(
                       controller: _usernameController,
-                      placeholder:
-                          const Text('default (leave empty for default user)'),
+                      placeholder: 'default (leave empty for default user)',
                     ),
                     const Gap(16),
                     const Text('Password (optional)').small().semiBold(),
@@ -424,14 +423,12 @@ class _RedisConnectionFormContentState
                     const Gap(8),
                     material.Stack(
                       children: [
-                        TextField(
+                        QueryaTextField(
                           controller: _passwordController,
                           enabled: !_removeSavedPassword,
-                          placeholder: Text(
-                            _isEditing
+                          placeholder: _isEditing
                                 ? 'Leave blank to keep existing'
                                 : 'Password',
-                          ),
                           obscureText: !_showPassword,
                         ),
                         material.Positioned(

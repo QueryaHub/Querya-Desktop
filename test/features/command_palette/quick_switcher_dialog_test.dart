@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/actions/querya_command_host.dart';
 import 'package:querya_desktop/core/actions/querya_schema_object.dart';
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
@@ -65,7 +66,7 @@ void main() {
     expect(find.text('Go to table, view, collection…'), findsOneWidget);
     expect(find.byKey(const ValueKey('pg:app:public:table:users')), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), 'users');
+    await tester.enterText(find.byType(QueryaTextField), 'users');
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
 

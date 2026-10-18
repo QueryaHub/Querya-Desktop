@@ -763,11 +763,11 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
                       }
                       return KeyEventResult.ignored;
                     },
-                    child: TextField(
+                    child: QueryaTextField(
                       controller: _inputController,
                       focusNode: _inputFocusNode,
                       autofocus: true,
-                      placeholder: const Text('Enter Redis command (Tab to autocomplete)...'),
+                      placeholder: 'Enter Redis command (Tab to autocomplete)...',
                       onSubmitted: (_) => _submitCommand(),
                     ),
                   ),

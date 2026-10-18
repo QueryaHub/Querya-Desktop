@@ -70,13 +70,13 @@ class _ErdNoteDialogState extends material.State<_ErdNoteDialog> {
                     .muted()
                     .small(),
                 const material.SizedBox(height: 16),
-                TextField(
+                QueryaTextField(
                   key: const material.ValueKey('erd_note_text'),
                   controller: _text,
                   autofocus: true,
                   minLines: 4,
                   maxLines: 8,
-                  placeholder: const Text('Note'),
+                  placeholder: 'Note',
                 ),
               ],
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/theme/querya_editor_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
@@ -42,7 +43,7 @@ class QueryaCodeEditor extends StatefulWidget {
   /// When null, uses [QueryaEditorTheme.fontSize] from scope.
   final bool readOnly;
   final ValueChanged<String>? onChanged;
-  final Widget? placeholder;
+  final String? placeholder;
   final QueryaCodeEditorVariant variant;
   final bool expands;
   final int? maxLines;
@@ -234,13 +235,11 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
       widget.textAlignVertical ??
       (widget.expands ? material.TextAlignVertical.top : null);
 
-  Widget? _resolvedPlaceholder() {
+  String? _resolvedPlaceholder() {
     if (widget.placeholder != null) return widget.placeholder;
     return switch (widget.language) {
-      QueryaCodeLanguage.sql => const Text(
-          '-- Enter SQL here…\nSELECT 1;',
-        ),
-      QueryaCodeLanguage.json => const Text('{ }'),
+      QueryaCodeLanguage.sql => '-- Enter SQL here…\nSELECT 1;',
+      QueryaCodeLanguage.json => '{ }',
       QueryaCodeLanguage.plain => null,
     };
   }
@@ -271,16 +270,22 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
       );
     }
 
-    return TextField(
-      controller: controller,
-      focusNode: widget.focusNode,
-      autofocus: widget.autofocus,
-      readOnly: widget.readOnly,
-      maxLines: widget.expands ? null : widget.maxLines,
-      expands: widget.expands,
-      style: style,
-      textAlignVertical: _verticalAlignment,
-      placeholder: placeholder,
+    // The editor sits in a card of its own (`SqlEditorChrome`), so the field
+    // draws no frame; the padding is the material variant's.
+    return material.Padding(
+      padding: widget.contentPadding ?? const material.EdgeInsets.all(12),
+      child: QueryaTextField(
+        framed: false,
+        controller: controller,
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
+        readOnly: widget.readOnly,
+        maxLines: widget.expands ? null : widget.maxLines,
+        expands: widget.expands,
+        style: style,
+        textAlignVertical: _verticalAlignment,
+        placeholder: placeholder,
+      ),
     );
   }
 }

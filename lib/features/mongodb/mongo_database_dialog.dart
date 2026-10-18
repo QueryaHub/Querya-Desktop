@@ -79,9 +79,9 @@ class _CreateMongoDBDialogContentState
               children: [
                 const Text('Database Name').small().semiBold(),
                 const Gap(8),
-                TextField(
+                QueryaTextField(
                   controller: _nameController,
-                  placeholder: const Text('mydb'),
+                  placeholder: 'mydb',
                 ),
               ],
             ),

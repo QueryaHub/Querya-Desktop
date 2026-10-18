@@ -246,9 +246,9 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                     children: [
                       const Text('Bastion Host').small().muted(),
                       const Gap(4),
-                      TextField(
+                      QueryaTextField(
                         controller: _hostController,
-                        placeholder: const Text('bastion.corp.example.com'),
+                        placeholder: 'bastion.corp.example.com',
                       ),
                     ],
                   ),
@@ -261,9 +261,9 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                     children: [
                       const Text('SSH Port').small().muted(),
                       const Gap(4),
-                      TextField(
+                      QueryaTextField(
                         controller: _portController,
-                        placeholder: const Text('22'),
+                        placeholder: '22',
                       ),
                     ],
                   ),
@@ -279,9 +279,9 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                     children: [
                       const Text('SSH Username').small().muted(),
                       const Gap(4),
-                      TextField(
+                      QueryaTextField(
                         controller: _usernameController,
-                        placeholder: const Text('ubuntu / root / ec2-user'),
+                        placeholder: 'ubuntu / root / ec2-user',
                       ),
                     ],
                   ),
@@ -341,13 +341,11 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                 children: [
                   const Text('SSH Password').small().muted(),
                   const Gap(4),
-                  TextField(
+                  QueryaTextField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
-                    placeholder: const Text('••••••••'),
-                    features: [
-                      InputFeature.trailing(
-                        QueryaButton.icon(
+                    placeholder: '••••••••',
+                    trailing: QueryaButton.icon(
                           icon: _obscurePassword
                               ? material.Icons.visibility_off_outlined
                               : material.Icons.visibility_outlined,
@@ -357,8 +355,6 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                             setState(() => _obscurePassword = !_obscurePassword);
                           },
                         ),
-                      ),
-                    ],
                   ),
                 ],
               ),
@@ -374,9 +370,9 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                             .small()
                             .muted(),
                         const Gap(4),
-                        TextField(
+                        QueryaTextField(
                           controller: _keyPathController,
-                          placeholder: const Text('~/.ssh/id_rsa or click Browse'),
+                          placeholder: '~/.ssh/id_rsa or click Browse',
                         ),
                       ],
                     ),
@@ -395,13 +391,11 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                 children: [
                   const Text('Key Passphrase (optional)').small().muted(),
                   const Gap(4),
-                  TextField(
+                  QueryaTextField(
                     controller: _passphraseController,
                     obscureText: _obscurePassphrase,
-                    placeholder: const Text('Passphrase if key is encrypted'),
-                    features: [
-                      InputFeature.trailing(
-                        QueryaButton.icon(
+                    placeholder: 'Passphrase if key is encrypted',
+                    trailing: QueryaButton.icon(
                           icon: _obscurePassphrase
                               ? material.Icons.visibility_off_outlined
                               : material.Icons.visibility_outlined,
@@ -411,8 +405,6 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                             setState(() => _obscurePassphrase = !_obscurePassphrase);
                           },
                         ),
-                      ),
-                    ],
                   ),
                 ],
               ),
@@ -482,11 +474,9 @@ class _SshTunnelSectionState extends material.State<SshTunnelSection> {
                         .small()
                         .muted(),
                     const Gap(4),
-                    TextField(
+                    QueryaTextField(
                       controller: _fingerprintController,
-                      placeholder: const Text(
-                        'SHA256:... (leave blank to trust on first connect)',
-                      ),
+                      placeholder: 'SHA256:... (leave blank to trust on first connect)',
                     ),
                     const Gap(6),
                     const Text(

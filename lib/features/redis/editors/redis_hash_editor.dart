@@ -55,16 +55,16 @@ class _RedisHashEditorState extends material.State<RedisHashEditor> {
           material.Row(
             children: [
               material.Expanded(
-                child: TextField(
+                child: QueryaTextField(
                   controller: _fieldController,
-                  placeholder: const Text('Field'),
+                  placeholder: 'Field',
                 ),
               ),
               const Gap(8),
               material.Expanded(
-                child: TextField(
+                child: QueryaTextField(
                   controller: _valueController,
-                  placeholder: const Text('Value'),
+                  placeholder: 'Value',
                 ),
               ),
               const Gap(8),

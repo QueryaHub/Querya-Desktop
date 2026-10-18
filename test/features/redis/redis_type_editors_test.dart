@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
@@ -10,8 +11,6 @@ import 'package:querya_desktop/features/redis/editors/redis_list_editor.dart';
 import 'package:querya_desktop/features/redis/editors/redis_set_editor.dart';
 import 'package:querya_desktop/features/redis/editors/redis_string_editor.dart';
 import 'package:querya_desktop/features/redis/editors/redis_zset_editor.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -41,8 +40,7 @@ Future<void> _pump(
 }
 
 Finder _field(String placeholder) => find.byWidgetPredicate(
-      (w) => w is shadcn.TextField && w.placeholder is shadcn.Text &&
-          (w.placeholder! as shadcn.Text).data == placeholder,
+      (w) => w is QueryaTextField && w.placeholder == placeholder,
     );
 
 void main() {
@@ -308,7 +306,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Edit Item [1]'), findsOneWidget);
 
-      await tester.enterText(find.byType(shadcn.TextField).last, 'changed');
+      await tester.enterText(find.byType(QueryaTextField).last, 'changed');
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
 

@@ -436,10 +436,9 @@ class _MongoConnectionFormContentState
                     if (_useConnectionString) ...[
                       const Text('Connection String').small().semiBold(),
                       const Gap(8),
-                      TextField(
+                      QueryaTextField(
                         controller: _connectionStringController,
-                        placeholder: const Text(
-                            'mongodb://username:password@host:port/database'),
+                        placeholder: 'mongodb://username:password@host:port/database',
                         maxLines: 2,
                       ),
                       const Gap(16),
@@ -467,9 +466,9 @@ class _MongoConnectionFormContentState
                       // Connection name
                       const Text('Connection Name').small().semiBold(),
                       const Gap(8),
-                      TextField(
+                      QueryaTextField(
                         controller: _nameController,
-                        placeholder: const Text('My MongoDB Server'),
+                        placeholder: 'My MongoDB Server',
                       ),
                       const Gap(16),
                       // Host and Port
@@ -507,9 +506,9 @@ class _MongoConnectionFormContentState
                                     .small()
                                     .semiBold(),
                                 const Gap(8),
-                                TextField(
+                                QueryaTextField(
                                   controller: _databaseController,
-                                  placeholder: const Text('admin'),
+                                  placeholder: 'admin',
                                 ),
                               ],
                             ),
@@ -525,9 +524,9 @@ class _MongoConnectionFormContentState
                                     .small()
                                     .semiBold(),
                                 const Gap(8),
-                                TextField(
+                                QueryaTextField(
                                   controller: _authSourceController,
-                                  placeholder: const Text('admin'),
+                                  placeholder: 'admin',
                                 ),
                               ],
                             ),

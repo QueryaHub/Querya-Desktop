@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 
 /// Drives the Command Palette (`Ctrl+P`) the way a user does.
 class E2ePalette {
@@ -15,7 +16,7 @@ class E2ePalette {
   }
 
   static Future<void> search(WidgetTester tester, String query) async {
-    await tester.enterText(find.byType(TextField).last, query);
+    await tester.enterText(find.byType(QueryaTextField).last, query);
     await tester.pump(const Duration(milliseconds: 50));
   }
 

@@ -72,4 +72,16 @@ void main() {
     expect(offenders, isEmpty,
         reason: 'Import shadcn with `hide Gap` and take Gap from package:gap.');
   });
+
+  test('text inputs are QueryaTextField, not shadcn TextField (#1733)', () {
+    final shadcnField = RegExp(r'(?<![\w.])TextField\(|\bInputFeature\.');
+    final offenders = <String>[
+      for (final MapEntry(:key, :value) in sources().entries)
+        if (key != 'lib/shared/widgets/querya_text_field.dart' &&
+            shadcnField.hasMatch(value))
+          key,
+    ];
+    expect(offenders, isEmpty,
+        reason: 'Use QueryaTextField (the barrel hides shadcn TextField).');
+  });
 }

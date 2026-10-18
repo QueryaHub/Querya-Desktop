@@ -394,9 +394,9 @@ class _MysqlConnectionFormContentState
                     children: [
                       const Text('Connection Name').small().semiBold(),
                       const Gap(8),
-                      TextField(
+                      QueryaTextField(
                       controller: _nameController,
-                      placeholder: const Text('My MySQL Server'),
+                      placeholder: 'My MySQL Server',
                     ),
                     const Gap(16),
                     const Text('Connection URI (optional)').small().semiBold(),
@@ -412,11 +412,9 @@ class _MysqlConnectionFormContentState
                       'prefer/require encrypt; verify_* needs sslrootcert.',
                     ).muted().small(),
                     const Gap(8),
-                    TextField(
+                    QueryaTextField(
                       controller: _connectionStringController,
-                      placeholder: const Text(
-                        'mysql://user:pass@host:3306/dbname?ssl-mode=disable',
-                      ),
+                      placeholder: 'mysql://user:pass@host:3306/dbname?ssl-mode=disable',
                     ),
                     const Gap(16),
                     ConnectionHostPortSection(

@@ -43,9 +43,9 @@ class _ConnectionAuthSectionState extends material.State<ConnectionAuthSection> 
       children: [
         Text(widget.usernameLabel).small().semiBold(),
         const Gap(8),
-        TextField(
+        QueryaTextField(
           controller: widget.usernameController,
-          placeholder: Text(widget.usernamePlaceholder),
+          placeholder: widget.usernamePlaceholder,
         ),
       ],
     );
@@ -65,12 +65,10 @@ class _ConnectionAuthSectionState extends material.State<ConnectionAuthSection> 
         const Gap(8),
         material.Stack(
           children: [
-            TextField(
+            QueryaTextField(
               controller: widget.passwordController,
               enabled: !widget.removeSavedPassword,
-              placeholder: Text(
-                widget.isEditing ? 'Leave blank to keep existing' : 'Password',
-              ),
+              placeholder: widget.isEditing ? 'Leave blank to keep existing' : 'Password',
               obscureText: !_showPassword,
             ),
             material.Positioned(

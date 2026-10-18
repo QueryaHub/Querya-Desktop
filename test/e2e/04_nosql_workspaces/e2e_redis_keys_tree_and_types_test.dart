@@ -142,7 +142,7 @@ void main() {
     await tester.enterText(
       find.descendant(
         of: find.byType(QueryaModalDialog),
-        matching: find.byType(TextField),
+        matching: find.byType(QueryaTextField),
       ),
       '120',
     );
@@ -175,7 +175,7 @@ void main() {
     await tester.enterText(
       find.descendant(
         of: find.byType(QueryaModalDialog),
-        matching: find.byType(TextField),
+        matching: find.byType(QueryaTextField),
       ),
       '0',
     );

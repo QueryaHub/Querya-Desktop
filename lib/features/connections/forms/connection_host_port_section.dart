@@ -39,9 +39,9 @@ class ConnectionHostPortSection extends StatelessWidget {
             children: [
               Text(hostLabel).small().semiBold(),
               const Gap(8),
-              TextField(
+              QueryaTextField(
                 controller: hostController,
-                placeholder: Text(hostPlaceholder),
+                placeholder: hostPlaceholder,
               ),
             ],
           ),
@@ -55,9 +55,9 @@ class ConnectionHostPortSection extends StatelessWidget {
             children: [
               Text(portLabel).small().semiBold(),
               const Gap(8),
-              TextField(
+              QueryaTextField(
                 controller: portController,
-                placeholder: Text(portPlaceholder),
+                placeholder: portPlaceholder,
               ),
             ],
           ),

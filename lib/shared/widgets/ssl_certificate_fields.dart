@@ -78,10 +78,10 @@ class _SslFileField extends material.StatelessWidget {
         material.Row(
           children: [
             material.Expanded(
-              child: TextField(
+              child: QueryaTextField(
                 key: Key(label),
                 controller: controller,
-                placeholder: const Text('/path/to/file.pem'),
+                placeholder: '/path/to/file.pem',
                 onChanged: onChanged == null ? null : (_) => onChanged!(),
               ),
             ),

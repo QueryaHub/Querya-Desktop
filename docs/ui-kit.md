@@ -38,6 +38,21 @@ QueryaSearchField(
 
 Anti-pattern: a bare `TextField` with a manual `Timer` for debouncing.
 
+### `QueryaTextField`
+
+The text input of every form (#1733). A single line has the height of a control size (the nearest `QueryaControlScope`, else `md`), so a field and a `Browse…` button in one row line up; `maxLines` / `minLines` / `expands` make it grow. The border takes the accent while it has the keyboard and the destructive colour with an `errorText`.
+
+```dart
+QueryaTextField(
+  controller: _host,
+  placeholder: 'localhost',
+  leading: const Icon(Icons.dns_outlined),
+)
+QueryaTextField(controller: _password, obscureText: true) // show / hide button
+```
+
+`leading` / `trailing` take an icon or a small button; `framed: false` is for a field inside a frame of its own (the code editor). The barrel hides shadcn's `TextField`; `test/guards/shadcn_imports_ratchet_test.dart` rejects it anywhere in `lib/`.
+
 ### `QueryaIconButton` / `QueryaToolbarButton`
 
 Compact toolbar buttons with `tooltip`, `isActive`, `isDestructive` and a

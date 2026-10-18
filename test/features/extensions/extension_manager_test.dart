@@ -218,7 +218,7 @@ void main() {
 
       testWidgets('debounces keystrokes into a single request', (tester) async {
         final repo = await openMarketplace(tester);
-        final field = find.byType(TextField);
+        final field = find.byType(QueryaTextField);
 
         for (final q in ['c', 'cl', 'cli', 'click']) {
           await tester.enterText(field, q);
@@ -235,7 +235,7 @@ void main() {
 
       testWidgets('a stale response arriving late is ignored', (tester) async {
         final repo = await openMarketplace(tester);
-        final field = find.byType(TextField);
+        final field = find.byType(QueryaTextField);
 
         await tester.enterText(field, 'click');
         await tester.pump(kMarketplaceSearchDebounce);
@@ -257,7 +257,7 @@ void main() {
           (tester) async {
         final repo = await openMarketplace(tester);
 
-        await tester.enterText(find.byType(TextField), 'click');
+        await tester.enterText(find.byType(QueryaTextField), 'click');
         await tester.pump(kMarketplaceSearchDebounce);
         expect(repo.searches, ['click']);
 
@@ -273,7 +273,7 @@ void main() {
           (tester) async {
         final repo = await openMarketplace(tester);
 
-        await tester.enterText(find.byType(TextField), 'click');
+        await tester.enterText(find.byType(QueryaTextField), 'click');
         await tester.pumpWidget(const material.SizedBox());
         await tester.pump(kMarketplaceSearchDebounce * 2);
 

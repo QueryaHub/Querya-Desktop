@@ -304,9 +304,9 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
                 const Spacer(),
                 material.SizedBox(
                   width: 180,
-                  child: TextField(
+                  child: QueryaTextField(
                     controller: _newDbController,
-                    placeholder: const Text('New database...'),
+                    placeholder: 'New database...',
                   ),
                 ),
                 const Gap(8),
