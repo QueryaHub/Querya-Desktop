@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:mysql_client/mysql_client.dart';
 import 'package:querya_desktop/core/database/statement_queue.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
+import 'package:querya_desktop/core/database/ssh_tunnel_host.dart';
 import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/database/mysql_result_cells.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
@@ -94,7 +95,7 @@ String replaceDatabaseInMysqlConnectionString(
 }
 
 /// Pure-Dart MySQL client wrapper around [MySQLConnection] (`mysql_client`).
-class MysqlConnection {
+class MysqlConnection with SshTunnelHost {
   MysqlConnection({
     required this.id,
     required this.name,
@@ -138,11 +139,10 @@ class MysqlConnection {
   final bool useSSL;
   String? _connectionString;
 
+  @override
   final SshTunnelConfig? sshConfig;
+  @override
   final SshTunnelSecrets? sshSecrets;
-  SshTunnelHandle? _sshTunnelHandle;
-
-  SshTunnelHandle? get sshTunnelHandle => _sshTunnelHandle;
 
   String? get password => _password;
   String? get connectionString => _connectionString;
@@ -237,27 +237,9 @@ class MysqlConnection {
     }
 
     try {
-      if (sshConfig != null && sshConfig!.enabled) {
-        var sec = sshSecrets;
-        if (sec == null && id > 0) {
-          final stored =
-              await ConnectionSecretsStore.readSshSecretsForConnection(id);
-          sec = SshTunnelSecrets(
-            password: stored.password,
-            privateKey: stored.privateKey,
-            passphrase: stored.passphrase,
-            jumpPassword: stored.jumpPassword,
-          );
-        }
-        openedHandle = await SshTunnelManager.instance.openTunnel(
-          config: sshConfig!,
-          secrets: sec ?? SshTunnelSecrets(),
-          remoteHost: host,
-          remotePort: port,
-        );
-        if (generation != _generation) throw _ConnectSuperseded();
-        _sshTunnelHandle = openedHandle;
-      }
+      openedHandle = await openSshTunnel(id: id, host: host, port: port);
+      if (generation != _generation) throw _ConnectSuperseded();
+      adoptSshTunnel(openedHandle);
 
       final user = username ?? '';
       final pass = effectivePassword ?? '';
@@ -277,8 +259,8 @@ class MysqlConnection {
         }
         validateMysqlSslMode(sslMode, sslPaths);
         final securityContext = buildSecurityContext(sslPaths);
-        final effectiveHost = _sshTunnelHandle?.localHost ?? parsed.host;
-        final effectivePort = _sshTunnelHandle?.localPort ?? parsed.port;
+        final effectiveHost = sshTunnelHandle?.localHost ?? parsed.host;
+        final effectivePort = sshTunnelHandle?.localPort ?? parsed.port;
         opened = await MySQLConnection.createConnection(
           host: effectiveHost,
           port: effectivePort,
@@ -296,8 +278,8 @@ class MysqlConnection {
         final sslPaths =
             extractSslCertificatePathsFromString(effectiveConnectionString);
         final securityContext = buildSecurityContext(sslPaths);
-        final effectiveHost = _sshTunnelHandle?.localHost ?? host;
-        final effectivePort = _sshTunnelHandle?.localPort ?? port;
+        final effectiveHost = sshTunnelHandle?.localHost ?? host;
+        final effectivePort = sshTunnelHandle?.localPort ?? port;
         opened = await MySQLConnection.createConnection(
           host: effectiveHost,
           port: effectivePort,
@@ -334,17 +316,12 @@ class MysqlConnection {
         } catch (e) {
           logIgnored('mysql_connection', e);
         }
-        if (identical(_sshTunnelHandle, openedHandle)) _sshTunnelHandle = null;
+        forgetSshTunnel(openedHandle);
         throw StateError('The connection was closed while it was being opened');
       }
       _isConnected = false;
       _conn = null;
-      try {
-        await _sshTunnelHandle?.release();
-      } catch (e) {
-        logIgnored('mysql_connection', e);
-      }
-      _sshTunnelHandle = null;
+      await releaseSshTunnel();
       rethrowMappedDatabaseError(e, st, driver: DatabaseDriver.mysql);
     }
   }
@@ -441,12 +418,7 @@ class MysqlConnection {
     } catch (e) {
       debugPrint('MysqlConnection.disconnect: $e');
     }
-    try {
-      await _sshTunnelHandle?.release();
-    } catch (e) {
-      debugPrint('MysqlConnection.sshRelease: $e');
-    }
-    _sshTunnelHandle = null;
+    await releaseSshTunnel(logLabel: 'MysqlConnection.sshRelease');
   }
 
   /// Best-effort close. The `mysql_client` driver may not allow graceful [close]
@@ -468,12 +440,7 @@ class MysqlConnection {
     } catch (e) {
       debugPrint('MysqlConnection.forceClose: $e');
     }
-    try {
-      await _sshTunnelHandle?.release();
-    } catch (e) {
-      debugPrint('MysqlConnection.forceClose ssh: $e');
-    }
-    _sshTunnelHandle = null;
+    await releaseSshTunnel(logLabel: 'MysqlConnection.forceClose ssh');
   }
 
   /// Session hint for Table Browser / tree (`MysqlSessionMode.readOnly`).

@@ -4,9 +4,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
+import 'package:querya_desktop/core/database/ssh_tunnel_host.dart';
 import 'package:querya_desktop/core/database/querya_database_exception.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
-import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
@@ -21,7 +21,7 @@ const redisCollectionPageSize = 200;
 const redisLargeCollectionWarnAt = 10000;
 
 /// Redis connection using the Dart redis package (no Java/JRE).
-class RedisConnection {
+class RedisConnection with SshTunnelHost {
   RedisConnection({
     required this.id,
     required this.name,
@@ -111,11 +111,10 @@ class RedisConnection {
   final bool useSSL;
   String? _connectionString;
 
+  @override
   final SshTunnelConfig? sshConfig;
+  @override
   final SshTunnelSecrets? sshSecrets;
-  SshTunnelHandle? _sshTunnelHandle;
-
-  SshTunnelHandle? get sshTunnelHandle => _sshTunnelHandle;
 
   String? get password => _password;
   String? get connectionString => _connectionString;
@@ -215,28 +214,10 @@ class RedisConnection {
     final limit = connectTimeout > Duration.zero ? connectTimeout : null;
 
     try {
-      if (sshConfig != null && sshConfig!.enabled) {
-        var sec = sshSecrets;
-        if (sec == null && id > 0) {
-          final stored =
-              await ConnectionSecretsStore.readSshSecretsForConnection(id);
-          sec = SshTunnelSecrets(
-            password: stored.password,
-            privateKey: stored.privateKey,
-            passphrase: stored.passphrase,
-            jumpPassword: stored.jumpPassword,
-          );
-        }
-        _sshTunnelHandle = await SshTunnelManager.instance.openTunnel(
-          config: sshConfig!,
-          secrets: sec ?? SshTunnelSecrets(),
-          remoteHost: host,
-          remotePort: port,
-        );
-      }
+      adoptSshTunnel(await openSshTunnel(id: id, host: host, port: port));
 
-      final effectiveHost = _sshTunnelHandle?.localHost ?? host;
-      final effectivePort = _sshTunnelHandle?.localPort ?? port;
+      final effectiveHost = sshTunnelHandle?.localHost ?? host;
+      final effectivePort = sshTunnelHandle?.localPort ?? port;
 
       // The socket is opened here, with a timeout, for plain and TLS alike.
       socket = secure
@@ -301,12 +282,7 @@ class RedisConnection {
       } catch (e) {
         logIgnored('redis_connection', e);
       }
-      try {
-        await _sshTunnelHandle?.release();
-      } catch (e) {
-        logIgnored('redis_connection', e);
-      }
-      _sshTunnelHandle = null;
+      await releaseSshTunnel();
       rethrow;
     }
   }
@@ -349,12 +325,7 @@ class RedisConnection {
         }
       }
     }
-    try {
-      await _sshTunnelHandle?.release();
-    } catch (e) {
-      logIgnored('redis_connection', e);
-    }
-    _sshTunnelHandle = null;
+    await releaseSshTunnel();
   }
 
   Future<void> forceClose() => disconnect();

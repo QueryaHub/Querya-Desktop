@@ -3,16 +3,16 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:mongo_dart/mongo_dart.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
+import 'package:querya_desktop/core/database/ssh_tunnel_host.dart';
 import 'package:querya_desktop/core/database/mongodb_uri.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
-import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// MongoDB connection configuration and state.
-class MongoConnection {
+class MongoConnection with SshTunnelHost {
   MongoConnection({
     required this.id,
     required this.name,
@@ -61,11 +61,10 @@ class MongoConnection {
   final String? replicaSet;
   String? _connectionString;
 
+  @override
   final SshTunnelConfig? sshConfig;
+  @override
   final SshTunnelSecrets? sshSecrets;
-  SshTunnelHandle? _sshTunnelHandle;
-
-  SshTunnelHandle? get sshTunnelHandle => _sshTunnelHandle;
 
   /// Handshake URI for this live session (includes auth). Not persisted; not
   /// exposed via [password] / [connectionString] after [scrubCredentials].
@@ -235,17 +234,6 @@ class MongoConnection {
 
     try {
       if (sshConfig != null && sshConfig!.enabled) {
-        var sec = sshSecrets;
-        if (sec == null && id > 0) {
-          final stored =
-              await ConnectionSecretsStore.readSshSecretsForConnection(id);
-          sec = SshTunnelSecrets(
-            password: stored.password,
-            privateKey: stored.privateKey,
-            passphrase: stored.passphrase,
-            jumpPassword: stored.jumpPassword,
-          );
-        }
         String targetHost = host;
         int targetPort = port;
         if (effectiveConnectionString != null &&
@@ -259,19 +247,15 @@ class MongoConnection {
             targetPort = seed.port ?? 27017;
           }
         }
-        _sshTunnelHandle = await SshTunnelManager.instance.openTunnel(
-          config: sshConfig!,
-          secrets: sec ?? SshTunnelSecrets(),
-          remoteHost: targetHost,
-          remotePort: targetPort,
-        );
+        adoptSshTunnel(
+            await openSshTunnel(id: id, host: targetHost, port: targetPort));
       }
 
       final uri = await _effectiveMongoUri(
         pass: effectivePassword,
         connStr: effectiveConnectionString,
-        hostOverride: _sshTunnelHandle?.localHost,
-        portOverride: _sshTunnelHandle?.localPort,
+        hostOverride: sshTunnelHandle?.localHost,
+        portOverride: sshTunnelHandle?.localPort,
       );
       _db = await Db.create(uri);
       await _db!.open();
@@ -286,12 +270,7 @@ class MongoConnection {
       _isConnected = false;
       _db = null;
       await _cleanupTempTlsKey();
-      try {
-        await _sshTunnelHandle?.release();
-      } catch (e) {
-        logIgnored('mongodb_connection', e);
-      }
-      _sshTunnelHandle = null;
+      await releaseSshTunnel();
       rethrowMappedDatabaseError(e, st, driver: DatabaseDriver.mongodb);
     }
   }
@@ -364,12 +343,7 @@ class MongoConnection {
       }
     }
     await _cleanupTempTlsKey();
-    try {
-      await _sshTunnelHandle?.release();
-    } catch (e) {
-      debugPrint('MongoConnection.sshRelease: $e');
-    }
-    _sshTunnelHandle = null;
+    await releaseSshTunnel(logLabel: 'MongoConnection.sshRelease');
   }
 
   Future<void> _cleanupTempTlsKey() async {
