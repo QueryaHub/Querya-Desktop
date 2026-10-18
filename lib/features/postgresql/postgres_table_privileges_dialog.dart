@@ -3,6 +3,7 @@ import 'package:querya_desktop/core/database/postgres_connection.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/database/postgres_metadata.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
@@ -78,7 +79,7 @@ class _PrivilegesDialogBodyState extends material.State<_PrivilegesDialogBody> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
+    final theme = context.colors;
     final mq = material.MediaQuery.sizeOf(context);
     final hInset = WindowLayout.dialogVerticalInset(mq.height) * 2;
     final wInset = WindowLayout.dialogHorizontalInset(mq.width) * 2;
@@ -167,7 +168,7 @@ class _PrivilegesDialogBodyState extends material.State<_PrivilegesDialogBody> {
     );
   }
 
-  material.Widget _buildListArea(ColorScheme theme) {
+  material.Widget _buildListArea(QueryaUiColors theme) {
     if (_loading) {
       return const material.Center(
         child: QueryaSpinner(size: QueryaSpinnerSize.md),

@@ -112,7 +112,7 @@ class _PostgresSequenceViewState extends material.State<PostgresSequenceView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     if (_loading) {
       return material.Container(

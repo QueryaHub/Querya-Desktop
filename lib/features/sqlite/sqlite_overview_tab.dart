@@ -134,7 +134,7 @@ class _SqliteOverviewTabState extends material.State<SqliteOverviewTab> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     if (_loading && _overview == null) {
       return const material.Center(
@@ -217,7 +217,7 @@ class _SqliteOverviewTabState extends material.State<SqliteOverviewTab> {
   }
 
   material.Widget _header(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final name = widget.connectionRow.name;
     final path = widget.connectionRow.host ?? 'in-memory';
     return material.Row(
@@ -280,7 +280,7 @@ class _SqliteOverviewTabState extends material.State<SqliteOverviewTab> {
     int pageCount,
     int pageSize,
   ) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     material.Widget chip(String label, String value, material.IconData icon) {
       return material.Expanded(
@@ -345,7 +345,7 @@ class _SqliteOverviewTabState extends material.State<SqliteOverviewTab> {
   }
 
   material.Widget _tablesCard(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.Container(
       decoration: material.BoxDecoration(
         color: cs.card,

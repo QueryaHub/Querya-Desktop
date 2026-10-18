@@ -89,7 +89,7 @@ class _PostgresIndexListViewState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     if (_loading) {
       return material.Container(
         color: cs.background,
@@ -264,7 +264,7 @@ class _PostgresTriggerListViewState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     if (_loading) {
       return material.Container(
         color: cs.background,
@@ -431,7 +431,7 @@ class _PostgresTypeListViewState extends material.State<PostgresTypeListView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     if (_loading) {
       return const material.Center(
         child: QueryaSpinner(size: QueryaSpinnerSize.md),
@@ -578,7 +578,7 @@ class _PostgresExtensionListViewState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     if (_loading) {
       return const material.Center(
         child: QueryaSpinner(size: QueryaSpinnerSize.md),
@@ -722,7 +722,7 @@ class _PostgresFdwListViewState extends material.State<PostgresFdwListView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     if (_loading) {
       return const material.Center(
         child: QueryaSpinner(size: QueryaSpinnerSize.md),
@@ -832,7 +832,7 @@ material.Widget _browserToolbar(
   required String title,
   required VoidCallback onRefresh,
 }) {
-  final cs = Theme.of(context).colorScheme;
+  final cs = context.colors;
   return material.Container(
     padding: const material.EdgeInsets.fromLTRB(16, 10, 16, 10),
     decoration: material.BoxDecoration(

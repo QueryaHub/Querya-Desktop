@@ -123,8 +123,7 @@ class _MysqlRoutineViewState extends material.State<MysqlRoutineView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = context.colors;
     final kindTitle = widget.isFunction ? 'Function' : 'Procedure';
 
     return material.Column(
@@ -134,10 +133,10 @@ class _MysqlRoutineViewState extends material.State<MysqlRoutineView> {
           padding:
               const material.EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: material.BoxDecoration(
-            color: theme.colorScheme.card,
+            color: cs.card,
             border: material.Border(
               bottom: material.BorderSide(
-                color: theme.colorScheme.border.withValues(alpha: 0.5),
+                color: cs.border.withValues(alpha: 0.5),
               ),
             ),
           ),
@@ -146,7 +145,7 @@ class _MysqlRoutineViewState extends material.State<MysqlRoutineView> {
               material.Icon(
                 material.Icons.functions_rounded,
                 size: 18,
-                color: theme.colorScheme.primary,
+                color: cs.primary,
               ),
               const Gap(8),
               material.Expanded(

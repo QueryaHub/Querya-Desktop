@@ -10,8 +10,11 @@ void main() {
   const migrated = <String>[
     'lib/features/connections',
     'lib/features/mongodb',
+    'lib/features/mysql',
+    'lib/features/postgresql',
     'lib/features/redis',
     'lib/features/settings',
+    'lib/features/sqlite',
     'lib/features/workspace',
   ];
 

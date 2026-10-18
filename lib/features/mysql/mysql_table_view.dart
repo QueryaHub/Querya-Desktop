@@ -339,7 +339,7 @@ class _MysqlTableViewState extends material.State<MysqlTableView> {
       onNavigateHome: widget.onNavigateHome,
       showExportToolbar: true,
       customToolbarBuilder: (ctx, state) {
-        final cs = Theme.of(ctx).colorScheme;
+        final cs = ctx.colors;
         final title = '$tableTitle${widget.isView ? ' (view)' : ''}';
 
         return material.Container(

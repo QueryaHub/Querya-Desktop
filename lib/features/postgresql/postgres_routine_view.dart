@@ -129,7 +129,7 @@ class _PostgresRoutineViewState extends material.State<PostgresRoutineView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     if (_loading) {
       return material.Container(

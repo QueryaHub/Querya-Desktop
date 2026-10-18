@@ -73,7 +73,7 @@ class _MysqlSqlEditorDialogState extends material.State<_MysqlSqlEditorDialog> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context).colorScheme;
+    final theme = context.colors;
     return material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: WindowLayout.dialogSymmetricInsets(context),

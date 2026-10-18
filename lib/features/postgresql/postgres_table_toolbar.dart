@@ -47,7 +47,7 @@ class PostgresTableToolbar extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.Container(
       padding: const material.EdgeInsets.fromLTRB(16, 10, 16, 10),
       decoration: material.BoxDecoration(
