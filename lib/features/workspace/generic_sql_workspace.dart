@@ -1,4 +1,5 @@
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
+import 'package:querya_desktop/core/database/query_error_text.dart';
 import 'package:querya_desktop/core/database/statement_queue.dart';
 import 'package:querya_desktop/core/database/sql_statement_splitter.dart';
 import 'dart:async';
@@ -810,6 +811,20 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     } catch (e) {
       if (mounted) {
         invalidatePane(session);
+        // One statement: the caret goes where the driver says it failed.
+        if (sent.length == 1) {
+          final offset = QueryErrorText.offsetIn(e, sent.single);
+          if (offset != null) {
+            final runStart = statementAtCursor
+                ? scopeStart + spans.single.start
+                : scopeStart + (scope.length - scope.trimLeft().length);
+            // The text may have been edited while the query ran.
+            final at = (runStart + offset)
+                .clamp(0, session.controller.text.length);
+            session.controller.selection =
+                material.TextSelection.collapsed(offset: at);
+          }
+        }
         setState(() {
           session.error = e.toString();
           session.running = false;
