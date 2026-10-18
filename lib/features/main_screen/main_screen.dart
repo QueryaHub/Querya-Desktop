@@ -1,50 +1,29 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/actions/querya_command_host.dart';
-import 'package:querya_desktop/core/actions/querya_schema_object.dart';
-import 'package:querya_desktop/core/actions/querya_schema_object_loader.dart';
 import 'package:querya_desktop/features/command_palette/command_palette_dialog.dart';
-import 'package:querya_desktop/features/command_palette/quick_switcher_dialog.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/actions/sql_editor_global_actions.dart';
-import 'package:querya_desktop/core/demo/demo_playground_service.dart';
-import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
-import 'package:querya_desktop/core/layout/querya_split_handle.dart';
-import 'package:querya_desktop/core/motion/querya_spring.dart';
-import 'package:querya_desktop/core/motion/querya_spring_controller.dart';
 import 'package:querya_desktop/core/platform/file_launch_service.dart';
-import 'package:querya_desktop/core/security/safe_mode.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/extensions/sandbox/unsandboxed_launch_consent_gate.dart';
 import 'package:querya_desktop/features/extensions/presentation/widgets/unsandboxed_driver_consent_dialog.dart';
-import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
-import 'package:querya_desktop/features/connections/new_connection_url_dialog.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
-import 'package:querya_desktop/features/connections/sqlite_connection_form.dart';
-import 'package:querya_desktop/core/ui/querya_shell_status.dart';
-import 'package:querya_desktop/core/unsaved_work_guard.dart';
-import 'package:querya_desktop/features/main_screen/connections_panel_width_persist.dart';
-import 'package:querya_desktop/features/main_screen/querya_status_bar.dart';
-import 'package:querya_desktop/features/main_screen/safe_mode_unlock_dialog.dart';
-import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
 import 'package:querya_desktop/features/macos/querya_platform_menu_bar.dart';
-import 'package:querya_desktop/features/mysql/mysql_object_kind.dart';
-import 'package:querya_desktop/features/mysql/mysql_sql_tx_guard.dart';
-import 'package:querya_desktop/features/onboarding/welcome_tour_dialog.dart';
-import 'package:querya_desktop/features/postgresql/postgres_object_kind.dart';
-import 'package:querya_desktop/features/postgresql/postgres_sql_tx_guard.dart';
-import 'package:querya_desktop/features/sqlite/sqlite_sql_tx_guard.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'main_screen_workspace_state.dart';
-import 'workspace_panel.dart';
+import 'main_content_split.dart';
+import 'main_screen_chrome.dart';
+import 'main_screen_dialogs.dart';
+import 'main_screen_navigator.dart';
+import 'main_screen_shortcuts.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -56,14 +35,27 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   final GlobalKey<ConnectionsPanelState> _connectionsPanelKey =
       GlobalKey<ConnectionsPanelState>();
-  final GlobalKey<_MainContentSplitState> _splitKey =
-      GlobalKey<_MainContentSplitState>();
+  final GlobalKey<MainContentSplitState> _splitKey =
+      GlobalKey<MainContentSplitState>();
 
   final ValueNotifier<MainScreenWorkspaceState> _workspace =
       ValueNotifier(MainScreenWorkspaceState.empty);
   final ValueNotifier<bool> _isSidebarVisible = ValueNotifier(true);
-  bool _openingConnectionDialog = false;
-  String? _pendingMongoCollection;
+  late final MainScreenDialogs _dialogs = MainScreenDialogs(
+    workspace: _workspace,
+    nav: _nav,
+    connectionsPanelKey: _connectionsPanelKey,
+    context: () => context,
+    mounted: () => mounted,
+  );
+  late final MainScreenNavigator _nav = MainScreenNavigator(
+    workspace: _workspace,
+    context: () => context,
+    mounted: () => mounted,
+    onPendingMongoCollectionChanged: () {
+      if (mounted) setState(() {});
+    },
+  );
 
   @override
   void initState() {
@@ -84,17 +76,17 @@ class _MainScreenState extends State<MainScreen> {
         if (connections.isEmpty &&
             mounted &&
             !FileLaunchService.instance.hasPendingTargets) {
-          _onOpenWelcomeTour();
+          _dialogs.onOpenWelcomeTour();
         }
       }
       if (mounted) {
-        await _handlePendingFileLaunch();
+        await _dialogs.handlePendingFileLaunch();
       }
     });
   }
 
   void _onFilesQueued() {
-    if (mounted) unawaited(_handlePendingFileLaunch());
+    if (mounted) unawaited(_dialogs.handlePendingFileLaunch());
   }
 
   @override
@@ -102,779 +94,76 @@ class _MainScreenState extends State<MainScreen> {
     FileLaunchService.instance.pendingRevision.removeListener(_onFilesQueued);
     HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
     UnsandboxedLaunchConsentGate.instance.handler = null;
-    _safeModeRelockTimer?.cancel();
+    _dialogs.dispose();
     _workspace.dispose();
     _isSidebarVisible.dispose();
     super.dispose();
   }
 
-  Timer? _safeModeRelockTimer;
-
-  /// Toggles the read-only lock. Turning it off for a Production connection
-  /// (Safe Mode) needs a typed confirmation and re-locks after
-  /// [kSafeModeUnlockDuration].
-  Future<void> _toggleReadOnly() async {
-    final ws = _workspace.value;
-    final connection = ws.activeConnection;
-    if (connection == null) return;
-
-    if (ws.isReadOnly &&
-        safeModeRequiresConfirmation(connection.environment)) {
-      final confirmed = await showSafeModeUnlockDialog(
-        context: context,
-        connectionName: connection.name,
-      );
-      if (!confirmed || !mounted) return;
-      final current = _workspace.value;
-      if (current.activeConnection?.id != connection.id || !current.isReadOnly) {
-        return;
-      }
-      _workspace.value = current.toggleReadOnly();
-      _safeModeRelockTimer?.cancel();
-      _safeModeRelockTimer = Timer(kSafeModeUnlockDuration, () {
-        if (!mounted) return;
-        final latest = _workspace.value;
-        if (latest.activeConnection?.id == connection.id &&
-            !latest.isReadOnly) {
-          _workspace.value = latest.toggleReadOnly();
-          showAppToast(
-            context: context,
-            message: '${connection.name} is read-only again',
-          );
-        }
-      });
-      return;
-    }
-
-    _safeModeRelockTimer?.cancel();
-    _workspace.value = ws.toggleReadOnly();
-  }
-
   bool _handleGlobalKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
 
-    final isMac = Platform.isMacOS;
-    final isCmdOrCtrl = isMac
-        ? (HardwareKeyboard.instance.isMetaPressed ||
-            HardwareKeyboard.instance.isControlPressed)
-        : HardwareKeyboard.instance.isControlPressed;
-    final isShift = HardwareKeyboard.instance.isShiftPressed;
-    final isAlt = HardwareKeyboard.instance.isAltPressed;
-
-    final physical = event.physicalKey;
-    final logical = event.logicalKey;
-
-    // 1. Execute SQL, as in the editor: Ctrl/Cmd+Enter and Ctrl/Cmd+R run the
-    // selection or the statement at the cursor; F5 and Ctrl/Cmd+Shift+Enter
-    // run the whole script.
-    final isEnter = physical == PhysicalKeyboardKey.enter ||
-        physical == PhysicalKeyboardKey.numpadEnter ||
-        logical == LogicalKeyboardKey.enter ||
-        logical == LogicalKeyboardKey.numpadEnter;
-    final isF5 = physical == PhysicalKeyboardKey.f5 ||
-        logical == LogicalKeyboardKey.f5;
-    final isKeyR = physical == PhysicalKeyboardKey.keyR ||
-        logical == LogicalKeyboardKey.keyR ||
-        logical == const LogicalKeyboardKey(0x0000043a); // Russian 'к'
-
-    final runScript = isF5 || (isCmdOrCtrl && isShift && !isAlt && isEnter);
-    final runStatement = isCmdOrCtrl &&
-        !isShift &&
-        !isAlt &&
-        (isEnter || isKeyR);
-    if ((runScript || runStatement) &&
-        SqlEditorCommandBridge.instance.canExecute) {
-      if (runScript) {
-        SqlEditorCommandBridge.instance.invokeExecute();
-      } else {
-        SqlEditorCommandBridge.instance.invokeExecuteStatement();
-      }
-      return true;
-    }
-
-    // Preferences: Ctrl+, / Cmd+, (Physical comma, Logical comma, Russian 'б')
-    final isComma = physical == PhysicalKeyboardKey.comma ||
-        logical == LogicalKeyboardKey.comma ||
-        logical == const LogicalKeyboardKey(0x00000431); // Russian 'б'
-    if (isCmdOrCtrl && !isShift && !isAlt && isComma) {
-      showPreferencesDialog(context);
-      return true;
-    }
-
-    // 2. Toggle Left Sidebar: Ctrl+B / Cmd+B (Physical B, Logical B, Russian 'и')
-    final isKeyB = physical == PhysicalKeyboardKey.keyB ||
-        logical == LogicalKeyboardKey.keyB ||
-        logical == const LogicalKeyboardKey(0x00000438); // Russian 'и'
-    if (isCmdOrCtrl && !isShift && !isAlt && isKeyB) {
-      _splitKey.currentState?.toggleSidebar();
-      return true;
-    }
-
-    // Command Palette: Ctrl+P / Cmd+P (Physical P, Logical P, Russian 'з')
-    final isKeyP = physical == PhysicalKeyboardKey.keyP ||
-        logical == LogicalKeyboardKey.keyP ||
-        logical == const LogicalKeyboardKey(0x00000437) || // з
-        logical == const LogicalKeyboardKey(0x00000417); // З
-    if (isCmdOrCtrl && !isShift && !isAlt && isKeyP) {
-      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-      unawaited(showCommandPalette(ctx));
-      return true;
-    }
-
-    // Quick Switcher: Ctrl+K / Cmd+K (Physical K, Logical K, Russian 'л')
-    final isKeyK = physical == PhysicalKeyboardKey.keyK ||
-        logical == LogicalKeyboardKey.keyK ||
-        logical == const LogicalKeyboardKey(0x0000043b) || // л
-        logical == const LogicalKeyboardKey(0x0000041b); // Л
-    if (isCmdOrCtrl && !isShift && !isAlt && isKeyK) {
-      _openQuickSwitcher();
-      return true;
-    }
-
-    // 3. New Connection / New Query Tab: (Physical N, Logical N, Russian 'т')
-    final isKeyN = physical == PhysicalKeyboardKey.keyN ||
-        logical == LogicalKeyboardKey.keyN ||
-        logical == const LogicalKeyboardKey(0x00000442); // Russian 'т'
-    if (isCmdOrCtrl && !isAlt && isKeyN) {
-      if (isShift) {
-        // Ctrl+Shift+N: New Query
-        final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-        Actions.maybeInvoke(ctx, const NewSqlIntent());
-      } else {
-        // Ctrl+N: New Database Connection
-        unawaited(_onNewDatabaseConnectionFromMenu());
-      }
-      return true;
-    }
-
-    // New Query Tab: Ctrl+T / Cmd+T (Physical T, Logical T, Russian 'е')
-    final isKeyT = physical == PhysicalKeyboardKey.keyT ||
-        logical == LogicalKeyboardKey.keyT ||
-        logical == const LogicalKeyboardKey(0x00000435); // Russian 'е'
-    if (isCmdOrCtrl && !isShift && !isAlt && isKeyT) {
-      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-      final handled = Actions.maybeInvoke(ctx, const NewSqlIntent());
-      if (handled == null) {
-        SqlEditorCommandBridge.instance.invokeNew();
-      }
-      return true;
-    }
-
-    // Close Query Tab: Ctrl+W / Cmd+W (Physical W, Logical W, Russian 'ц')
-    final isKeyW = physical == PhysicalKeyboardKey.keyW ||
-        logical == LogicalKeyboardKey.keyW ||
-        logical == const LogicalKeyboardKey(0x00000446); // Russian 'ц'
-    if (isCmdOrCtrl && !isShift && !isAlt && isKeyW) {
-      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-      final handled = Actions.maybeInvoke(ctx, const CloseSqlTabIntent());
-      if (handled == null) {
-        SqlEditorCommandBridge.instance.invokeCloseTab();
-      }
-      return true;
-    }
-
-    // Next / Prev Tab: Ctrl+Tab / Ctrl+Shift+Tab
-    final isTab = physical == PhysicalKeyboardKey.tab ||
-        logical == LogicalKeyboardKey.tab;
-    if (isCmdOrCtrl && !isAlt && isTab) {
-      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-      if (isShift) {
-        final handled = Actions.maybeInvoke(ctx, const PrevSqlTabIntent());
-        if (handled == null) {
-          SqlEditorCommandBridge.instance.invokePrevTab();
-        }
-      } else {
-        final handled = Actions.maybeInvoke(ctx, const NextSqlTabIntent());
-        if (handled == null) {
-          SqlEditorCommandBridge.instance.invokeNextTab();
-        }
-      }
-      return true;
-    }
-
-    // 4. Open SQL: Ctrl+O / Cmd+O (Physical O, Logical O, Russian 'щ')
-    final isKeyO = physical == PhysicalKeyboardKey.keyO ||
-        logical == LogicalKeyboardKey.keyO ||
-        logical == const LogicalKeyboardKey(0x00000449); // Russian 'щ'
-    if (isCmdOrCtrl && !isShift && !isAlt && isKeyO) {
-      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-      Actions.maybeInvoke(ctx, const OpenSqlIntent());
-      return true;
-    }
-
-    // 5. Save SQL: Ctrl+S / Cmd+S (Physical S, Logical S, Russian 'ы')
-    final isKeyS = physical == PhysicalKeyboardKey.keyS ||
-        logical == LogicalKeyboardKey.keyS ||
-        logical == const LogicalKeyboardKey(0x0000044b); // Russian 'ы'
-    if (isCmdOrCtrl && !isShift && !isAlt && isKeyS) {
-      final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-      Actions.maybeInvoke(ctx, const SaveSqlIntent());
-      return true;
-    }
-
-    // 6. Tutorial & Welcome: F1 or Ctrl+Shift+H / Cmd+Shift+H (Physical H, Logical H, Russian 'р')
-    final isF1 = physical == PhysicalKeyboardKey.f1 ||
-        logical == LogicalKeyboardKey.f1;
-    final isKeyH = physical == PhysicalKeyboardKey.keyH ||
-        logical == LogicalKeyboardKey.keyH ||
-        logical == const LogicalKeyboardKey(0x00000440); // Russian 'р'
-    if (isF1 || (isCmdOrCtrl && isShift && isKeyH)) {
-      _onOpenWelcomeTour();
-      return true;
-    }
-
-    // 7. Home / Start Screen: Ctrl+Shift+0 / Cmd+Shift+0
-    final isDigit0 = physical == PhysicalKeyboardKey.digit0 ||
-        physical == PhysicalKeyboardKey.numpad0 ||
-        logical == LogicalKeyboardKey.digit0 ||
-        logical == LogicalKeyboardKey.numpad0;
-    if (isCmdOrCtrl && isShift && isDigit0) {
-      _onGoHome();
-      return true;
-    }
-
-    return false;
-  }
-
-  Future<bool> _allowUnsavedNavigation() {
-    return confirmDiscardUnsavedWorkIfNeeded(context);
-  }
-
-  void _onConnectionSelected(ConnectionRow connection) {
-    unawaited(_selectConnection(connection));
-  }
-
-  Future<void> _selectConnection(ConnectionRow connection) async {
-    if (!await _allowUnsavedNavigation()) return;
-    if (!mounted) return;
-    final prevId = _workspace.value.activeConnection?.id;
-    _workspace.value = _workspace.value.selectConnection(connection);
-    if (prevId != connection.id) {
-      QueryaShellStatus.instance.clear();
-      _pendingMongoCollection = null;
-    }
-    final id = connection.id;
-    if (id != null) {
-      unawaited(AppSettings.instance.recordRecentConnection(id));
-    }
-  }
-
-  void _onPostgresObjectSelected(
-    ConnectionRow connection,
-    String database,
-    String schema,
-    String name,
-    PostgresObjectKind kind,
-  ) {
-    unawaited(_selectPostgresObject(
-      connection,
-      database,
-      schema,
-      name,
-      kind,
-    ));
-  }
-
-  Future<void> _selectPostgresObject(
-    ConnectionRow connection,
-    String database,
-    String schema,
-    String name,
-    PostgresObjectKind kind,
-  ) async {
-    final ws = _workspace.value;
-    final cur = ws.selectedPostgresObject;
-    final same = ws.activeConnection?.id == connection.id &&
-        cur != null &&
-        cur.database == database &&
-        cur.schema == schema &&
-        cur.name == name &&
-        cur.kind == kind;
-    if (same) return;
-    if (!await _allowUnsavedNavigation()) return;
-    if (!mounted) return;
-    if (!await confirmOpenPostgresTableIfSqlTx(
-      context,
-      connection: connection,
-      database: database,
-      kind: kind,
-    )) {
-      return;
-    }
-    if (!mounted) return;
-    _workspace.value = _workspace.value.selectPostgresObject(
-      connection,
-      database,
-      schema,
-      name,
-      kind,
+    final keyboard = HardwareKeyboard.instance;
+    final shortcut = MainScreenShortcuts.resolve(
+      event,
+      cmdOrCtrl: Platform.isMacOS
+          ? (keyboard.isMetaPressed || keyboard.isControlPressed)
+          : keyboard.isControlPressed,
+      shift: keyboard.isShiftPressed,
+      alt: keyboard.isAltPressed,
     );
-  }
+    if (shortcut == null) return false;
 
-  void _onMysqlObjectSelected(
-    ConnectionRow connection,
-    String database,
-    String name,
-    MysqlObjectKind kind,
-  ) {
-    unawaited(_selectMysqlObject(connection, database, name, kind));
-  }
-
-  Future<void> _selectMysqlObject(
-    ConnectionRow connection,
-    String database,
-    String name,
-    MysqlObjectKind kind,
-  ) async {
-    final ws = _workspace.value;
-    final cur = ws.selectedMysqlObject;
-    final same = ws.activeConnection?.id == connection.id &&
-        cur != null &&
-        cur.database == database &&
-        cur.name == name &&
-        cur.kind == kind;
-    if (same) return;
-    if (!await _allowUnsavedNavigation()) return;
-    if (!mounted) return;
-    if (!await confirmOpenMysqlTableIfSqlTx(
-      context,
-      connection: connection,
-      database: database,
-      kind: kind,
-    )) {
-      return;
+    BuildContext focused() =>
+        FocusManager.instance.primaryFocus?.context ?? context;
+    // An intent the focused editor handles, else the bridge to the open one.
+    void intentOr(Intent intent, void Function() fallback) {
+      if (Actions.maybeInvoke(focused(), intent) == null) fallback();
     }
-    if (!mounted) return;
-    _workspace.value = _workspace.value.selectMysqlObject(
-      connection,
-      database,
-      name,
-      kind,
-    );
-  }
 
-  void _onRedisDatabaseSelected(ConnectionRow connection, int database) {
-    unawaited(_selectRedisDatabase(connection, database));
-  }
-
-  Future<void> _selectRedisDatabase(
-    ConnectionRow connection,
-    int database,
-  ) async {
-    final ws = _workspace.value;
-    if (ws.activeConnection?.id == connection.id &&
-        ws.activeRedisDb == database) {
-      return;
+    final bridge = SqlEditorCommandBridge.instance;
+    switch (shortcut) {
+      case MainShortcut.runScript:
+        if (!bridge.canExecute) return false;
+        bridge.invokeExecute();
+      case MainShortcut.runStatement:
+        if (!bridge.canExecute) return false;
+        bridge.invokeExecuteStatement();
+      case MainShortcut.preferences:
+        showPreferencesDialog(context);
+      case MainShortcut.toggleSidebar:
+        _splitKey.currentState?.toggleSidebar();
+      case MainShortcut.commandPalette:
+        unawaited(showCommandPalette(focused()));
+      case MainShortcut.quickSwitcher:
+        _nav.openQuickSwitcher();
+      case MainShortcut.newConnection:
+        unawaited(_dialogs.onNewDatabaseConnectionFromMenu());
+      case MainShortcut.newQuery:
+        Actions.maybeInvoke(focused(), const NewSqlIntent());
+      case MainShortcut.newQueryTab:
+        intentOr(const NewSqlIntent(), bridge.invokeNew);
+      case MainShortcut.closeQueryTab:
+        intentOr(const CloseSqlTabIntent(), bridge.invokeCloseTab);
+      case MainShortcut.nextQueryTab:
+        intentOr(const NextSqlTabIntent(), bridge.invokeNextTab);
+      case MainShortcut.prevQueryTab:
+        intentOr(const PrevSqlTabIntent(), bridge.invokePrevTab);
+      case MainShortcut.openSql:
+        Actions.maybeInvoke(focused(), const OpenSqlIntent());
+      case MainShortcut.saveSql:
+        Actions.maybeInvoke(focused(), const SaveSqlIntent());
+      case MainShortcut.welcomeTour:
+        _dialogs.onOpenWelcomeTour();
+      case MainShortcut.goHome:
+        _nav.onGoHome();
     }
-    if (!await _allowUnsavedNavigation()) return;
-    if (!mounted) return;
-    _workspace.value = _workspace.value.selectRedisDb(connection, database);
+    return true;
   }
 
-  void _onMongoDBDatabaseSelected(ConnectionRow connection, String database) {
-    unawaited(_selectMongoDatabase(connection, database));
-  }
-
-  Future<void> _selectMongoDatabase(
-    ConnectionRow connection,
-    String database,
-  ) async {
-    final ws = _workspace.value;
-    if (ws.activeConnection?.id == connection.id &&
-        ws.activeMongoDB == database &&
-        ws.selectedMongoCollection == null) {
-      return;
-    }
-    if (!await _allowUnsavedNavigation()) return;
-    if (!mounted) return;
-    setState(() => _pendingMongoCollection = null);
-    _workspace.value = _workspace.value.selectMongoDb(connection, database);
-  }
-
-  void _onMongoCollectionSelected(
-    ConnectionRow connection,
-    String database,
-    String collection,
-  ) {
-    unawaited(_selectMongoCollection(connection, database, collection));
-  }
-
-  Future<void> _selectMongoCollection(
-    ConnectionRow connection,
-    String database,
-    String collection,
-  ) async {
-    final ws = _workspace.value;
-    if (ws.activeConnection?.id == connection.id &&
-        ws.activeMongoDB == database &&
-        ws.selectedMongoCollection == collection) {
-      return;
-    }
-    if (!await _allowUnsavedNavigation()) return;
-    if (!mounted) return;
-    setState(() => _pendingMongoCollection = collection);
-    _workspace.value =
-        _workspace.value.selectMongoCollection(connection, database, collection);
-  }
-
-  void _onPostgresOpenSqlWorkspace(
-    ConnectionRow connection, {
-    String? database,
-    String? schema,
-    String? name,
-    PostgresObjectKind? kind,
-  }) {
-    unawaited(_openPostgresSqlWorkspace(
-      connection,
-      database: database,
-      schema: schema,
-      name: name,
-      kind: kind,
-    ));
-  }
-
-  Future<void> _openPostgresSqlWorkspace(
-    ConnectionRow connection, {
-    String? database,
-    String? schema,
-    String? name,
-    PostgresObjectKind? kind,
-  }) async {
-    if (!await _allowUnsavedNavigation()) return;
-    if (!mounted) return;
-    _workspace.value = _workspace.value.openPostgresSqlWorkspace(
-      connection,
-      seedDatabase: database,
-      seedSchema: schema,
-      seedName: name,
-      seedKind: kind,
-    );
-  }
-
-  void _onMysqlOpenSqlWorkspace(ConnectionRow connection) {
-    unawaited(_openMysqlSqlWorkspace(connection));
-  }
-
-  Future<void> _openMysqlSqlWorkspace(ConnectionRow connection) async {
-    if (!await _allowUnsavedNavigation()) return;
-    if (!mounted) return;
-    _workspace.value = _workspace.value.openMysqlSqlWorkspace(connection);
-  }
-
-  void _onSqliteObjectSelected(
-    ConnectionRow connection,
-    String name,
-    SqliteObjectKind kind,
-  ) {
-    unawaited(_selectSqliteObject(connection, name, kind));
-  }
-
-  Future<void> _selectSqliteObject(
-    ConnectionRow connection,
-    String name,
-    SqliteObjectKind kind,
-  ) async {
-    final ws = _workspace.value;
-    final cur = ws.selectedSqliteObject;
-    final same = ws.activeConnection?.id == connection.id &&
-        cur != null &&
-        cur.name == name &&
-        cur.kind == kind;
-    if (same) return;
-    if (!await _allowUnsavedNavigation()) return;
-    if (!mounted) return;
-    if (!await confirmOpenSqliteTableIfSqlTx(
-      context,
-      connection: connection,
-      kind: kind,
-    )) {
-      return;
-    }
-    if (!mounted) return;
-    _workspace.value = _workspace.value.selectSqliteObject(
-      connection,
-      name,
-      kind,
-    );
-  }
-
-  void _onSqliteOpenSqlWorkspace(ConnectionRow connection) {
-    unawaited(_openSqliteSqlWorkspace(connection));
-  }
-
-  Future<void> _openSqliteSqlWorkspace(ConnectionRow connection) async {
-    if (!await _allowUnsavedNavigation()) return;
-    if (!mounted) return;
-    _workspace.value = _workspace.value.openSqliteSqlWorkspace(connection);
-  }
-
-  void _onExtensionObjectSelected(
-    ConnectionRow connection,
-    String database,
-    String name,
-  ) {
-    unawaited(_selectExtensionObject(connection, database, name));
-  }
-
-  Future<void> _selectExtensionObject(
-    ConnectionRow connection,
-    String database,
-    String name,
-  ) async {
-    final ws = _workspace.value;
-    final cur = ws.selectedExtensionObject;
-    final same = ws.activeConnection?.id == connection.id &&
-        cur != null &&
-        cur.database == database &&
-        cur.name == name;
-    if (same) return;
-    if (!await _allowUnsavedNavigation()) return;
-    if (!mounted) return;
-    _workspace.value = _workspace.value.selectExtensionObject(
-      connection,
-      database,
-      name,
-    );
-  }
-
-  void _openQuickSwitcher([String query = '']) {
-    final ctx = FocusManager.instance.primaryFocus?.context ?? context;
-    final ws = _workspace.value;
-    final conn = ws.activeConnection;
-    unawaited(showQuickSwitcher(
-      ctx,
-      initialQuery: query,
-      load: () => QueryaSchemaObjectLoader.load(
-        connection: conn,
-        database: ws.selectedPostgresObject?.database ??
-            ws.selectedMysqlObject?.database ??
-            ws.selectedExtensionObject?.database ??
-            conn?.databaseName,
-        mongoDatabase: ws.activeMongoDB ?? conn?.databaseName,
-      ),
-    ));
-  }
-
-  void _onOpenSchemaObject(QueryaSchemaObject object) {
-    final conn = _workspace.value.activeConnection;
-    if (conn == null) return;
-    final type = conn.type.toLowerCase();
-    switch (object.kind) {
-      case QueryaSchemaObjectKind.table:
-      case QueryaSchemaObjectKind.view:
-      case QueryaSchemaObjectKind.materializedView:
-        if (type == 'postgres' || type == 'postgresql') {
-          _onPostgresObjectSelected(
-            conn,
-            object.database ?? conn.databaseName ?? '',
-            object.schema ?? 'public',
-            object.name,
-            switch (object.kind) {
-              QueryaSchemaObjectKind.view => PostgresObjectKind.view,
-              QueryaSchemaObjectKind.materializedView =>
-                PostgresObjectKind.materializedView,
-              _ => PostgresObjectKind.table,
-            },
-          );
-          return;
-        }
-        if (type == 'mysql') {
-          _onMysqlObjectSelected(
-            conn,
-            object.database ?? conn.databaseName ?? '',
-            object.name,
-            object.kind == QueryaSchemaObjectKind.view
-                ? MysqlObjectKind.view
-                : MysqlObjectKind.table,
-          );
-          return;
-        }
-        if (type == 'sqlite') {
-          _onSqliteObjectSelected(
-            conn,
-            object.name,
-            object.kind == QueryaSchemaObjectKind.view
-                ? SqliteObjectKind.view
-                : SqliteObjectKind.table,
-          );
-          return;
-        }
-        if (conn.isExtensionDriver) {
-          _onExtensionObjectSelected(
-            conn,
-            object.database ?? conn.databaseName ?? '',
-            object.name,
-          );
-        }
-      case QueryaSchemaObjectKind.collection:
-        _onMongoCollectionSelected(
-          conn,
-          object.database ?? conn.databaseName ?? '',
-          object.name,
-        );
-    }
-  }
-
-  void _openSqlWorkspaceForConnection(ConnectionRow connection) {
-    switch (connection.type) {
-      case 'postgresql':
-        _onPostgresOpenSqlWorkspace(connection);
-      case 'mysql':
-        _onMysqlOpenSqlWorkspace(connection);
-      case 'sqlite':
-        _onSqliteOpenSqlWorkspace(connection);
-      default:
-        if (ExtensionDriverCatalog.isExtensionDriverConnection(connection)) {
-          unawaited(_selectConnection(connection));
-        }
-    }
-  }
-
-  Future<void> _openNewConnectionFromHero() async {
-    final row = await promptCreateConnection(context);
-    if (!mounted || row == null) return;
-    await LocalDb.instance.addConnection(row);
-    await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
-  }
-
-  Future<void> _onNewDatabaseConnectionFromMenu() async {
-    if (_openingConnectionDialog) return;
-    _openingConnectionDialog = true;
-    try {
-      // Menu overlay context is torn down before the connection form opens.
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (!mounted) return;
-      final row = await promptCreateConnection(context, folderId: null);
-      if (!mounted || row == null) return;
-      await LocalDb.instance.addConnection(row);
-      await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
-    } finally {
-      _openingConnectionDialog = false;
-    }
-  }
-
-  Future<void> _onNewDatabaseConnectionFromUrl() async {
-    if (_openingConnectionDialog) return;
-    _openingConnectionDialog = true;
-    try {
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (!mounted) return;
-      final row = await showNewConnectionUrlDialog(context);
-      if (!mounted || row == null) return;
-      await LocalDb.instance.addConnection(row);
-      await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
-    } finally {
-      _openingConnectionDialog = false;
-    }
-  }
-
-  Future<void> _openSqliteFromHero() async {
-    final row = await showSqliteConnectionForm(context);
-    if (!mounted || row == null) return;
-    await LocalDb.instance.addConnection(row);
-    await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
-  }
-
-  void _onGoHome() {
-    unawaited(_goHome());
-  }
-
-  Future<void> _goHome() async {
-    if (!await _allowUnsavedNavigation()) return;
-    if (!mounted) return;
-    _workspace.value = MainScreenWorkspaceState.empty;
-    QueryaShellStatus.instance.clear();
-  }
-
-  Future<void> _closeWorkspace() async {
-    if (!await _allowUnsavedNavigation()) return;
-    if (!mounted) return;
-    _workspace.value = _workspace.value.unselectActiveObject();
-  }
-
-  bool _hasCloseableWorkspace(MainScreenWorkspaceState ws) {
-    return ws.selectedPostgresObject != null ||
-        ws.selectedMysqlObject != null ||
-        ws.selectedSqliteObject != null ||
-        ws.selectedExtensionObject != null ||
-        ws.activeMongoDB != null ||
-        ws.activeRedisDb != null;
-  }
-
-  void _onOpenWelcomeTour() {
-    showWelcomeTourDialog(
-      context,
-      onLaunchDemo: _onLaunchDemoPlayground,
-      onGoHome: _workspace.value.activeConnection != null ? _onGoHome : null,
-    );
-  }
-
-  Future<void> _onLaunchDemoPlayground() async {
-    try {
-      final demoConn = await DemoPlaygroundService.getOrCreateDemoConnection();
-      if (!mounted) return;
-      await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
-      _workspace.value = _workspace.value.selectConnection(demoConn);
-      _onSqliteOpenSqlWorkspace(demoConn);
-    } catch (_) {}
-  }
-
-  Future<void> _handlePendingFileLaunch() async {
-    final targets = FileLaunchService.instance.consumePendingTargets();
-    if (targets.isEmpty || !mounted) return;
-
-    for (final target in targets) {
-      if (!mounted) return;
-      try {
-        if (target.kind == FileLaunchKind.sqlite) {
-          final conn = await FileLaunchService.instance
-              .resolveOrRegisterSqliteConnection(target);
-          if (!mounted) return;
-          await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
-          _workspace.value = _workspace.value.selectConnection(conn);
-          _onSqliteOpenSqlWorkspace(conn);
-        } else if (target.kind == FileLaunchKind.sql) {
-          final sql = await FileLaunchService.instance.readSqlContent(target);
-          if (!mounted) return;
-
-          var conn = _workspace.value.activeConnection;
-          if (conn == null) {
-            final connections = await LocalDb.instance.getConnections();
-            if (connections.isNotEmpty) {
-              conn = connections.first;
-            } else {
-              final scratchRow = ConnectionRow(
-                name: 'Local Scratch (${target.fileName})',
-                type: 'sqlite',
-                host: '',
-                createdAt: DateTime.now().toUtc().toIso8601String(),
-              );
-              final id = await LocalDb.instance.addConnection(scratchRow);
-              conn = scratchRow.copyWith(id: id);
-              await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
-            }
-          }
-
-          if (mounted) {
-            _workspace.value = _workspace.value.selectConnection(conn);
-            _openSqlWorkspaceForConnection(conn);
-            SqlEditorCommandBridge.instance.openFileWithContent(
-              sql: sql,
-              filePath: target.path,
-              title: target.fileName,
-            );
-          }
-        }
-      } catch (e) {
-        if (!mounted) return;
-        showAppToast(
-          context: context,
-          message: 'Failed to open file "${target.fileName}": $e',
-          variant: AppToastVariant.error,
-        );
-      }
-    }
-  }
+  /// Runs [intent] on the focused editor, if one handles it.
+  void _invoke(Intent intent) => Actions.maybeInvoke(
+      FocusManager.instance.primaryFocus?.context ?? context, intent);
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -884,16 +173,16 @@ class _MainScreenState extends State<MainScreen> {
       builder: (context, workspace, _) {
         return QueryaCommandHost(
           onToggleSidebar: () => _splitKey.currentState?.toggleSidebar(),
-          onNewConnection: () => unawaited(_onNewDatabaseConnectionFromMenu()),
+          onNewConnection: () => unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
           onReloadConnections: () => unawaited(
               _connectionsPanelKey.currentState?.reloadConnectionsFromDb() ??
                   Future<void>.value()),
-          onShowQuickSwitcher: _openQuickSwitcher,
-          onOpenSchemaObject: _onOpenSchemaObject,
+          onShowQuickSwitcher: _nav.openQuickSwitcher,
+          onOpenSchemaObject: _nav.onOpenSchemaObject,
           onGoHome:
-              workspace.activeConnection != null ? _onGoHome : null,
-          onCloseWorkspace: _hasCloseableWorkspace(workspace)
-              ? () => unawaited(_closeWorkspace())
+              workspace.activeConnection != null ? _nav.onGoHome : null,
+          onCloseWorkspace: _nav.hasCloseableWorkspace(workspace)
+              ? () => unawaited(_nav.closeWorkspace())
               : null,
           onConnect: workspace.activeConnection?.id != null
               ? () => _connectionsPanelKey.currentState
@@ -914,9 +203,9 @@ class _MainScreenState extends State<MainScreen> {
                   )
               : null,
           onToggleReadOnly: workspace.activeConnection != null
-              ? () => unawaited(_toggleReadOnly())
+              ? () => unawaited(_dialogs.toggleReadOnly())
               : null,
-          onOpenWelcomeTour: _onOpenWelcomeTour,
+          onOpenWelcomeTour: _dialogs.onOpenWelcomeTour,
           selectedConnectionId: workspace.activeConnection?.id,
           child: FocusScope(
           autofocus: true,
@@ -926,67 +215,43 @@ class _MainScreenState extends State<MainScreen> {
               const material.SingleActivator(
                 LogicalKeyboardKey.keyN,
                 meta: true,
-              ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
+              ): () => unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
               const material.SingleActivator(
                 LogicalKeyboardKey.keyN,
                 control: true,
-              ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
+              ): () => unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
 
               // New Query Tab: Ctrl+Shift+N / Cmd+Shift+N
               const material.SingleActivator(
                 LogicalKeyboardKey.keyN,
                 meta: true,
                 shift: true,
-              ): () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const NewSqlIntent());
-              },
+              ): () => _invoke(const NewSqlIntent()),
               const material.SingleActivator(
                 LogicalKeyboardKey.keyN,
                 control: true,
                 shift: true,
-              ): () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const NewSqlIntent());
-              },
+              ): () => _invoke(const NewSqlIntent()),
 
               // Open SQL File: Ctrl+O / Cmd+O
               const material.SingleActivator(
                 LogicalKeyboardKey.keyO,
                 meta: true,
-              ): () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const OpenSqlIntent());
-              },
+              ): () => _invoke(const OpenSqlIntent()),
               const material.SingleActivator(
                 LogicalKeyboardKey.keyO,
                 control: true,
-              ): () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const OpenSqlIntent());
-              },
+              ): () => _invoke(const OpenSqlIntent()),
 
               // Save SQL File: Ctrl+S / Cmd+S
               const material.SingleActivator(
                 LogicalKeyboardKey.keyS,
                 meta: true,
-              ): () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const SaveSqlIntent());
-              },
+              ): () => _invoke(const SaveSqlIntent()),
               const material.SingleActivator(
                 LogicalKeyboardKey.keyS,
                 control: true,
-              ): () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const SaveSqlIntent());
-              },
+              ): () => _invoke(const SaveSqlIntent()),
 
               // Toggle Left Sidebar: Ctrl+B / Cmd+B
               const material.SingleActivator(
@@ -1009,66 +274,54 @@ class _MainScreenState extends State<MainScreen> {
               const material.SingleActivator(
                 LogicalKeyboardKey.keyK,
                 control: true,
-              ): () => _openQuickSwitcher(),
+              ): () => _nav.openQuickSwitcher(),
               const material.SingleActivator(
                 LogicalKeyboardKey.keyK,
                 meta: true,
-              ): () => _openQuickSwitcher(),
+              ): () => _nav.openQuickSwitcher(),
 
               // Welcome Tour & Tutorial: F1 / Cmd+Shift+H / Ctrl+Shift+H
               const material.SingleActivator(
                 LogicalKeyboardKey.f1,
-              ): () => _onOpenWelcomeTour(),
+              ): () => _dialogs.onOpenWelcomeTour(),
               const material.SingleActivator(
                 LogicalKeyboardKey.keyH,
                 meta: true,
                 shift: true,
-              ): () => _onOpenWelcomeTour(),
+              ): () => _dialogs.onOpenWelcomeTour(),
               const material.SingleActivator(
                 LogicalKeyboardKey.keyH,
                 control: true,
                 shift: true,
-              ): () => _onOpenWelcomeTour(),
+              ): () => _dialogs.onOpenWelcomeTour(),
 
               // Return to Start / Home Screen: Cmd+Shift+0 / Ctrl+Shift+0
               const material.SingleActivator(
                 LogicalKeyboardKey.digit0,
                 meta: true,
                 shift: true,
-              ): _onGoHome,
+              ): _nav.onGoHome,
               const material.SingleActivator(
                 LogicalKeyboardKey.digit0,
                 control: true,
                 shift: true,
-              ): _onGoHome,
+              ): _nav.onGoHome,
             },
             child: QueryaPlatformMenuBar(
               onNewConnection: () =>
-                  unawaited(_onNewDatabaseConnectionFromMenu()),
-              onNewQueryTab: () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const NewSqlIntent());
-              },
-              onOpenSqlScript: () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const OpenSqlIntent());
-              },
-              onSaveQuery: () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const SaveSqlIntent());
-              },
+                  unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
+              onNewQueryTab: () => _invoke(const NewSqlIntent()),
+              onOpenSqlScript: () => _invoke(const OpenSqlIntent()),
+              onSaveQuery: () => _invoke(const SaveSqlIntent()),
               onExecuteQuery: () =>
                   SqlEditorCommandBridge.instance.invokeExecute(),
               onToggleSidebar: () => _splitKey.currentState?.toggleSidebar(),
               onOpenPreferences: () => showPreferencesDialog(context),
-              onOpenWelcomeTour: () => _onOpenWelcomeTour(),
-              onGoHome: _onGoHome,
+              onOpenWelcomeTour: () => _dialogs.onOpenWelcomeTour(),
+              onGoHome: _nav.onGoHome,
               child: SqlEditorGlobalActions(
                 activeConnection: workspace.activeConnection,
-                onOpenSqlWorkspace: _openSqlWorkspaceForConnection,
+                onOpenSqlWorkspace: _nav.openSqlWorkspaceForConnection,
                 child: material.Scaffold(
                 backgroundColor: wb.canvas,
                 body: WindowBorder(
@@ -1076,111 +329,51 @@ class _MainScreenState extends State<MainScreen> {
                 width: 1,
                 child: Column(
                   children: [
-                    ValueListenableBuilder<bool>(
-                      valueListenable: _isSidebarVisible,
-                      builder: (context, isSidebarVisible, _) {
-                        return QueryaWindowTitleBar(
-                          onNewDatabaseConnection:
-                              _onNewDatabaseConnectionFromMenu,
-                          onNewDatabaseConnectionFromUrl:
-                              _onNewDatabaseConnectionFromUrl,
-                          activeConnection: workspace.activeConnection,
-                          isReadOnly: workspace.isReadOnly,
-                          isSidebarVisible: isSidebarVisible,
-                          onToggleSidebar: () =>
-                              _splitKey.currentState?.toggleSidebar(),
-                          onOpenWelcomeTour: _onOpenWelcomeTour,
-                          onGoHome: _onGoHome,
-                          onReadOnlyChanged: () => unawaited(_toggleReadOnly()),
-                          onConnect: () {
-                            final active = workspace.activeConnection;
-                            if (active != null && active.id != null) {
-                              _connectionsPanelKey.currentState
-                                  ?.connect(active.id!);
-                            }
-                          },
-                          onReconnect: () {
-                            final active = workspace.activeConnection;
-                            if (active != null) {
-                              _connectionsPanelKey.currentState
-                                  ?.reconnect(active);
-                            }
-                          },
-                          onDisconnect: () {
-                            final active = workspace.activeConnection;
-                            if (active != null) {
-                              _connectionsPanelKey.currentState
-                                  ?.disconnect(active);
-                            }
-                          },
-                          onDisconnectAll: () {
-                            _connectionsPanelKey.currentState?.disconnectAll();
-                          },
-                          onDisconnectOthers: () {
-                            final active = workspace.activeConnection;
-                            if (active != null) {
-                              _connectionsPanelKey.currentState
-                                  ?.disconnectOthers(active);
-                            }
-                          },
-                        );
-                      },
+                    ShellTitleBar(
+                      workspace: workspace,
+                      isSidebarVisible: _isSidebarVisible,
+                      connectionsPanelKey: _connectionsPanelKey,
+                      onToggleSidebar: () =>
+                          _splitKey.currentState?.toggleSidebar(),
+                      dialogs: _dialogs,
+                      nav: _nav,
                     ),
                     QueryaDivider(
                         height: 1,
                         color: wb.borderSubtle.withValues(alpha: 0.22)),
                     Expanded(
-                      child: _MainContentSplit(
+                      child: MainContentSplit(
                         key: _splitKey,
                         connectionsPanelKey: _connectionsPanelKey,
                         workspace: _workspace,
                         onSidebarVisibilityChanged: (v) =>
                             _isSidebarVisible.value = v,
-                        onConnectionSelected: _onConnectionSelected,
-                        onPostgresObjectSelected: _onPostgresObjectSelected,
-                        onMysqlObjectSelected: _onMysqlObjectSelected,
-                        onSqliteObjectSelected: _onSqliteObjectSelected,
-                        onExtensionObjectSelected: _onExtensionObjectSelected,
-                        onRedisDatabaseSelected: _onRedisDatabaseSelected,
-                        onMongoDBDatabaseSelected: _onMongoDBDatabaseSelected,
-                        onMongoCollectionSelected: _onMongoCollectionSelected,
-                        onPostgresOpenSqlWorkspace: _onPostgresOpenSqlWorkspace,
-                        onMysqlOpenSqlWorkspace: _onMysqlOpenSqlWorkspace,
-                        onSqliteOpenSqlWorkspace: _onSqliteOpenSqlWorkspace,
-                        onRequestNewConnection: _openNewConnectionFromHero,
+                        onConnectionSelected: _nav.onConnectionSelected,
+                        onPostgresObjectSelected: _nav.onPostgresObjectSelected,
+                        onMysqlObjectSelected: _nav.onMysqlObjectSelected,
+                        onSqliteObjectSelected: _nav.onSqliteObjectSelected,
+                        onExtensionObjectSelected: _nav.onExtensionObjectSelected,
+                        onRedisDatabaseSelected: _nav.onRedisDatabaseSelected,
+                        onMongoDBDatabaseSelected: _nav.onMongoDBDatabaseSelected,
+                        onMongoCollectionSelected: _nav.onMongoCollectionSelected,
+                        onPostgresOpenSqlWorkspace: _nav.onPostgresOpenSqlWorkspace,
+                        onMysqlOpenSqlWorkspace: _nav.onMysqlOpenSqlWorkspace,
+                        onSqliteOpenSqlWorkspace: _nav.onSqliteOpenSqlWorkspace,
+                        onRequestNewConnection: _dialogs.openNewConnectionFromHero,
                         onRequestNewConnectionFromUrl:
-                            _onNewDatabaseConnectionFromUrl,
-                        onRequestOpenSqlite: _openSqliteFromHero,
-                        onRequestLaunchDemo: _onLaunchDemoPlayground,
-                        onRequestOpenTour: _onOpenWelcomeTour,
-                        onOpenConnection: _onConnectionSelected,
-                        initialMongoCollection: _pendingMongoCollection,
+                            _dialogs.onNewDatabaseConnectionFromUrl,
+                        onRequestOpenSqlite: _dialogs.openSqliteFromHero,
+                        onRequestLaunchDemo: _dialogs.onLaunchDemoPlayground,
+                        onRequestOpenTour: _dialogs.onOpenWelcomeTour,
+                        onOpenConnection: _nav.onConnectionSelected,
+                        initialMongoCollection: _nav.pendingMongoCollection,
                       ),
                     ),
-                    ValueListenableBuilder<bool>(
-                      valueListenable: _isSidebarVisible,
-                      builder: (context, isSidebarVisible, _) {
-                        return ListenableBuilder(
-                          listenable: QueryaShellStatus.instance,
-                          builder: (context, _) {
-                            final status = QueryaShellStatus.instance;
-                            return QueryaStatusBar(
-                              activeConnection: workspace.activeConnection,
-                              isReadOnly: workspace.isReadOnly,
-                              isSidebarVisible: isSidebarVisible,
-                              onToggleSidebar: () =>
-                                  _splitKey.currentState?.toggleSidebar(),
-                              onOpenPreferences: () =>
-                                  showPreferencesDialog(context),
-                              isBusy: status.isBusy,
-                              statusMessage: status.statusMessage,
-                              rowCount: status.rowCount,
-                              columnCount: status.columnCount,
-                              lastQueryDuration: status.lastQueryDuration,
-                            );
-                          },
-                        );
-                      },
+                    ShellStatusBar(
+                      workspace: workspace,
+                      isSidebarVisible: _isSidebarVisible,
+                      onToggleSidebar: () =>
+                          _splitKey.currentState?.toggleSidebar(),
                     ),
                   ],
                 ),
@@ -1194,580 +387,4 @@ class _MainScreenState extends State<MainScreen> {
     },
   );
 }
-}
-
-/// Owns splitter width and collapsible spring motion.
-class _MainContentSplit extends StatefulWidget {
-  const _MainContentSplit({
-    super.key,
-    required this.connectionsPanelKey,
-    required this.workspace,
-    required this.onConnectionSelected,
-    required this.onPostgresObjectSelected,
-    required this.onMysqlObjectSelected,
-    required this.onSqliteObjectSelected,
-    required this.onExtensionObjectSelected,
-    required this.onRedisDatabaseSelected,
-    required this.onMongoDBDatabaseSelected,
-    required this.onMongoCollectionSelected,
-    required this.onPostgresOpenSqlWorkspace,
-    required this.onMysqlOpenSqlWorkspace,
-    required this.onSqliteOpenSqlWorkspace,
-    required this.onRequestNewConnection,
-    required this.onRequestNewConnectionFromUrl,
-    required this.onRequestOpenSqlite,
-    this.onRequestLaunchDemo,
-    this.onRequestOpenTour,
-    required this.onOpenConnection,
-    this.onSidebarVisibilityChanged,
-    this.initialMongoCollection,
-  });
-
-  final GlobalKey<ConnectionsPanelState> connectionsPanelKey;
-  final ValueNotifier<MainScreenWorkspaceState> workspace;
-  final ValueChanged<bool>? onSidebarVisibilityChanged;
-  final void Function(ConnectionRow) onConnectionSelected;
-  final void Function(
-    ConnectionRow,
-    String database,
-    String schema,
-    String name,
-    PostgresObjectKind kind,
-  ) onPostgresObjectSelected;
-  final void Function(
-    ConnectionRow,
-    String database,
-    String name,
-    MysqlObjectKind kind,
-  ) onMysqlObjectSelected;
-  final void Function(
-    ConnectionRow,
-    String name,
-    SqliteObjectKind kind,
-  ) onSqliteObjectSelected;
-  final void Function(
-    ConnectionRow,
-    String database,
-    String name,
-  ) onExtensionObjectSelected;
-  final void Function(ConnectionRow, int) onRedisDatabaseSelected;
-  final void Function(ConnectionRow, String) onMongoDBDatabaseSelected;
-  final void Function(ConnectionRow, String, String) onMongoCollectionSelected;
-  final OnPostgresOpenSqlWorkspace onPostgresOpenSqlWorkspace;
-  final void Function(ConnectionRow) onMysqlOpenSqlWorkspace;
-  final void Function(ConnectionRow) onSqliteOpenSqlWorkspace;
-  final VoidCallback onRequestNewConnection;
-  final VoidCallback onRequestNewConnectionFromUrl;
-  final VoidCallback onRequestOpenSqlite;
-  final String? initialMongoCollection;
-  final VoidCallback? onRequestLaunchDemo;
-  final VoidCallback? onRequestOpenTour;
-  final void Function(ConnectionRow) onOpenConnection;
-
-  @override
-  State<_MainContentSplit> createState() => _MainContentSplitState();
-}
-
-class _MainContentSplitState extends State<_MainContentSplit>
-    with SingleTickerProviderStateMixin {
-  static const double _minLeftWidth = 180;
-  static const double _maxLeftWidth = 500;
-  static const double _minWorkspaceWidth = 64;
-  static const double _resizeHandleWidth = 6;
-  static const double _collapseThreshold = 1.0;
-
-  /// High-responsiveness critically damped spring for fluid sidebar toggling (~0.22s).
-  static const SpringDescription _sidebarSpring = SpringDescription(
-    mass: 1.0,
-    stiffness: 580.0,
-    damping: 48.0,
-  );
-
-  late final QueryaSpringController _widthSpring;
-  late final ConnectionsPanelWidthPersist _widthPersist;
-  VoidCallback? _persistWhenSettled;
-  double _lastMaxWidth = 1200;
-  double _lastExpandedWidth = kDefaultConnectionsPanelWidth;
-  bool _sidebarVisible = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _widthPersist = ConnectionsPanelWidthPersist(
-      write: AppSettings.instance.setConnectionsPanelWidth,
-    );
-    _widthSpring = QueryaSpringController(
-      vsync: this,
-      value: kDefaultConnectionsPanelWidth,
-      spring: _sidebarSpring,
-      cubicDuration: QueryaMotion.sidebarCubic,
-      cubicCurve: QueryaMotion.enter,
-    );
-    _widthSpring.addListener(_onWidthSpringChanged);
-    unawaited(_restoreState());
-  }
-
-  Future<void> _restoreLastSelectedObject() async {
-    final ws = widget.workspace.value;
-    final conn = ws.activeConnection;
-    final pg = ws.lastSelectedPostgresObject;
-    if (conn != null && conn.type == 'postgresql' && pg != null) {
-      if (!await confirmOpenPostgresTableIfSqlTx(
-        context,
-        connection: conn,
-        database: pg.database,
-        kind: pg.kind,
-      )) {
-        return;
-      }
-    }
-    if (!mounted) return;
-    final sq = ws.lastSelectedSqliteObject;
-    if (conn != null && conn.type == 'sqlite' && sq != null) {
-      if (!await confirmOpenSqliteTableIfSqlTx(
-        context,
-        connection: conn,
-        kind: sq.kind,
-      )) {
-        return;
-      }
-    }
-    if (!mounted) return;
-    final my = ws.lastSelectedMysqlObject;
-    if (conn != null && conn.type == 'mysql' && my != null) {
-      if (!await confirmOpenMysqlTableIfSqlTx(
-        context,
-        connection: conn,
-        database: my.database,
-        kind: my.kind,
-      )) {
-        return;
-      }
-    }
-    if (!mounted) return;
-    widget.workspace.value = widget.workspace.value.restoreLastSelectedObject();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _widthSpring.cubicDuration =
-        context.motionDuration(QueryaMotion.sidebarCubic);
-    _widthSpring.cubicCurve = context.motionCurve(QueryaMotion.enter);
-    _widthSpring.useSprings = QueryaSpring.springsEnabled(context);
-  }
-
-  Future<void> _restoreState() async {
-    final width = await AppSettings.instance.getConnectionsPanelWidth();
-    final visible = await AppSettings.instance.getSidebarVisible();
-    if (!mounted) return;
-    final clamped = _clampLeftWidth(width, _lastMaxWidth);
-    _lastExpandedWidth = clamped;
-    _sidebarVisible = visible;
-    widget.onSidebarVisibilityChanged?.call(visible);
-    final targetW = visible ? clamped : 0.0;
-    _widthSpring.jumpTo(targetW);
-  }
-
-  void toggleSidebar({bool? visible}) {
-    final target = visible ?? !_sidebarVisible;
-    _sidebarVisible = target;
-    widget.onSidebarVisibilityChanged?.call(target);
-    _widthSpring.useSprings = QueryaSpring.springsEnabled(context);
-    final targetWidth = target ? _lastExpandedWidth : 0.0;
-    _widthSpring.animateTo(targetWidth);
-    unawaited(AppSettings.instance.setSidebarVisible(target));
-  }
-
-  void _onWidthSpringChanged() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  void _schedulePersistAfterSettle() {
-    _widthPersist.markDirty();
-    final pending = _persistWhenSettled;
-    if (pending != null) {
-      _widthSpring.removeListener(pending);
-    }
-    void listener() {
-      if (_widthSpring.isAnimating) return;
-      _widthSpring.removeListener(listener);
-      _persistWhenSettled = null;
-      if (_sidebarVisible) {
-        unawaited(_widthPersist.persist(_lastExpandedWidth));
-      }
-    }
-
-    _persistWhenSettled = listener;
-    if (_widthSpring.isAnimating) {
-      _widthSpring.addListener(listener);
-    } else {
-      listener();
-    }
-  }
-
-  @override
-  void dispose() {
-    final pending = _persistWhenSettled;
-    if (pending != null) {
-      _widthSpring.removeListener(pending);
-      _persistWhenSettled = null;
-    }
-    if (_sidebarVisible) {
-      _widthPersist.disposeFlush(_lastExpandedWidth);
-    }
-    _widthSpring.removeListener(_onWidthSpringChanged);
-    _widthSpring.dispose();
-    super.dispose();
-  }
-
-  double _clampLeftWidth(double raw, double maxWidth) {
-    final maxLeft = maxWidth - _resizeHandleWidth - _minWorkspaceWidth;
-    if (maxLeft <= 0) return 0;
-    if (maxLeft < _minLeftWidth) return raw.clamp(0, maxLeft);
-    return raw.clamp(_minLeftWidth, math.min(_maxLeftWidth, maxLeft));
-  }
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        _lastMaxWidth = constraints.maxWidth;
-        final currentW = _widthSpring.value.clamp(0.0, constraints.maxWidth);
-        final progress = _lastExpandedWidth > 0
-            ? (currentW / _lastExpandedWidth).clamp(0.0, 1.0)
-            : 0.0;
-        final currentHandleW =
-            (progress * _resizeHandleWidth).clamp(0.0, _resizeHandleWidth);
-        final handleOpacity = (progress * 5.0).clamp(0.0, 1.0);
-        final contentOpacity = (progress * 2.2).clamp(0.0, 1.0);
-        final parallaxOffset = (progress - 1.0) * 36.0;
-        final isCollapsed =
-            currentW <= _collapseThreshold || contentOpacity <= 0.0;
-
-        final slot = material.RepaintBoundary(
-          child: _ConnectionsPanelSlot(
-            connectionsPanelKey: widget.connectionsPanelKey,
-            workspace: widget.workspace,
-            onConnectionSelected: widget.onConnectionSelected,
-            onRedisDatabaseSelected:
-                widget.onRedisDatabaseSelected,
-            onMongoDBDatabaseSelected:
-                widget.onMongoDBDatabaseSelected,
-            onMongoCollectionSelected:
-                widget.onMongoCollectionSelected,
-            onPostgresObjectSelected:
-                widget.onPostgresObjectSelected,
-            onPostgresOpenSqlWorkspace:
-                widget.onPostgresOpenSqlWorkspace,
-            onMysqlObjectSelected: widget.onMysqlObjectSelected,
-            onMysqlOpenSqlWorkspace:
-                widget.onMysqlOpenSqlWorkspace,
-            onSqliteObjectSelected:
-                widget.onSqliteObjectSelected,
-            onSqliteOpenSqlWorkspace:
-                widget.onSqliteOpenSqlWorkspace,
-            onExtensionObjectSelected:
-                widget.onExtensionObjectSelected,
-          ),
-        );
-
-        final material.Widget slotContent;
-        if (isCollapsed) {
-          slotContent = Offstage(
-            offstage: true,
-            child: TickerMode(
-              enabled: false,
-              child: slot,
-            ),
-          );
-        } else if (contentOpacity < 1.0) {
-          slotContent = Opacity(
-            opacity: contentOpacity,
-            child: slot,
-          );
-        } else {
-          slotContent = slot;
-        }
-
-        final material.Widget positionedSlot =
-            (isCollapsed || parallaxOffset.abs() <= 0.001)
-                ? slotContent
-                : Transform.translate(
-                    offset: Offset(parallaxOffset, 0),
-                    child: slotContent,
-                  );
-
-        final handleWidget = IgnorePointer(
-          ignoring: currentW <= 20.0 || !_sidebarVisible,
-          child: QueryaSplitHandle(
-            key: const Key('main_content_resize_handle'),
-            axis: Axis.horizontal,
-            semanticsLabel:
-                'Resize connections and workspace panes',
-            onDragDelta: (dx) {
-              final ml = constraints.maxWidth -
-                  _resizeHandleWidth -
-                  _minWorkspaceWidth;
-              if (ml <= 0) return;
-              final nextW = _clampLeftWidth(
-                _widthSpring.value + dx,
-                constraints.maxWidth,
-              );
-              _lastExpandedWidth = nextW;
-              _widthSpring.jumpTo(nextW);
-            },
-            onDiscreteResize: () => _widthPersist
-                .onDiscreteResize(() => _lastExpandedWidth),
-            onDragEnd: (details) {
-              _widthPersist.cancelDiscreteTimer();
-              final velocity = details.primaryVelocity ??
-                  details.velocity.pixelsPerSecond.dx;
-              final useSprings =
-                  QueryaSpring.springsEnabled(context);
-              _widthSpring.useSprings = useSprings;
-              if (_widthSpring.value < 100 && velocity < -50) {
-                _sidebarVisible = false;
-                widget.onSidebarVisibilityChanged?.call(false);
-                _widthSpring.animateTo(0.0, velocity: velocity);
-                unawaited(
-                    AppSettings.instance.setSidebarVisible(false));
-              } else {
-                _sidebarVisible = true;
-                widget.onSidebarVisibilityChanged?.call(true);
-                _lastExpandedWidth = _clampLeftWidth(
-                  _widthSpring.value,
-                  constraints.maxWidth,
-                );
-                _widthSpring.animateTo(
-                  _lastExpandedWidth,
-                  velocity: velocity,
-                );
-                unawaited(
-                    AppSettings.instance.setSidebarVisible(true));
-                _schedulePersistAfterSettle();
-              }
-            },
-          ),
-        );
-
-        final material.Widget handleContent;
-        if (handleOpacity >= 1.0) {
-          handleContent = handleWidget;
-        } else if (handleOpacity <= 0.0) {
-          handleContent = const material.SizedBox.shrink();
-        } else {
-          handleContent = Opacity(
-            opacity: handleOpacity,
-            child: handleWidget,
-          );
-        }
-
-        final isAnimating = _widthSpring.isAnimating;
-        final remainingWidth =
-            math.max(0.0, constraints.maxWidth - currentW - currentHandleW);
-        final workspaceLaidOutWidth =
-            isAnimating ? constraints.maxWidth : remainingWidth;
-
-        return Row(
-          children: [
-            ClipRect(
-              child: SizedBox(
-                width: currentW,
-                child: OverflowBox(
-                  minWidth: _lastExpandedWidth,
-                  maxWidth: _lastExpandedWidth,
-                  alignment: Alignment.topLeft,
-                  child: positionedSlot,
-                ),
-              ),
-            ),
-            if (!isCollapsed)
-              SizedBox(
-                width: currentHandleW,
-                child: ClipRect(
-                  child: OverflowBox(
-                    minWidth: _resizeHandleWidth,
-                    maxWidth: _resizeHandleWidth,
-                    alignment: Alignment.center,
-                    child: handleContent,
-                  ),
-                ),
-              ),
-            Expanded(
-              key: const ValueKey('main_content_workspace_expanded'),
-              child: ClipRect(
-                child: OverflowBox(
-                  alignment: Alignment.topLeft,
-                  minWidth: workspaceLaidOutWidth,
-                  maxWidth: workspaceLaidOutWidth,
-                  child: material.RepaintBoundary(
-                    child: ValueListenableBuilder<MainScreenWorkspaceState>(
-                      valueListenable: widget.workspace,
-                      builder: (context, ws, _) {
-                        return WorkspacePanel(
-                          activeConnection: ws.activeConnection,
-                          selectedRedisDb: ws.activeRedisDb,
-                          selectedMongoDb: ws.activeMongoDB,
-                          selectedPostgresObject: ws.selectedPostgresObject,
-                          postgresSqlTabRequestToken:
-                              ws.postgresSqlTabRequestToken,
-                          postgresSqlEditorContext:
-                              ws.postgresSqlEditorContext,
-                          postgresSqlEditorContextToken:
-                              ws.postgresSqlEditorContextToken,
-                          selectedMysqlObject: ws.selectedMysqlObject,
-                          mysqlSqlTabRequestToken: ws.mysqlSqlTabRequestToken,
-                          selectedSqliteObject: ws.selectedSqliteObject,
-                          sqliteSqlTabRequestToken: ws.sqliteSqlTabRequestToken,
-                          selectedExtensionObject: ws.selectedExtensionObject,
-                          lastSelectedPostgresObject:
-                              ws.lastSelectedPostgresObject,
-                          lastSelectedMysqlObject: ws.lastSelectedMysqlObject,
-                          lastSelectedSqliteObject: ws.lastSelectedSqliteObject,
-                          lastSelectedExtensionObject:
-                              ws.lastSelectedExtensionObject,
-                          lastSelectedMongoDb: ws.lastSelectedMongoDb,
-                          lastSelectedMongoCollection:
-                              ws.lastSelectedMongoCollection,
-                          lastSelectedRedisDb: ws.lastSelectedRedisDb,
-                          selectedRedisKey: ws.selectedRedisKey,
-                          lastSelectedRedisKey: ws.lastSelectedRedisKey,
-                          onNavigateHome: () {
-                            widget.workspace.value =
-                                widget.workspace.value.unselectActiveObject();
-                          },
-                          onRestoreLastSelectedObject: () {
-                            unawaited(_restoreLastSelectedObject());
-                          },
-                          isReadOnly: ws.isReadOnly,
-                          onRequestNewConnection: widget.onRequestNewConnection,
-                          onRequestNewConnectionFromUrl:
-                              widget.onRequestNewConnectionFromUrl,
-                          onRequestOpenSqlite: widget.onRequestOpenSqlite,
-                          onRequestLaunchDemo: widget.onRequestLaunchDemo,
-                          onRequestOpenTour: widget.onRequestOpenTour,
-                          onOpenConnection: widget.onOpenConnection,
-                          initialMongoCollection: widget.initialMongoCollection,
-                          selectedMongoCollection: ws.selectedMongoCollection,
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// Rebuilds [ConnectionsPanel] only when the selected connection id changes.
-class _ConnectionsPanelSlot extends StatefulWidget {
-  const _ConnectionsPanelSlot({
-    required this.connectionsPanelKey,
-    required this.workspace,
-    required this.onConnectionSelected,
-    required this.onPostgresObjectSelected,
-    required this.onMysqlObjectSelected,
-    required this.onSqliteObjectSelected,
-    required this.onRedisDatabaseSelected,
-    required this.onMongoDBDatabaseSelected,
-    required this.onMongoCollectionSelected,
-    required this.onPostgresOpenSqlWorkspace,
-    required this.onMysqlOpenSqlWorkspace,
-    required this.onSqliteOpenSqlWorkspace,
-    required this.onExtensionObjectSelected,
-  });
-
-  final GlobalKey<ConnectionsPanelState> connectionsPanelKey;
-  final ValueNotifier<MainScreenWorkspaceState> workspace;
-  final void Function(ConnectionRow) onConnectionSelected;
-  final void Function(
-    ConnectionRow,
-    String database,
-    String schema,
-    String name,
-    PostgresObjectKind kind,
-  ) onPostgresObjectSelected;
-  final void Function(
-    ConnectionRow,
-    String database,
-    String name,
-    MysqlObjectKind kind,
-  ) onMysqlObjectSelected;
-  final void Function(
-    ConnectionRow,
-    String name,
-    SqliteObjectKind kind,
-  ) onSqliteObjectSelected;
-  final void Function(ConnectionRow, int) onRedisDatabaseSelected;
-  final void Function(ConnectionRow, String) onMongoDBDatabaseSelected;
-  final void Function(ConnectionRow, String, String) onMongoCollectionSelected;
-  final OnPostgresOpenSqlWorkspace onPostgresOpenSqlWorkspace;
-  final void Function(ConnectionRow) onMysqlOpenSqlWorkspace;
-  final void Function(ConnectionRow) onSqliteOpenSqlWorkspace;
-  final void Function(
-    ConnectionRow,
-    String database,
-    String name,
-  ) onExtensionObjectSelected;
-
-  @override
-  State<_ConnectionsPanelSlot> createState() => _ConnectionsPanelSlotState();
-}
-
-class _ConnectionsPanelSlotState extends State<_ConnectionsPanelSlot> {
-  @override
-  void initState() {
-    super.initState();
-    widget.workspace.addListener(_onWorkspaceChanged);
-  }
-
-  @override
-  void dispose() {
-    widget.workspace.removeListener(_onWorkspaceChanged);
-    super.dispose();
-  }
-
-  void _onWorkspaceChanged() {
-    setState(() {});
-  }
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    final ws = widget.workspace.value;
-    return ConnectionsPanel(
-      key: widget.connectionsPanelKey,
-      selectedConnectionId: ws.activeConnection?.id,
-      selectedPostgresObject: ws.selectedPostgresObject,
-      selectedMysqlObject: ws.selectedMysqlObject,
-      selectedSqliteObject: ws.selectedSqliteObject,
-      selectedExtensionObject: ws.selectedExtensionObject,
-      selectedRedisDb: ws.activeRedisDb,
-      selectedMongoDb: ws.activeMongoDB,
-      selectedMongoCollection: ws.selectedMongoCollection,
-      onConnectionSelected: widget.onConnectionSelected,
-      onRedisDatabaseSelected: widget.onRedisDatabaseSelected,
-      onMongoDBDatabaseSelected: widget.onMongoDBDatabaseSelected,
-      onMongoCollectionSelected: widget.onMongoCollectionSelected,
-      onPostgresObjectSelected: widget.onPostgresObjectSelected,
-      onPostgresOpenSqlWorkspace: widget.onPostgresOpenSqlWorkspace,
-      onMysqlObjectSelected: widget.onMysqlObjectSelected,
-      onMysqlOpenSqlWorkspace: widget.onMysqlOpenSqlWorkspace,
-      onSqliteObjectSelected: widget.onSqliteObjectSelected,
-      onSqliteOpenSqlWorkspace: widget.onSqliteOpenSqlWorkspace,
-      onExtensionObjectSelected: widget.onExtensionObjectSelected,
-      onConnectionRemoved: (id) {
-        // The open workspace belonged to the removed connection: go home.
-        if (widget.workspace.value.activeConnection?.id != id) return;
-        widget.workspace.value = MainScreenWorkspaceState.empty;
-        QueryaShellStatus.instance.clear();
-      },
-    );
-  }
 }
