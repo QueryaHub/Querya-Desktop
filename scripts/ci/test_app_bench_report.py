@@ -64,6 +64,16 @@ class ReportTest(unittest.TestCase):
         self.assertEqual(over, 1)
         self.assertIn("**5**", body)
 
+    def test_an_aborted_run_is_named(self):
+        text = line("charts_5000") + "\nBENCH FAILED: Bad state: timeout waiting for the Diagram tab\nstack\n"
+        self.assertEqual(abr.failure(text), "Bad state: timeout waiting for the Diagram tab")
+        _, body = abr.report(text)
+        self.assertIn("The run aborted: `Bad state: timeout waiting for the Diagram tab`", body)
+
+    def test_a_clean_run_has_no_failure(self):
+        self.assertIsNone(abr.failure(all_ok()))
+        self.assertNotIn("aborted", abr.report(all_ok())[1])
+
     def test_main_prints_the_count_first(self):
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "app.log")

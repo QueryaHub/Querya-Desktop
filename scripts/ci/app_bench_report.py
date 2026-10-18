@@ -6,8 +6,9 @@ usage: app_bench_report.py APP_BENCH.log
 Reads the `BENCH <scenario> frames=.. build p50/p90/max=.. raster ..` lines and
 checks each scenario of LIMITS: build p90 against its limit (ms), and for
 multi_tab_run the number of query panes rebuilt by one run. The first output
-line is `OVER=<n>`, the number of scenarios over a limit or missing.
-Informational: always exits 0.
+line is `OVER=<n>`, the number of scenarios over a limit or missing. A run that
+aborted prints `BENCH FAILED: <reason>` (`flutter run` exits 0 whatever the
+app does), which the report names. Informational: always exits 0.
 """
 import re
 import sys
@@ -32,6 +33,13 @@ _LINE = re.compile(
     r"build p50/p90/max=([\d.]+)/([\d.]+)/([\d.]+)\s+"
     r"raster p50/p90/max=([\d.]+)/([\d.]+)/([\d.]+).*?stutters=(\d+)")
 _PANES = re.compile(r"BENCH multi_tab_run panes rebuilt=(\d+)")
+_FAILED = re.compile(r"BENCH FAILED: (.*)$", re.M)
+
+
+def failure(text):
+    """The reason the bench aborted, or None."""
+    m = _FAILED.search(text)
+    return m[1].strip() if m else None
 
 
 def parse(text):
@@ -75,6 +83,9 @@ def report(text):
         over += bad
         lines += ["", f"Query panes rebuilt by one run in one of five tabs: "
                       f"**{panes}** (limit {MAX_PANES_REBUILT}){' ⚠️' if bad else ''}."]
+    failed = failure(text)
+    if failed:
+        lines += ["", f"⚠️ The run aborted: `{failed}`. Scenarios after it did not run."]
     lines += ["", "Times in ms, profile build under xvfb with software "
                   "rendering. Informational, never blocks a merge."]
     return over, "\n".join(lines)
