@@ -84,4 +84,18 @@ void main() {
     expect(offenders, isEmpty,
         reason: 'Use QueryaTextField (the barrel hides shadcn TextField).');
   });
+
+  test('no hand-built material TextField outside the kit (#1733)', () {
+    const kit = {
+      'lib/shared/widgets/querya_text_field.dart',
+      'lib/shared/widgets/querya_search_field.dart',
+    };
+    final offenders = <String>[
+      for (final MapEntry(:key, :value) in sources().entries)
+        if (!kit.contains(key) && value.contains('material.TextField('))
+          key,
+    ];
+    expect(offenders, isEmpty,
+        reason: 'Use QueryaTextField (framed: false inside a frame of your own).');
+  });
 }

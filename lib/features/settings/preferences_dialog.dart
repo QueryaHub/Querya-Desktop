@@ -308,7 +308,8 @@ class PreferencesDialogContentState
                               ),
                               const Gap(8),
                               material.Expanded(
-                                child: material.TextField(
+                                child: QueryaTextField(
+ framed: false,
                                   controller: _searchController,
                                   focusNode: _searchFocusNode,
                                   onChanged: (val) {
@@ -333,17 +334,7 @@ class PreferencesDialogContentState
                                     fontSize: 12,
                                     color: theme.foreground,
                                   ),
-                                  decoration: material.InputDecoration(
-                                    hintText: 'Filter preferences... (Ctrl+F)',
-                                    hintStyle: material.TextStyle(
-                                      fontSize: 12,
-                                      color: theme.mutedForeground
-                                          .withValues(alpha: 0.6),
-                                    ),
-                                    border: material.InputBorder.none,
-                                    isDense: true,
-                                    contentPadding: material.EdgeInsets.zero,
-                                  ),
+                                  placeholder: 'Filter preferences… (Ctrl+F)',
                                 ),
                               ),
                               if (_searchQuery.isNotEmpty)

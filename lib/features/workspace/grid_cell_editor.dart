@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
@@ -183,7 +184,8 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
               focusNode: _focusNode,
               onKeyEvent: _handleKeyEvent,
               autofocus: true,
-              child: material.TextField(
+              child: QueryaTextField(
+                framed: false,
                 controller: _controller,
                 autofocus: true,
                 maxLines: 1,
@@ -191,11 +193,6 @@ class _GridCellEditorState extends material.State<GridCellEditor> {
                   fontSize: 12,
                   fontFamily: 'monospace',
                   fontFamilyFallback: QueryaTypography.cjkFontFamilyFallback,
-                ),
-                decoration: const material.InputDecoration(
-                  border: material.InputBorder.none,
-                  isDense: true,
-                  contentPadding: material.EdgeInsets.zero,
                 ),
                 onSubmitted: (value) {
                   _commit(value, moveNextRow: true);

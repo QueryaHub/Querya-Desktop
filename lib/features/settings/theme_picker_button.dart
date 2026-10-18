@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/layout/ui_scale.dart';
@@ -300,7 +301,6 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
   material.Widget _buildMenuPanel(
       material.BuildContext context, QueryaUiColors cs) {
     final filteredThemes = _filteredThemes;
-    final radius = context.scaled(QueryaDropdownTokens.menuBorderRadius);
 
     return material.Column(
       children: [
@@ -311,44 +311,10 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
             context.scaled(8),
             context.scaled(4),
           ),
-          child: material.TextField(
+          child: QueryaTextField(
             controller: _searchController,
-            style: material.TextStyle(
-              fontSize: context.scaled(QueryaDropdownTokens.fontSize),
-              color: cs.popoverForeground,
-            ),
-            decoration: material.InputDecoration(
-              isDense: true,
-              hintText: 'Search themes…',
-              hintStyle: material.TextStyle(color: cs.mutedForeground),
-              prefixIcon: material.Icon(
-                material.Icons.search,
-                size: context.scaled(18),
-                color: cs.mutedForeground,
-              ),
-              prefixIconConstraints: material.BoxConstraints(
-                minWidth: context.scaled(36),
-                minHeight: context.scaled(32),
-              ),
-              contentPadding: material.EdgeInsets.symmetric(
-                horizontal: context.scaled(8),
-                vertical: context.scaled(8),
-              ),
-              filled: true,
-              fillColor: cs.muted.withValues(alpha: 0.18),
-              border: material.OutlineInputBorder(
-                borderRadius: material.BorderRadius.circular(radius),
-                borderSide: material.BorderSide(color: cs.border),
-              ),
-              enabledBorder: material.OutlineInputBorder(
-                borderRadius: material.BorderRadius.circular(radius),
-                borderSide: material.BorderSide(color: cs.border),
-              ),
-              focusedBorder: material.OutlineInputBorder(
-                borderRadius: material.BorderRadius.circular(radius),
-                borderSide: material.BorderSide(color: cs.ring),
-              ),
-            ),
+            placeholder: 'Search themes…',
+            leading: const material.Icon(material.Icons.search),
           ),
         ),
         if (widget.onPreviewTheme != null)

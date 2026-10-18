@@ -86,18 +86,17 @@ class RedisStringEditor extends material.StatelessWidget {
                 color: colors.border.withValues(alpha: 0.3)),
             borderRadius: material.BorderRadius.circular(8),
           ),
-          child: material.TextField(
-            controller: controller,
-            readOnly: isReadOnly,
-            maxLines: null,
-            style: const material.TextStyle(
-              fontSize: 13,
-              fontFamily: QueryaTypography.mono,
-              fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
-            ),
-            decoration: const material.InputDecoration(
-              border: material.InputBorder.none,
-              contentPadding: material.EdgeInsets.all(12),
+          child: material.Padding(
+            padding: const material.EdgeInsets.all(12),
+            child: QueryaTextField(
+              framed: false,
+              controller: controller,
+              readOnly: isReadOnly,
+              maxLines: null,
+              style: const material.TextStyle(
+                fontFamily: QueryaTypography.mono,
+                fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
+              ),
             ),
           ),
         ),

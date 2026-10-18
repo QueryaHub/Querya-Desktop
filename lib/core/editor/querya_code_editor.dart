@@ -252,20 +252,19 @@ class _QueryaCodeEditorState extends State<QueryaCodeEditor> {
     final controller = _effectiveController;
 
     if (widget.variant == QueryaCodeEditorVariant.material) {
-      return material.TextField(
-        controller: controller,
-        focusNode: widget.focusNode,
-        autofocus: widget.autofocus,
-        readOnly: widget.readOnly,
-        maxLines: widget.expands ? null : widget.maxLines,
-        expands: widget.expands,
-        style: style,
-        textAlignVertical: _verticalAlignment,
-        decoration: material.InputDecoration(
-          border: material.InputBorder.none,
-          hintText: widget.hintText,
-          contentPadding:
-              widget.contentPadding ?? const material.EdgeInsets.all(12),
+      return material.Padding(
+        padding: widget.contentPadding ?? const material.EdgeInsets.all(12),
+        child: QueryaTextField(
+          framed: false,
+          controller: controller,
+          focusNode: widget.focusNode,
+          autofocus: widget.autofocus,
+          readOnly: widget.readOnly,
+          maxLines: widget.expands ? null : widget.maxLines,
+          expands: widget.expands,
+          style: style,
+          textAlignVertical: _verticalAlignment,
+          placeholder: widget.hintText,
         ),
       );
     }

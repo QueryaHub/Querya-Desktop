@@ -1,6 +1,7 @@
 import 'dart:async' show Timer;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart' show KeyDownEvent, LogicalKeyboardKey;
+import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
@@ -385,26 +386,16 @@ class _DataGridFilterBarState extends material.State<DataGridFilterBar> {
                   }
                   return material.KeyEventResult.ignored;
                 },
-                child: material.TextField(
+                child: QueryaTextField(
+                  framed: false,
                   controller: _controller,
                   focusNode: _focusNode,
                   autofocus: true,
                   onChanged: _onChanged,
                   onSubmitted: _onSubmitted,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: cs.foreground,
-                  ),
-                  decoration: material.InputDecoration(
-                    hintText: 'Filter results... (e.g. "active", "status = ACTIVE", "amount > 100")',
-                    hintStyle: TextStyle(
-                      fontSize: 12,
-                      color: cs.mutedForeground.withValues(alpha: 0.7),
-                    ),
-                    border: material.InputBorder.none,
-                    isDense: true,
-                    contentPadding: material.EdgeInsets.zero,
-                  ),
+                  style: const TextStyle(fontSize: 12),
+                  placeholder:
+                      'Filter results… (e.g. "active", "status = ACTIVE", "amount > 100")',
                 ),
               ),
             ),
