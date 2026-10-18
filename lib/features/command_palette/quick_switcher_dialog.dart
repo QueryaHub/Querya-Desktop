@@ -197,11 +197,11 @@ class _QuickSwitcherDialogState extends State<QuickSwitcherDialog> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                child: TextField(
+                child: QueryaTextField(
                   controller: _controller,
                   focusNode: _focusNode,
                   autofocus: true,
-                  placeholder: const Text('Go to table, view, collection…'),
+                  placeholder: 'Go to table, view, collection…',
                   onSubmitted: (_) {
                     if (hits.isNotEmpty) _open(hits[selectedIndex]);
                   },

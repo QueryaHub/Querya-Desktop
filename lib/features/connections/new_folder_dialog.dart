@@ -78,9 +78,9 @@ class _NewFolderDialogContentState
                       ),
                       const material.SizedBox(width: 10),
                       material.Expanded(
-                        child: TextField(
+                        child: QueryaTextField(
                           controller: _nameController,
-                          placeholder: const Text('Folder name'),
+                          placeholder: 'Folder name',
                         ),
                       ),
                     ],

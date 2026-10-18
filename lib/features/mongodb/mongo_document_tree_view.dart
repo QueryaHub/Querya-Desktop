@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
+import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/theme/querya_semantic_palette.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
@@ -200,9 +201,9 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
               material.SizedBox(
                 width: 200,
                 height: 28,
-                child: TextField(
+                child: QueryaTextField(
                   controller: _searchController,
-                  placeholder: const Text('Filter keys / values...'),
+                  placeholder: 'Filter keys / values...',
                   onChanged: (val) {
                     setState(() {
                       _searchQuery = val.trim().toLowerCase();

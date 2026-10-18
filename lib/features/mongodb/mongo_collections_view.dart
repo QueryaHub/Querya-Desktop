@@ -316,9 +316,9 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
                 ],
                 material.SizedBox(
                   width: 180,
-                  child: TextField(
+                  child: QueryaTextField(
                     controller: _newCollController,
-                    placeholder: const Text('New collection...'),
+                    placeholder: 'New collection...',
                   ),
                 ),
                 const Gap(8),

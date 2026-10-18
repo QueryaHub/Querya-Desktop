@@ -2,10 +2,10 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/database/destructive_sql_detector.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/redis/redis_cli_workspace.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 import '../../support/redis_connection_test_fake.dart';
@@ -306,7 +306,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       // Enter PING
-      final inputField = find.byType(TextField);
+      final inputField = find.byType(QueryaTextField);
       expect(inputField, findsOneWidget);
       await tester.enterText(inputField, 'PING');
       await tester.pump();
@@ -356,7 +356,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      final inputField = find.byType(TextField);
+      final inputField = find.byType(QueryaTextField);
       await tester.enterText(inputField, 'help');
       await tester.pump();
 

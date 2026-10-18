@@ -88,18 +88,18 @@ class _ErdGroupDialogState extends material.State<_ErdGroupDialog> {
                     .muted()
                     .small(),
                 const material.SizedBox(height: 16),
-                TextField(
+                QueryaTextField(
                   key: const material.ValueKey('erd_group_name'),
                   controller: _name,
                   autofocus: true,
-                  placeholder: const Text('Group name'),
+                  placeholder: 'Group name',
                   onSubmitted: (_) => _submit(),
                 ),
                 const material.SizedBox(height: 8),
-                TextField(
+                QueryaTextField(
                   key: const material.ValueKey('erd_group_note'),
                   controller: _note,
-                  placeholder: const Text('Note (optional)'),
+                  placeholder: 'Note (optional)',
                   onSubmitted: (_) => _submit(),
                 ),
               ],

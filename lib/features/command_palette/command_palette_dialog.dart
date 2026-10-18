@@ -187,11 +187,11 @@ class _CommandPaletteDialogState extends State<CommandPaletteDialog> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                child: TextField(
+                child: QueryaTextField(
                   controller: _controller,
                   focusNode: _focusNode,
                   autofocus: true,
-                  placeholder: const Text('Type a command…'),
+                  placeholder: 'Type a command…',
                   onSubmitted: (_) {
                     if (_objectPrefix) {
                       _openQuickSwitcher();

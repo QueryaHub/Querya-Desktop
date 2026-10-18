@@ -28,9 +28,9 @@ class ConnectionDatabaseSection extends StatelessWidget {
           Text(hint!).muted().small(),
         ],
         const Gap(8),
-        TextField(
+        QueryaTextField(
           controller: databaseController,
-          placeholder: Text(placeholder),
+          placeholder: placeholder,
         ),
       ],
     );

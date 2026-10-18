@@ -5,8 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/database/redis_bulk.dart';
 import 'package:querya_desktop/features/redis/redis_key_editor.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 import '../../support/redis_connection_test_fake.dart';
@@ -299,7 +297,7 @@ void main() {
 
     expect(find.text('Rename Key'), findsOneWidget);
     // Enter new key name
-    final textField = find.byType(shadcn.TextField);
+    final textField = find.byType(QueryaTextField);
     await tester.enterText(textField, 'session:renamed');
     await tester.pumpAndSettle();
 
@@ -334,7 +332,7 @@ void main() {
     await tester.tap(find.byTooltip('Rename key'));
     await tester.pumpAndSettle();
 
-    final textField = find.byType(shadcn.TextField);
+    final textField = find.byType(QueryaTextField);
     await tester.enterText(textField, 'session:exists');
     await tester.pumpAndSettle();
 
@@ -355,7 +353,7 @@ void main() {
     await tester.tap(find.byTooltip('Rename key'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(shadcn.TextField), 'session:exists');
+    await tester.enterText(find.byType(QueryaTextField), 'session:exists');
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Rename'));
@@ -419,7 +417,7 @@ void main() {
     expect(find.text('Edit Item [0]'), findsOneWidget);
     final field = find.descendant(
       of: find.byType(QueryaModalDialog),
-      matching: find.byType(shadcn.TextField),
+      matching: find.byType(QueryaTextField),
     );
     await tester.enterText(field, 'task1_updated');
     await tester.pumpAndSettle();
@@ -503,7 +501,7 @@ void main() {
 
     final field = find.descendant(
       of: find.byType(QueryaModalDialog),
-      matching: find.byType(shadcn.TextField),
+      matching: find.byType(QueryaTextField),
     );
     await tester.enterText(field, 'task1_my_edit');
     await tester.pumpAndSettle();

@@ -37,6 +37,7 @@ export 'querya_modal_dialog.dart';
 export 'querya_search_field.dart';
 export 'querya_spinner.dart';
 export 'querya_text.dart';
+export 'querya_text_field.dart';
 export 'tree_load_error.dart';
 export 'package:querya_desktop/core/motion/querya_motion.dart';
 export 'package:querya_desktop/core/motion/querya_motion_context.dart';
@@ -55,5 +56,7 @@ export 'package:shadcn_flutter/shadcn_flutter.dart'
         MenuButton,
         MenuDivider,
         MenuItem,
-        Menubar;
+        Menubar,
+        InputFeature,
+        TextField;
 

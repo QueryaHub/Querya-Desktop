@@ -140,10 +140,9 @@ class _NewConnectionUrlDialogContentState
                           ),
                           const material.SizedBox(width: 10),
                           material.Expanded(
-                            child: TextField(
+                            child: QueryaTextField(
                               controller: _urlController,
-                              placeholder:
-                                  const Text('database://user:pass@host:port/db'),
+                              placeholder: 'database://user:pass@host:port/db',
                               onSubmitted: (_) => _validateAndSubmit(),
                             ),
                           ),

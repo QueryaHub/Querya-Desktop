@@ -66,11 +66,11 @@ class _SafeModeUnlockDialogState extends material.State<SafeModeUnlockDialog> {
         children: [
           Text('Type $phrase to confirm').small().muted(),
           const Gap(8),
-          TextField(
+          QueryaTextField(
             key: const material.Key('safe_mode_unlock_field'),
             controller: _controller,
             autofocus: true,
-            placeholder: Text(phrase),
+            placeholder: phrase,
             onChanged: (_) => setState(() {}),
             onSubmitted: (_) => _confirm(),
           ),

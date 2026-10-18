@@ -75,9 +75,9 @@ class _RedisListEditorState extends material.State<RedisListEditor> {
           material.Row(
             children: [
               material.Expanded(
-                child: TextField(
+                child: QueryaTextField(
                   controller: _valueController,
-                  placeholder: const Text('New item'),
+                  placeholder: 'New item',
                 ),
               ),
               const Gap(8),
@@ -163,9 +163,9 @@ class RedisEditListDialogContentState
         children: [
           const Text('Enter new value').muted().small(),
           const Gap(8),
-          TextField(
+          QueryaTextField(
             controller: _controller,
-            placeholder: const Text('Value'),
+            placeholder: 'Value',
           ),
         ],
       ),

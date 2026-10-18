@@ -56,16 +56,16 @@ class _RedisZsetEditorState extends material.State<RedisZsetEditor> {
             children: [
               material.Expanded(
                 flex: 2,
-                child: TextField(
+                child: QueryaTextField(
                   controller: _memberController,
-                  placeholder: const Text('Member'),
+                  placeholder: 'Member',
                 ),
               ),
               const Gap(8),
               material.Expanded(
-                child: TextField(
+                child: QueryaTextField(
                   controller: _scoreController,
-                  placeholder: const Text('Score'),
+                  placeholder: 'Score',
                 ),
               ),
               const Gap(8),

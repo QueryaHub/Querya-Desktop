@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/actions/querya_command.dart';
 import 'package:querya_desktop/core/actions/querya_command_registry.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
@@ -46,7 +47,7 @@ void main() {
     expect(find.text('Type a command…'), findsOneWidget);
     expect(find.text('Toggle Dark/Light Theme'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), 'dark');
+    await tester.enterText(find.byType(QueryaTextField), 'dark');
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
 

@@ -235,9 +235,9 @@ class _ExtensionConnectionFormContentState
                     children: [
                       const Text('Connection name').small().muted(),
                       const material.SizedBox(height: 4),
-                      TextField(
+                      QueryaTextField(
                         controller: _nameController,
-                        placeholder: const Text('My ClickHouse'),
+                        placeholder: 'My ClickHouse',
                       ),
                       const material.SizedBox(height: 16),
                       EnvironmentSection(

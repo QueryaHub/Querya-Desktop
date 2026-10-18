@@ -1,13 +1,13 @@
 import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/motion/querya_hover_surface.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/folders_storage.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' show Text, TextField;
 
 import '../helpers/e2e_app_harness.dart';
 import '../helpers/e2e_connection_helper.dart';
@@ -30,9 +30,7 @@ void main() {
   };
 
   Finder byPlaceholder(String text) => find.byWidgetPredicate((w) =>
-      w is TextField &&
-      w.placeholder is Text &&
-      (w.placeholder as Text).data == text);
+      w is QueryaTextField && w.placeholder == text);
 
   Finder inSidebar(String text) => find.descendant(
         of: find.byType(ConnectionsPanel),

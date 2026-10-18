@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/features/redis/redis_cli_workspace.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 import '../../support/redis_connection_test_fake.dart';
@@ -54,7 +54,7 @@ void main() {
   }
 
   Future<void> run(WidgetTester tester, String command) async {
-    await tester.enterText(find.byType(TextField), command);
+    await tester.enterText(find.byType(QueryaTextField), command);
     await tester.pump();
     await tester.tap(find.text('Run'));
     await tester.pump();
@@ -62,7 +62,7 @@ void main() {
   }
 
   String input(WidgetTester tester) =>
-      tester.widget<TextField>(find.byType(TextField)).controller!.text;
+      tester.widget<QueryaTextField>(find.byType(QueryaTextField)).controller!.text;
 
   testWidgets('Up / Down walk through the command history', timeout: _timeout,
       (tester) async {
@@ -89,7 +89,7 @@ void main() {
   testWidgets('Tab completes a unique command name', timeout: _timeout,
       (tester) async {
     await open(tester);
-    await tester.enterText(find.byType(TextField), 'flushal');
+    await tester.enterText(find.byType(QueryaTextField), 'flushal');
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pump();

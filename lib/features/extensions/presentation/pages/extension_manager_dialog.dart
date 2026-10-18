@@ -398,18 +398,10 @@ class _ExtensionManagerContentState
         ),
         material.Padding(
           padding: const material.EdgeInsets.fromLTRB(24, 16, 24, 8),
-          child: TextField(
-            placeholder: const material.Text(
-                'Search extensions by name, tag, or description...'),
+          child: QueryaTextField(
+            placeholder: 'Search extensions by name, tag, or description…',
             onChanged: _onSearchChanged,
-            features: const [
-              InputFeature.leading(
-                Padding(
-                  padding: material.EdgeInsets.only(right: 8),
-                  child: material.Icon(material.Icons.search_rounded, size: 18),
-                ),
-              ),
-            ],
+            leading: const material.Icon(material.Icons.search_rounded),
           ),
         ),
         material.Expanded(

@@ -1027,9 +1027,9 @@ class _RedisTtlDialogContentState
         children: [
           const Text('Enter TTL in seconds (0 to remove)').muted().small(),
           const Gap(8),
-          TextField(
+          QueryaTextField(
             controller: _controller,
-            placeholder: const Text('Seconds'),
+            placeholder: 'Seconds',
           ),
         ],
       ),
@@ -1093,9 +1093,9 @@ class _RedisRenameDialogContentState
         children: [
           const Text('Enter new key name').muted().small(),
           const Gap(8),
-          TextField(
+          QueryaTextField(
             controller: _controller,
-            placeholder: const Text('New key name'),
+            placeholder: 'New key name',
           ),
         ],
       ),

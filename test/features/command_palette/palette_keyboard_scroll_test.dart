@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/actions/querya_command.dart';
 import 'package:querya_desktop/core/actions/querya_command_registry.dart';
 import 'package:querya_desktop/core/actions/querya_schema_object.dart';
@@ -100,7 +101,7 @@ void main() {
       await _press(tester, LogicalKeyboardKey.arrowDown, 20);
       expect(_listOffset(tester), greaterThan(0));
 
-      await tester.enterText(find.byType(TextField), 'Scroll test');
+      await tester.enterText(find.byType(QueryaTextField), 'Scroll test');
       await tester.pump();
       await tester.pump();
 
