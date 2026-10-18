@@ -379,7 +379,7 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
       onNavigateHome: widget.onNavigateHome,
       showExportToolbar: true,
       customToolbarBuilder: (ctx, state) {
-        final cs = Theme.of(ctx).colorScheme;
+        final cs = ctx.colors;
         final title = '${widget.tableName}${widget.isView ? ' (view)' : ''}';
 
         return material.Container(

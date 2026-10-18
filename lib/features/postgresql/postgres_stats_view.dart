@@ -9,8 +9,6 @@ import 'package:querya_desktop/core/database/postgres_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/querya_sparkline.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 const _pollInterval = Duration(seconds: 5);
@@ -202,7 +200,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView>
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     if (_loading) {
       return const material.Center(
@@ -301,7 +299,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView>
   }
 
   material.Widget _header(material.BuildContext context) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.LayoutBuilder(
       builder: (context, constraints) {
         return material.SingleChildScrollView(
@@ -369,7 +367,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView>
 
   material.Widget _summaryChips(
       material.BuildContext context, Map<String, dynamic> stats) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     final versionFull = stats['version'] as String? ?? '—';
     final versionShort = _extractPgVersion(versionFull);
     final settings = stats['settings'] as Map<String, String>? ?? {};
@@ -451,7 +449,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView>
   material.Widget _card(
       material.BuildContext context, String title, material.Widget body,
       {double? minHeight}) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.Container(
       width: double.infinity,
       constraints: minHeight != null
@@ -535,7 +533,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView>
     final databases = stats['databases'] as List<Map<String, dynamic>>? ?? [];
     if (databases.isEmpty) return const material.SizedBox.shrink();
 
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return _card(
       context,
       'Databases',
@@ -609,7 +607,7 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView>
 
   material.Widget _row(
       material.BuildContext context, String key, String value) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.Padding(
       padding: const material.EdgeInsets.symmetric(vertical: 4),
       child: material.Row(

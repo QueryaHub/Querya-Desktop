@@ -101,7 +101,7 @@ class _PostgresWorkspaceHomeState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     return Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
       children: [
@@ -109,7 +109,7 @@ class _PostgresWorkspaceHomeState
           constraints: const material.BoxConstraints(minHeight: 44),
           padding: const material.EdgeInsets.symmetric(horizontal: 12),
           decoration: material.BoxDecoration(
-            color: theme.colorScheme.muted.withValues(alpha: 0.6),
+            color: colors.muted.withValues(alpha: 0.6),
           ),
           child: material.Row(
             children: [
@@ -119,7 +119,7 @@ class _PostgresWorkspaceHomeState
                 material.Icon(
                   material.Icons.lock_outline_rounded,
                   size: 14,
-                  color: theme.colorScheme.mutedForeground,
+                  color: colors.mutedForeground,
                 ),
               ],
               if (widget.lastSelectedPostgresObject != null &&

@@ -35,8 +35,6 @@ void main() {
     'lib/features/mongodb/mongo_document_tree_view.dart',
     'lib/features/mongodb/mongo_documents_json_view.dart',
     'lib/features/mongodb/mongo_documents_table_view.dart',
-    'lib/features/mysql/mysql_stats_view.dart',
-    'lib/features/postgresql/postgres_stats_view.dart',
     'lib/features/settings/preferences_controls.dart',
     'lib/features/updater/update_changelog_view.dart',
     'lib/features/workspace/data_grid_calc_bar.dart',

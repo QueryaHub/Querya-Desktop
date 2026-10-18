@@ -8,8 +8,6 @@ import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/shared/widgets/querya_sparkline.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 
 const _pollInterval = Duration(seconds: 5);
@@ -164,7 +162,7 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView>
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     if (_loading) {
       return const material.Center(
@@ -260,7 +258,7 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView>
   }
 
   material.Widget _header(material.BuildContext context) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.Row(
       children: [
         material.Container(
@@ -354,7 +352,7 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView>
 
   material.Widget _summaryChips(
       material.BuildContext context, Map<String, dynamic> stats) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     final versionFull = stats['version'] as String? ?? '—';
     final versionShort = _extractMysqlVersion(versionFull);
     final uptimeSec = stats['uptime_seconds'] as int? ?? 0;
@@ -436,7 +434,7 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView>
     double? minHeight,
     bool stretchBody = false,
   }) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.Container(
       width: double.infinity,
       constraints: minHeight != null
@@ -578,7 +576,7 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView>
     final databases = stats['databases'] as List<Map<String, dynamic>>? ?? [];
     if (databases.isEmpty) return const material.SizedBox.shrink();
 
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return _card(
       context,
       'Databases',
@@ -637,7 +635,7 @@ class _MysqlStatsViewState extends material.State<MysqlStatsView>
 
   material.Widget _metricRow(
       material.BuildContext context, String label, String value) {
-    final cs = shadcn.Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.Padding(
       padding: const material.EdgeInsets.symmetric(vertical: 6),
       child: material.Row(
