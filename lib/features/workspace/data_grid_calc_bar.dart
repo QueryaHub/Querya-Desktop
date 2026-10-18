@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/motion/querya_animated_expand.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/workspace/grid_selection_calc_engine.dart';
@@ -18,7 +19,7 @@ class DataGridCalcBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visible = stats.totalCount > 1 || stats.hasNumericStats;
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     return QueryaAnimatedExpand(
       expanded: visible,
@@ -135,7 +136,7 @@ class _StatBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     return material.Tooltip(
       message: 'Click to copy $label: $value',

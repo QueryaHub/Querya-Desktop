@@ -110,7 +110,7 @@ class _DataGridGroupingsViewState
       );
     }
 
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final groups = _cachedGroups;
 
     return material.Column(

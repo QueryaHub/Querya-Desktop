@@ -123,7 +123,7 @@ extension _GridCellActions on _VirtualResultGridState {
         StagedRowStatus.unchanged;
     final cellStatus = widget.stagingBuffer?.getCellStatus(modelRow, column) ??
         StagedCellStatus.clean;
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     return [
       MenuButton(

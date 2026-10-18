@@ -250,7 +250,7 @@ class _SqlQueryHistoryDialogContentState
 
   @override
   material.Widget build(material.BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final scheme = context.colors;
     return QueryaDialogCard(
       constraints: WindowLayout.dialogConstraints(
         context,

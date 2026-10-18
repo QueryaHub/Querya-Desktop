@@ -10,7 +10,7 @@ extension _GridViewBuilder on _VirtualResultGridState {
       _columnOffsets = computeResultGridColumnOffsets(_columnWidths);
       _widthsNeedUpdate = false;
     }
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final piiKinds = _activePiiKinds;
 
     return material.CallbackShortcuts(
@@ -354,7 +354,7 @@ extension _GridViewBuilder on _VirtualResultGridState {
                           columnWidths: displayWidths,
                           window: window,
                           height: headerHeight,
-                          colorScheme: cs,
+                          colors: cs,
                           sortColumnIndex: _sortColumnIndex,
                           sortOrder: _sortOrder,
                           onSortColumn: _toggleSort,
@@ -403,7 +403,7 @@ extension _GridViewBuilder on _VirtualResultGridState {
                                       columnWidths: displayWidths,
                                       window: window,
                                       height: rowHeight,
-                                      colorScheme: cs,
+                                      colors: cs,
                                       striped: !isEven,
                                       selection: _selectionForRow(rowIndex),
                                       stagingBuffer: widget.stagingBuffer,

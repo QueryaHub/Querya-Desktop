@@ -38,7 +38,6 @@ void main() {
     'lib/features/mysql/mysql_stats_view.dart',
     'lib/features/postgresql/postgres_stats_view.dart',
     'lib/features/settings/preferences_controls.dart',
-    'lib/features/settings/theme_picker_button.dart',
     'lib/features/updater/update_changelog_view.dart',
     'lib/features/workspace/data_grid_calc_bar.dart',
     'lib/features/workspace/data_grid_filter_bar.dart',

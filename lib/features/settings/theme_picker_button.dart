@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
@@ -8,7 +10,6 @@ import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/theme_definition.dart';
 import 'package:querya_desktop/features/settings/theme_preview_card.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown_tokens.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 /// Debounce delay before requesting a hover preview load.
 const Duration themePreviewDebounce = Duration(milliseconds: 120);
@@ -216,7 +217,7 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final fieldWidth = widget.expandToParent
         ? null
         : (widget.width != null ? context.scaled(widget.width!) : null);
@@ -297,7 +298,7 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
   }
 
   material.Widget _buildMenuPanel(
-      material.BuildContext context, ColorScheme cs) {
+      material.BuildContext context, QueryaUiColors cs) {
     final filteredThemes = _filteredThemes;
     final radius = context.scaled(QueryaDropdownTokens.menuBorderRadius);
 
@@ -393,7 +394,7 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
                       return _ThemePickerRow(
                         definition: theme,
                         selected: theme.id == widget.selectedThemeId,
-                        colorScheme: cs,
+                        colors: cs,
                         onHover: widget.onPreviewTheme == null
                             ? null
                             : () => _schedulePreview(theme),
@@ -415,7 +416,7 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
   material.Widget _buildTrigger({
     required material.BuildContext context,
     required material.MenuController controller,
-    required ColorScheme cs,
+    required QueryaUiColors cs,
     required double? fieldWidth,
   }) {
     final borderColor = _enabled
@@ -492,7 +493,7 @@ class _ThemePickerButtonState extends material.State<ThemePickerButton> {
 
   material.Widget _triggerLabelText({
     required material.BuildContext context,
-    required ColorScheme cs,
+    required QueryaUiColors cs,
     required bool expand,
   }) {
     final text = material.Text(
@@ -574,14 +575,14 @@ class _ThemePickerRow extends material.StatefulWidget {
   const _ThemePickerRow({
     required this.definition,
     required this.selected,
-    required this.colorScheme,
+    required this.colors,
     required this.onSelected,
     this.onHover,
   });
 
   final ThemeDefinition definition;
   final bool selected;
-  final ColorScheme colorScheme;
+  final QueryaUiColors colors;
   final material.VoidCallback onSelected;
   final material.VoidCallback? onHover;
 
@@ -594,7 +595,7 @@ class _ThemePickerRowState extends material.State<_ThemePickerRow> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = widget.colorScheme;
+    final cs = widget.colors;
     final bg = _hovered
         ? cs.accent.withValues(alpha: 0.14)
         : widget.selected
@@ -648,18 +649,18 @@ class _ThemePickerRowState extends material.State<_ThemePickerRow> {
                 material.Expanded(
                   child: _ThemePickerRowTitle(
                     definition: widget.definition,
-                    colorScheme: cs,
+                    colors: cs,
                     selected: widget.selected,
                   ),
                 ),
                 material.SizedBox(width: context.scaled(6)),
                 _SourceBadge(
                   label: _sourceBadgeLabel(widget.definition.source),
-                  colorScheme: cs,
+                  colors: cs,
                 ),
                 material.SizedBox(width: context.scaled(6)),
                 _BrightnessLabel(
-                    isDark: widget.definition.isDark, colorScheme: cs),
+                    isDark: widget.definition.isDark, colors: cs),
               ],
             ),
           ),
@@ -672,17 +673,17 @@ class _ThemePickerRowState extends material.State<_ThemePickerRow> {
 class _ThemePickerRowTitle extends material.StatelessWidget {
   const _ThemePickerRowTitle({
     required this.definition,
-    required this.colorScheme,
+    required this.colors,
     required this.selected,
   });
 
   final ThemeDefinition definition;
-  final ColorScheme colorScheme;
+  final QueryaUiColors colors;
   final bool selected;
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = colorScheme;
+    final cs = colors;
     final subtitle = definition.metadata?.pickerSubtitle;
 
     if (subtitle == null) {
@@ -730,15 +731,15 @@ class _ThemePickerRowTitle extends material.StatelessWidget {
 class _SourceBadge extends material.StatelessWidget {
   const _SourceBadge({
     required this.label,
-    required this.colorScheme,
+    required this.colors,
   });
 
   final String label;
-  final ColorScheme colorScheme;
+  final QueryaUiColors colors;
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = colorScheme;
+    final cs = colors;
     return material.Container(
       padding: material.EdgeInsets.symmetric(
         horizontal: context.scaled(6),
@@ -767,15 +768,15 @@ class _SourceBadge extends material.StatelessWidget {
 class _BrightnessLabel extends material.StatelessWidget {
   const _BrightnessLabel({
     required this.isDark,
-    required this.colorScheme,
+    required this.colors,
   });
 
   final bool isDark;
-  final ColorScheme colorScheme;
+  final QueryaUiColors colors;
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = colorScheme;
+    final cs = colors;
     return material.Row(
       mainAxisSize: material.MainAxisSize.min,
       children: [

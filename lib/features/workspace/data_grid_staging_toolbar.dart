@@ -24,7 +24,7 @@ class DataGridStagingToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
 
     return ListenableBuilder(
       listenable: stagingBuffer,
@@ -165,7 +165,7 @@ class _PendingBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final label = compact
         ? '$count'
         : '$count pending ${count == 1 ? 'change' : 'changes'}';

@@ -6,7 +6,7 @@ class _HeaderRow extends material.StatelessWidget {
     required this.columnWidths,
     required this.window,
     required this.height,
-    required this.colorScheme,
+    required this.colors,
     this.sortColumnIndex,
     this.sortOrder,
     this.onSortColumn,
@@ -18,7 +18,7 @@ class _HeaderRow extends material.StatelessWidget {
   final List<double> columnWidths;
   final ResultGridColumnWindow window;
   final double height;
-  final ColorScheme colorScheme;
+  final QueryaUiColors colors;
   final int? sortColumnIndex;
   final ResultGridSortOrder? sortOrder;
   final material.ValueChanged<int>? onSortColumn;
@@ -30,10 +30,10 @@ class _HeaderRow extends material.StatelessWidget {
     return material.Container(
       height: height,
       decoration: material.BoxDecoration(
-        color: colorScheme.muted.withValues(alpha: 0.35),
+        color: colors.muted.withValues(alpha: 0.35),
         border: material.Border(
           bottom: material.BorderSide(
-            color: colorScheme.border.withValues(alpha: 0.5),
+            color: colors.border.withValues(alpha: 0.5),
           ),
         ),
       ),
@@ -45,7 +45,7 @@ class _HeaderRow extends material.StatelessWidget {
             _HeaderCell(
               text: columns[i],
               width: columnWidths[i],
-              colorScheme: colorScheme,
+              colors: colors,
               sortOrder: sortColumnIndex == i ? sortOrder : null,
               onSort: onSortColumn != null ? () => onSortColumn!(i) : null,
               onResize: onResizeColumn != null
@@ -66,7 +66,7 @@ class _HeaderCell extends material.StatelessWidget {
   const _HeaderCell({
     required this.text,
     required this.width,
-    required this.colorScheme,
+    required this.colors,
     this.sortOrder,
     this.onSort,
     this.onResize,
@@ -75,7 +75,7 @@ class _HeaderCell extends material.StatelessWidget {
 
   final String text;
   final double width;
-  final ColorScheme colorScheme;
+  final QueryaUiColors colors;
   final ResultGridSortOrder? sortOrder;
   final material.VoidCallback? onSort;
   final material.ValueChanged<double>? onResize;
@@ -87,7 +87,7 @@ class _HeaderCell extends material.StatelessWidget {
     final style = material.TextStyle(
       fontSize: 12,
       fontWeight: material.FontWeight.w600,
-      color: isSorted ? colorScheme.primary : colorScheme.foreground,
+      color: isSorted ? colors.primary : colors.foreground,
     );
 
     return material.Container(
@@ -96,7 +96,7 @@ class _HeaderCell extends material.StatelessWidget {
       decoration: material.BoxDecoration(
         border: material.Border(
           right: material.BorderSide(
-            color: colorScheme.border.withValues(alpha: 0.3),
+            color: colors.border.withValues(alpha: 0.3),
           ),
         ),
       ),
@@ -138,7 +138,7 @@ class _HeaderCell extends material.StatelessWidget {
                           child: material.Icon(
                             material.Icons.arrow_upward_rounded,
                             size: 14,
-                            color: colorScheme.primary,
+                            color: colors.primary,
                           ),
                         ),
                       ],

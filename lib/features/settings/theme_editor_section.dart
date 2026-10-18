@@ -14,8 +14,7 @@ class ThemeEditorSection extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = context.colors;
 
     return material.Container(
       margin: const material.EdgeInsets.only(top: 12),

@@ -44,7 +44,7 @@ class ThemePreviewCard extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final appScheme = Theme.of(context).colorScheme;
+    final appScheme = context.colors;
     final radius = context.scaled(QueryaDropdownTokens.menuBorderRadius);
 
     if (isLoading) {
@@ -105,7 +105,7 @@ class ThemePreviewCard extends material.StatelessWidget {
       );
     }
 
-    final scheme = previewTheme.colorScheme;
+    final scheme = previewTheme.colors;
     final workbench = previewTheme.workbench;
     final editor = previewTheme.editor;
 
@@ -193,7 +193,7 @@ class ThemePreviewCard extends material.StatelessWidget {
       width: double.infinity,
       padding: material.EdgeInsets.all(context.scaled(8)),
       decoration: material.BoxDecoration(
-        color: Theme.of(context).colorScheme.muted.withValues(alpha: 0.12),
+        color: context.colors.muted.withValues(alpha: 0.12),
         borderRadius: material.BorderRadius.circular(radius),
         border: material.Border.all(color: borderColor),
       ),
@@ -223,7 +223,7 @@ class _Swatch extends material.StatelessWidget {
             color: color,
             borderRadius: material.BorderRadius.circular(radius),
             border: material.Border.all(
-              color: Theme.of(context).colorScheme.border.withValues(alpha: 0.6),
+              color: context.colors.border.withValues(alpha: 0.6),
             ),
           ),
         ),
@@ -232,7 +232,7 @@ class _Swatch extends material.StatelessWidget {
           label,
           style: material.TextStyle(
             fontSize: context.scaled(9),
-            color: Theme.of(context).colorScheme.mutedForeground,
+            color: context.colors.mutedForeground,
           ),
         ),
       ],

@@ -10,7 +10,7 @@ class _DataRow extends material.StatefulWidget {
     required this.columnWidths,
     required this.window,
     required this.height,
-    required this.colorScheme,
+    required this.colors,
     required this.striped,
     this.selection,
     this.stagingBuffer,
@@ -30,7 +30,7 @@ class _DataRow extends material.StatefulWidget {
   final List<double> columnWidths;
   final ResultGridColumnWindow window;
   final double height;
-  final ColorScheme colorScheme;
+  final QueryaUiColors colors;
   final bool striped;
   final ResultGridSelection? selection;
   final DataGridStagingBuffer? stagingBuffer;
@@ -69,7 +69,7 @@ class _DataRow extends material.StatefulWidget {
               foundation.listEquals(columnWidths, other.columnWidths)) &&
           window == other.window &&
           height == other.height &&
-          colorScheme == other.colorScheme &&
+          colors == other.colors &&
           striped == other.striped &&
           selection == other.selection &&
           identical(stagingBuffer, other.stagingBuffer) &&
@@ -122,7 +122,7 @@ class _DataRow extends material.StatefulWidget {
         columnName: columnName,
         text: c < row.length ? _maskCellText(piiKinds, c, row[c]) : '',
         width: columnWidths[c],
-        colorScheme: colorScheme,
+        colors: colors,
         striped: striped,
         rowStatus: rowStatus,
         cellStatus: stagingBuffer?.getCellStatus(modelRowIndex, c) ??

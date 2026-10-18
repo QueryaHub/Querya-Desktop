@@ -97,7 +97,7 @@ class _PlanRow extends material.StatelessWidget {
           color: hottest ? wb.accent.withValues(alpha: 0.12) : null,
           border: material.Border.all(
             color: selected
-                ? Theme.of(context).colorScheme.foreground
+                ? context.colors.foreground
                 : hottest
                     ? wb.accent
                     : wb.borderSubtle,

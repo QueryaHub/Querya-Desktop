@@ -33,7 +33,6 @@ class _PreferencesAboutSectionState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
 
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.start,
@@ -42,10 +41,10 @@ class _PreferencesAboutSectionState
         material.Container(
           padding: const material.EdgeInsets.all(16),
           decoration: material.BoxDecoration(
-            color: theme.colorScheme.muted.withValues(alpha: 0.18),
+            color: context.colors.muted.withValues(alpha: 0.18),
             borderRadius: material.BorderRadius.circular(8),
             border: material.Border.all(
-              color: theme.colorScheme.border.withValues(alpha: 0.25),
+              color: context.colors.border.withValues(alpha: 0.25),
             ),
           ),
           child: material.Row(
@@ -54,10 +53,10 @@ class _PreferencesAboutSectionState
                 width: 48,
                 height: 48,
                 decoration: material.BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                  color: context.colors.primary.withValues(alpha: 0.12),
                   borderRadius: material.BorderRadius.circular(8),
                   border: material.Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                    color: context.colors.primary.withValues(alpha: 0.3),
                   ),
                 ),
                 child: material.Center(
@@ -69,7 +68,7 @@ class _PreferencesAboutSectionState
                     errorBuilder: (_, __, ___) => material.Icon(
                       QueryaIcons.database,
                       size: 24,
-                      color: theme.colorScheme.primary,
+                      color: context.colors.primary,
                     ),
                   ),
                 ),
@@ -120,10 +119,10 @@ class _PreferencesAboutSectionState
               margin: const material.EdgeInsets.only(bottom: 12),
               padding: const material.EdgeInsets.all(12),
               decoration: material.BoxDecoration(
-                color: theme.colorScheme.muted.withValues(alpha: 0.25),
+                color: context.colors.muted.withValues(alpha: 0.25),
                 borderRadius: material.BorderRadius.circular(6),
                 border: material.Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                  color: context.colors.primary.withValues(alpha: 0.3),
                 ),
               ),
               child: material.Row(

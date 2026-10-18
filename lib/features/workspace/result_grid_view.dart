@@ -11,6 +11,7 @@ import 'package:flutter/gestures.dart'
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart'
     show Clipboard, ClipboardData, HardwareKeyboard, LogicalKeyboardKey;
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/layout/ui_scale.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_context.dart';
@@ -25,6 +26,7 @@ import 'package:querya_desktop/features/workspace/grid/grid_column_sizer.dart';
 import 'package:querya_desktop/features/workspace/grid/grid_selection_manager.dart';
 import 'package:querya_desktop/features/workspace/grid/grid_sorting.dart';
 import 'package:gap/gap.dart';
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 export 'package:querya_desktop/features/workspace/grid/grid_column_sizer.dart';
@@ -330,7 +332,7 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     if (overlay == null || !mounted) return;
 
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = context.colors;
     final media = material.MediaQuery.maybeOf(context);
     final screenW = media?.size.width ?? 1920.0;
     final screenH = media?.size.height ?? 1080.0;

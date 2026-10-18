@@ -677,7 +677,7 @@ class GenericTableViewState extends material.State<GenericTableView> {
   }
 
   material.Widget _buildDefaultToolbar() {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final title = '$effectiveTableTitle${widget.isMaterializedView ? ' (materialized view)' : widget.isView ? ' (view)' : ''}';
 
     return material.Container(
@@ -807,7 +807,7 @@ class GenericTableViewState extends material.State<GenericTableView> {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final buffer = _stagingBuffer;
 
     final toolbar = widget.customToolbarBuilder != null
