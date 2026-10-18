@@ -20,7 +20,8 @@ import 'package:querya_desktop/features/updater/update_dialog.dart';
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/shared/widgets/querya_icon_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_text.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:gap/gap.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 /// Custom bitsdojo title bar styled from [QueryaThemeScope] workbench tokens.
 class QueryaWindowTitleBar extends StatelessWidget {

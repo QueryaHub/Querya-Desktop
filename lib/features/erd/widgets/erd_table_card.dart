@@ -1,10 +1,10 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/core/erd/erd_layout.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 /// A card's share of the focus: highlighted, faded, and the column of a
 /// picked relation on it, if any.

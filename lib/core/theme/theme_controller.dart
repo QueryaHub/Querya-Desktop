@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/theme/querya_material_theme.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 import 'parser/apply_token_colors_to_editor.dart';
 import 'parser/color_parser.dart';

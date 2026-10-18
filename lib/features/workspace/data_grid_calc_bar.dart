@@ -3,7 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/motion/querya_animated_expand.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/workspace/grid_selection_calc_engine.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:gap/gap.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 /// Status bar footer for Data Grid displaying live selection statistics (Count, Distinct, Sum, Avg, Median, Min, Max).
 class DataGridCalcBar extends StatelessWidget {

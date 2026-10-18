@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart' as material;
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 import 'package:querya_desktop/shared/widgets/querya_text.dart';
 
 /// Lightweight Markdown-ish renderer for GitHub release notes.

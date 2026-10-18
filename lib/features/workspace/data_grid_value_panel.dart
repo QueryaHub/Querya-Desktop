@@ -9,7 +9,8 @@ import 'package:querya_desktop/shared/widgets/querya_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_dropdown.dart';
 import 'package:querya_desktop/shared/widgets/querya_icon_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_text.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:gap/gap.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 import 'xml_html_formatter.dart';
 

@@ -1,9 +1,9 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/shared/widgets/querya_search_field.dart';
 import 'package:querya_desktop/shared/widgets/querya_text.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 /// Find-a-table field and the tables it matches. Enter picks the first.
 class ErdSearchPanel extends material.StatelessWidget {

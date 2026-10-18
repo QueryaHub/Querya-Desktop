@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 import '../motion/querya_motion_scope.dart';
 import '../theme/querya_theme_preset.dart';

@@ -1,4 +1,4 @@
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 import 'color_contrast.dart';
 import 'parser/vscode_theme_manifest.dart';

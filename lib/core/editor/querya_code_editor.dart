@@ -2,7 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/theme/querya_editor_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 import 'querya_code_language.dart';
 import 'querya_highlight_controller.dart';

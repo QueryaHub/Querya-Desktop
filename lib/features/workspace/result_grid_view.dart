@@ -24,7 +24,8 @@ import 'package:querya_desktop/features/workspace/grid_cell_popover_inspector.da
 import 'package:querya_desktop/features/workspace/grid/grid_column_sizer.dart';
 import 'package:querya_desktop/features/workspace/grid/grid_selection_manager.dart';
 import 'package:querya_desktop/features/workspace/grid/grid_sorting.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
+import 'package:gap/gap.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 
 export 'package:querya_desktop/features/workspace/grid/grid_column_sizer.dart';
 export 'package:querya_desktop/features/workspace/grid/grid_selection_manager.dart';
