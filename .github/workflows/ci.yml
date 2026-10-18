@@ -117,6 +117,21 @@ jobs:
       - uses: actions/checkout@v4
       - run: ./scripts/ci/test_sections.sh check
 
+  # A pull request from a release branch (release/X.Y.Z) must be taggable as
+  # it is: pubspec, CHANGELOG section and SemVer form (#1498).
+  release-check:
+    name: Release branch check
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: check_release.sh for the pubspec version
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/^version:[[:space:]]*//; s/+.*//')
+          ./scripts/release/check_release.sh "$VERSION"
+
   analyze:
     name: Code Analysis
     timeout-minutes: 20

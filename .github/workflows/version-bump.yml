@@ -30,12 +30,28 @@ jobs:
           ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get current version
+      # A release branch carrying a beta (`0.5.0-beta.2+7`) keeps its version
+      # on merge: stripping `-beta.N` and bumping the patch would turn it into
+      # 0.5.1 (#1498). The bump happens on the next ordinary merge after the
+      # final version is in pubspec.
+      - name: Skip pre-release versions
         if: steps.check.outputs.merged == 'true'
+        id: pre
+        run: |
+          LINE=$(grep "^version:" pubspec.yaml | sed 's/^version:[[:space:]]*//')
+          if [[ "${LINE%%+*}" == *-* ]]; then
+            echo "::notice::pubspec has the pre-release version $LINE; not bumping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Get current version
+        if: steps.check.outputs.merged == 'true' && steps.pre.outputs.skip != 'true'
         id: current_version
         run: |
           LINE=$(grep "^version:" pubspec.yaml | sed 's/^version:[[:space:]]*//')
-          # Drop +build, then any -prerelease (e.g. 0.4.11-b → 0.4.11).
+          # Drop +build (a -prerelease was skipped above).
           CORE=$(echo "$LINE" | sed 's/+.*//; s/-.*//')
           if [[ "$LINE" == *'+'* ]]; then
             BUILD="${LINE##*+}"
@@ -50,7 +66,7 @@ jobs:
           echo "current_build=$BUILD" >> "$GITHUB_OUTPUT"
 
       - name: Bump patch version
-        if: steps.check.outputs.merged == 'true'
+        if: steps.check.outputs.merged == 'true' && steps.pre.outputs.skip != 'true'
         id: bump
         run: |
           CURRENT_VERSION="${{ steps.current_version.outputs.current_version }}"
@@ -73,7 +89,7 @@ jobs:
           echo "new_build=$NEW_BUILD" >> "$GITHUB_OUTPUT"
 
       - name: Update pubspec.yaml
-        if: steps.check.outputs.merged == 'true'
+        if: steps.check.outputs.merged == 'true' && steps.pre.outputs.skip != 'true'
         run: |
           NEW_VERSION="${{ steps.bump.outputs.new_version }}"
           NEW_BUILD="${{ steps.bump.outputs.new_build }}"
@@ -81,7 +97,7 @@ jobs:
           grep "^version:" pubspec.yaml
 
       - name: Sync AUR PKGBUILD pkgver with pubspec
-        if: steps.check.outputs.merged == 'true'
+        if: steps.check.outputs.merged == 'true' && steps.pre.outputs.skip != 'true'
         run: |
           NEW_VERSION="${{ steps.bump.outputs.new_version }}"
           sed -i "s/^pkgver=.*/pkgver=${NEW_VERSION}/" packaging/linux/aur/PKGBUILD
@@ -90,7 +106,7 @@ jobs:
           grep ^pkgver packaging/linux/aur/PKGBUILD
 
       - name: Commit version bump
-        if: steps.check.outputs.merged == 'true'
+        if: steps.check.outputs.merged == 'true' && steps.pre.outputs.skip != 'true'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
