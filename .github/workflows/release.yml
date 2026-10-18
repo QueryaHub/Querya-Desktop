@@ -28,6 +28,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Release checks (scripts/release/check_release.sh)
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          # The same checks as before tagging (#1498); here they only warn, the
+          # tag is already pushed.
+          if ! ./scripts/release/check_release.sh "${{ github.ref_name }}" --no-tag-check; then
+            echo "::warning::scripts/release/check_release.sh found problems with tag ${{ github.ref_name }} (see the log above)."
+          fi
+
       - name: Warn when git tag and pubspec semver differ
         if: startsWith(github.ref, 'refs/tags/')
         run: |
