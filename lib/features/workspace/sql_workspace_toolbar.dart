@@ -82,7 +82,10 @@ class SqlWorkspaceToolbar extends StatelessWidget {
   final VoidCallback onToggleAutocommit;
   final void Function(int? seconds) onTimeoutChanged;
 
-  static const double compactWidthBreakpoint = 900;
+  /// Below this width only the run button keeps its label; the rest are
+  /// icons. Below [iconOnlyWidth] the run button is an icon too.
+  static const double labelsWidth = 900;
+  static const double iconOnlyWidth = 620;
   static String get _modLabel => Platform.isMacOS ? '⌘' : 'Ctrl+';
 
   List<QueryaActionMenuItem<SqlWorkspaceSessionChoice>> _sessionMenuItems() => [
@@ -125,27 +128,33 @@ class SqlWorkspaceToolbar extends StatelessWidget {
     }
   }
 
-  material.Widget _txBadge() {
-    final open = txOpen;
-    // An unknown state (before the first run) reads as the commit mode, not
-    // as a dash.
-    if (open == true) {
+  /// What is not the default: an open transaction or manual commit. Auto-commit
+  /// is the default and is named by the Session menu, so it has no badge of its
+  /// own next to it (#1558).
+  material.Widget? _txBadge() {
+    if (txOpen == true) {
       return const QueryaBadge.status(
         'Transaction open',
         status: QueryaBadgeStatus.warning,
       );
     }
-    return QueryaBadge.status(
-      autocommit ? 'Auto-commit' : 'Manual commit',
-      status: autocommit ? QueryaBadgeStatus.neutral : QueryaBadgeStatus.info,
-    );
+    if (!autocommit) {
+      return const QueryaBadge.status(
+        'Manual commit',
+        status: QueryaBadgeStatus.info,
+      );
+    }
+    return null;
   }
 
   @override
   material.Widget build(material.BuildContext context) {
     return material.LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < compactWidthBreakpoint;
+        // Controls give up their labels as the row narrows, the run button
+        // last, so the row stays on one line without hiding what it does.
+        final compact = constraints.maxWidth < labelsWidth;
+        final runCompact = constraints.maxWidth < iconOnlyWidth;
         // One size for the whole row: the run split button, the buttons, the
         // icon buttons and the session menu are all `md` (#1439).
         return QueryaControlScope(
@@ -163,7 +172,7 @@ class SqlWorkspaceToolbar extends StatelessWidget {
                 menuKey: const material.ValueKey('run_menu'),
                 label: 'Execute (F5)',
                 icon: material.Icons.play_arrow_rounded,
-                compact: compact,
+                compact: runCompact,
                 loading: session.running,
                 onPressed: () => onExecute(false),
                 menuTooltip: 'Run options',
@@ -187,10 +196,11 @@ class SqlWorkspaceToolbar extends StatelessWidget {
               ),
               if (delegate.supportsExplain) ...[
                 const material.SizedBox(width: 8),
-                QueryaButton.secondary(
+                // A magnifier over lines: the plan. The diagram keeps the tree.
+                QueryaButton.ghost(
                   key: const material.ValueKey('explain_query'),
                   label: 'Explain',
-                  icon: material.Icons.account_tree_outlined,
+                  icon: material.Icons.manage_search_rounded,
                   compact: compact,
                   tooltip: 'Show the query plan',
                   onPressed: session.running ? null : onExplain,
@@ -242,7 +252,7 @@ class SqlWorkspaceToolbar extends StatelessWidget {
                 const material.SizedBox(width: 8),
               ],
               if (delegate.supportsTransactions) ...[
-                _txBadge(),
+                if (_txBadge() case final badge?) badge,
                 if (txOpen == true) ...[
                   const material.SizedBox(width: 8),
                   QueryaButton.secondary(
@@ -262,10 +272,14 @@ class SqlWorkspaceToolbar extends StatelessWidget {
               ],
               QueryaMenuButton<SqlWorkspaceSessionChoice>(
                 key: const material.ValueKey('session_menu'),
+                variant: QueryaButtonVariant.ghost,
                 items: _sessionMenuItems(),
                 onSelected: (choice) => _onSessionChoice(context, choice),
                 enabled: !session.running,
                 icon: material.Icons.tune_rounded,
+                tooltip: autocommit
+                    ? 'Session: auto-commit'
+                    : 'Session: manual commit',
                 label: compact
                     ? null
                     : (autocommit ? 'Session · auto-commit' : 'Session · manual'),

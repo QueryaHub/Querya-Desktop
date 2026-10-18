@@ -55,19 +55,23 @@ void main() {
     final delegate = _TxDelegate();
     await ws.pump(tester, delegate);
     await E2eSqlWorkspace.settle(tester);
-    // Unknown until the first command refreshes the state.
-    expect(find.text('Auto-commit'), findsOneWidget);
+    // Unknown until the first command refreshes the state: the default,
+    // which has no badge; the Session menu names it.
+    expect(find.text('Transaction open'), findsNothing);
+    expect(find.byTooltip('Session: auto-commit'), findsOneWidget);
 
     await beginFromSessionMenu(tester);
     expect(find.text('Transaction open'), findsOneWidget);
     expect(find.text('OK: BEGIN'), findsWidgets);
 
     await tapAndSettle(tester, 'Rollback');
-    expect(find.text('Auto-commit'), findsOneWidget);
+    expect(find.text('Transaction open'), findsNothing);
+    expect(find.byTooltip('Session: auto-commit'), findsOneWidget);
 
     await beginFromSessionMenu(tester);
     await tapAndSettle(tester, 'Commit');
-    expect(find.text('Auto-commit'), findsOneWidget);
+    expect(find.text('Transaction open'), findsNothing);
+    expect(find.byTooltip('Session: auto-commit'), findsOneWidget);
 
     expect(delegate.commands, ['BEGIN', 'ROLLBACK', 'BEGIN', 'COMMIT']);
   });

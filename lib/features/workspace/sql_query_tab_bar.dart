@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
 import 'package:querya_desktop/features/workspace/sql_query_tab_session.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
@@ -26,18 +27,11 @@ class SqlQueryTabBar extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
+    // The same strip as the toolbar under it: workbench surface, hairline.
     return material.Container(
       height: 40,
       padding: const material.EdgeInsets.symmetric(horizontal: 8),
-      decoration: material.BoxDecoration(
-        color: cs.card,
-        border: material.Border(
-          bottom: material.BorderSide(color: cs.border),
-        ),
-      ),
+      decoration: SqlEditorChrome.sqlToolbarDecoration(context),
       child: material.Row(
         children: [
           material.Expanded(

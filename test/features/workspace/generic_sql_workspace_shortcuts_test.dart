@@ -367,20 +367,30 @@ void main() {
     expect(tester.getCenter(session).dy, closeTo(tester.getCenter(run).dy, 1));
   });
 
-  testWidgets('below the breakpoint the labels hide and the icons stay',
+  testWidgets('the row gives up its labels one control at a time (#1558)',
       timeout: _timeout, (tester) async {
     await pumpWorkspace(tester, FakeSqlExecutionDelegate());
     expect(find.text('Execute (F5)'), findsOneWidget);
     expect(find.text('Explain'), findsOneWidget);
+    expect(find.text('Session · auto-commit'), findsOneWidget);
 
+    // Narrower: Explain and Session become icons, the run button keeps its
+    // label.
     await tester.binding.setSurfaceSize(const material.Size(800, 700));
     await tester.pumpAndSettle();
-
-    expect(find.text('Execute (F5)'), findsNothing);
+    expect(find.text('Execute (F5)'), findsOneWidget);
     expect(find.text('Explain'), findsNothing);
-    expect(find.byKey(const material.ValueKey('run_script')), findsOneWidget);
+    expect(find.text('Session · auto-commit'), findsNothing);
     expect(find.byKey(const material.ValueKey('explain_query')), findsOneWidget);
     expect(find.byTooltip('Show the query plan'), findsOneWidget);
+    expect(find.byTooltip('Session: auto-commit'), findsOneWidget);
+
+    // Narrowest: the run button is an icon too, and every control stays.
+    await tester.binding.setSurfaceSize(const material.Size(560, 700));
+    await tester.pumpAndSettle();
+    expect(find.text('Execute (F5)'), findsNothing);
+    expect(find.byKey(const material.ValueKey('run_script')), findsOneWidget);
+    expect(find.byKey(const material.ValueKey('explain_query')), findsOneWidget);
     expect(find.byTooltip('Execute (F5)'), findsOneWidget);
   });
 
