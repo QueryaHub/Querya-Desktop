@@ -68,6 +68,12 @@ payload as the portable zip and AppImage.
 
 **Runtime dependencies (deb/rpm):** GTK 3, libsecret, GLib; app indicator recommended for tray.
 
+### Betas on package channels (decision, #1495)
+
+**Betas are GitHub-only.** A pre-release (`X.Y.Z-beta.N`) is published as a GitHub pre-release with its zip, AppImage, `.deb`, `.rpm`, `.flatpak` and Windows / macOS builds, and it **does not** reach AUR, the APT / DNF repository or Flathub: the Release workflow skips those jobs for it (#1492), so package users keep Stable. Someone who wants a beta on a package install downloads the zip or AppImage from the release page. The final `X.Y.Z` then reaches everyone, and a beta `.deb` / `.rpm` is versioned `X.Y.Z~beta.N` so that it upgrades to the final package (#1494).
+
+A separate beta line per package system (an APT `beta` component and a DNF `querya-beta` repository from `publish_package_repo.sh`, an AUR `querya-desktop-beta` package that conflicts with `querya-desktop`, a Flatpak `beta` branch) is **not** built. Revisit it when there is demand; `publish_package_repo.sh` would need a parameter for the component that never touches the stable index from a beta tag, and the Flatpak branch waits for the Flathub submission.
+
 ### Updater policy
 
 | Install type | In-app updater |

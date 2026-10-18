@@ -120,4 +120,7 @@ If you fix something **after** pushing a release tag, either move the tag (only 
 the team agrees and the release is not yet consumed) or ship a **new** semver
 (update `pubspec.yaml` / `CHANGELOG.md`) and push a new tag. See
 [docs/tags-and-releases.md](docs/tags-and-releases.md) and
-[docs/release-checklist.md](docs/release-checklist.md).
+[docs/release-checklist.md](docs/release-checklist.md). Betas
+(`X.Y.Z-beta.N`, a GitHub pre-release only Beta-channel users see) have their
+own procedure and a `scripts/release/check_release.sh` to run before the tag:
+[docs/tags-and-releases.md](docs/tags-and-releases.md#beta-канал-pre-release).

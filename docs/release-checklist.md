@@ -4,6 +4,22 @@ Use this before tagging **`0.4.19`** or running the **Release** workflow.
 See [tags-and-releases.md](tags-and-releases.md), [CHANGELOG.md](../CHANGELOG.md).
 Manual 120 Hz DevTools QA: issue [#739](https://github.com/QueryaHub/Querya-Desktop/issues/739) (does not block this cut).
 
+## Beta release (`X.Y.Z-beta.N`)
+
+Procedure and traps: [tags-and-releases.md](tags-and-releases.md#beta-канал-pre-release).
+
+- [ ] On `release/X.Y.Z`: `scripts/release/prepare_beta.sh X.Y.Z N`, then `scripts/release/check_release.sh X.Y.Z-beta.N` passes.
+- [ ] Smoke subset on the beta build: start with an existing database, open a connection per engine, run a query, update check says *Beta*.
+- [ ] After the tag: the GitHub Release is marked **Pre-release**, is **not** *Latest* (`gh release view --json isPrerelease,isLatest`), `releases/latest` still returns the previous stable; no AUR commit, no APT / DNF update.
+- [ ] A Stable install is not offered the beta; a Beta install is.
+- [ ] **How long a beta stays out:** at least 3 days and one weekend of use; blockers are a crash on startup, data loss or corruption, a connection / query regression, a broken updater. A blocker means `beta.N+1` from the same branch.
+
+### Promote to stable
+
+- [ ] `version: X.Y.Z+B`, `## [X.Y.Z]` with the full notes, `check_release.sh X.Y.Z`, annotated tag `X.Y.Z`.
+- [ ] The release is *Latest*; AUR and the APT / DNF repositories are updated; a `.deb` / `.rpm` of the beta upgrades to the final package.
+- [ ] Beta users are offered `X.Y.Z` (a stable outranks its own beta).
+
 ## Product smoke (manual) — 0.4.19
 
 - [ ] **Buttons and controls (#1331)** — in the SQL toolbar, results bar, ERD toolbar and Preferences every control of a row has one height; hover, pressed, keyboard focus ring (Tab, not mouse click) and disabled states look the same on primary / secondary / ghost / destructive; icon buttons show a tooltip.
@@ -84,6 +100,8 @@ Verify the 0.4.4 motion tokens, smooth animations, and high refresh rate support
 - [ ] CI **Flutter version** in `.github/workflows/*.yml` matches the toolchain you validated (bump intentionally when upgrading stable).
 
 ## Versioning and release
+
+(The items below are for the 0.4.19 cut; the versions are examples. For a beta or the stable that follows it, see *Beta release* above.)
 
 - [x] `pubspec.yaml` on the 0.4.19 track is **`0.4.19+2`** (the same as `main` after the bump that followed 0.4.18, so the merge has no version conflict).
 - [ ] After merge to `main`, confirm **Auto Version Bump** yields a **0.4.20+…** placeholder.
