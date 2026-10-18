@@ -9,6 +9,7 @@ import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// MongoDB connection configuration and state.
 class MongoConnection {
@@ -287,7 +288,9 @@ class MongoConnection {
       await _cleanupTempTlsKey();
       try {
         await _sshTunnelHandle?.release();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('mongodb_connection', e);
+      }
       _sshTunnelHandle = null;
       rethrowMappedDatabaseError(e, st, driver: DatabaseDriver.mongodb);
     }
@@ -392,7 +395,9 @@ class MongoConnection {
       _openedDbs.remove(databaseName);
       try {
         await existing.close();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('mongodb_connection', e);
+      }
     }
     return _openingDbs.putIfAbsent(databaseName, () async {
       try {
@@ -403,7 +408,9 @@ class MongoConnection {
         } catch (_) {
           try {
             await db.close();
-          } catch (_) {}
+          } catch (e) {
+            logIgnored('mongodb_connection', e);
+          }
           rethrow;
         }
         _openedDbs[databaseName] = db;
@@ -495,7 +502,9 @@ class MongoConnection {
       _openedDbs.remove(databaseName);
       try {
         await db.close();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('mongodb_connection', e);
+      }
       if (identical(_db, db)) {
         _db = null;
         for (final other in _openedDbs.values) {

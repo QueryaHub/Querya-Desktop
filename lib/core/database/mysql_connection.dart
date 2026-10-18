@@ -12,6 +12,7 @@ import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/security/ssl_certificate_support.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// TLS policy from `ssl-mode` / `sslmode` / `ssl` on a MySQL URI.
 enum MysqlSslMode {
@@ -212,7 +213,9 @@ class MysqlConnection {
     if (_conn != null && !_conn!.connected) {
       try {
         await _conn?.close();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('mysql_connection', e);
+      }
       _conn = null;
     }
     final generation = _generation;
@@ -323,10 +326,14 @@ class MysqlConnection {
         if (identical(_conn, opened)) _conn = null;
         try {
           if (opened != null && opened.connected) await opened.close();
-        } catch (_) {}
+        } catch (e) {
+          logIgnored('mysql_connection', e);
+        }
         try {
           await openedHandle?.release();
-        } catch (_) {}
+        } catch (e) {
+          logIgnored('mysql_connection', e);
+        }
         if (identical(_sshTunnelHandle, openedHandle)) _sshTunnelHandle = null;
         throw StateError('The connection was closed while it was being opened');
       }
@@ -334,7 +341,9 @@ class MysqlConnection {
       _conn = null;
       try {
         await _sshTunnelHandle?.release();
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('mysql_connection', e);
+      }
       _sshTunnelHandle = null;
       rethrowMappedDatabaseError(e, st, driver: DatabaseDriver.mysql);
     }
@@ -591,7 +600,9 @@ class MysqlConnection {
       if (!join) {
         try {
           await execute('ROLLBACK');
-        } catch (_) {}
+        } catch (e) {
+          logIgnored('mysql_connection', e);
+        }
       }
       rethrow;
     }

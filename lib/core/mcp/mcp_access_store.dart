@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// Which connections MCP clients may read. Opt-in per connection: a
 /// connection that was never enabled is invisible to every MCP tool.
@@ -29,7 +30,9 @@ class McpAccessStore implements McpAccessSettings {
     try {
       final decoded = jsonDecode(raw);
       if (decoded is List) return {for (final v in decoded) if (v is int) v};
-    } catch (_) {}
+    } catch (e) {
+      logIgnored('mcp_access_store', e);
+    }
     return {};
   }
 

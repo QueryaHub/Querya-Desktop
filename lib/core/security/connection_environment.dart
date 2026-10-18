@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'dart:convert';
 
 /// Which kind of server a connection points at. Drives the color coding in the
@@ -40,7 +41,9 @@ enum ConnectionEnvironment {
     try {
       final decoded = jsonDecode(driverOptions);
       if (decoded is Map) return fromStorageValue(decoded[optionsKey]);
-    } catch (_) {}
+    } catch (e) {
+      logIgnored('connection_environment', e);
+    }
     return null;
   }
 
@@ -56,7 +59,9 @@ enum ConnectionEnvironment {
       try {
         final decoded = jsonDecode(driverOptions);
         if (decoded is Map) options = Map<String, dynamic>.from(decoded);
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('connection_environment', e);
+      }
     }
     if (environment == null) {
       options.remove(optionsKey);

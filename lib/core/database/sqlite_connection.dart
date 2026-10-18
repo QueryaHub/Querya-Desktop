@@ -7,6 +7,7 @@ import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
 import 'package:querya_desktop/core/database/sqlite_sql.dart';
 import 'package:querya_desktop/core/database/table_schema_meta.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// In-memory paths (`:memory:`) skip the missing-file check.
 bool sqlitePathIsInMemory(String path) =>
@@ -275,7 +276,9 @@ class SqliteConnection {
       if (!join) {
         try {
           await execute('ROLLBACK');
-        } catch (_) {}
+        } catch (e) {
+          logIgnored('sqlite_connection', e);
+        }
       }
       rethrow;
     }
@@ -353,7 +356,9 @@ class SqliteConnection {
       } catch (_) {
         try {
           await _db!.execute('DROP VIEW IF EXISTS $viewName');
-        } catch (_) {}
+        } catch (e) {
+          logIgnored('sqlite_connection', e);
+        }
       }
     }
 
@@ -362,7 +367,9 @@ class SqliteConnection {
     if (target != null) {
       try {
         return await listColumnNames(table: target.tableName);
-      } catch (_) {}
+      } catch (e) {
+        logIgnored('sqlite_connection', e);
+      }
     }
 
     return const [];
