@@ -121,7 +121,7 @@ Future<void> _runAll() async {
 
   await _scenario('sidebar_toggle', () async {
     for (var i = 0; i < 8; i++) {
-      (_findState((s) => s.runtimeType.toString() == '_MainContentSplitState')
+      (_findState((s) => s.runtimeType.toString() == 'MainContentSplitState')
               as dynamic)
           .toggleSidebar();
       await _wait(450);
