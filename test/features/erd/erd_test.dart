@@ -13,6 +13,7 @@ import 'package:querya_desktop/core/erd/erd_layout.dart';
 import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_router.dart';
 import 'package:querya_desktop/features/erd/erd_view.dart';
+import 'package:querya_desktop/features/erd/widgets/erd_search_panel.dart';
 import 'package:querya_desktop/features/erd/erd_source.dart';
 import 'package:querya_desktop/features/workspace/sql_execution_delegate.dart';
 
@@ -1035,7 +1036,7 @@ void main() {
       expect(cards(), 100);
     });
 
-    testWidgets('picking a table rebuilds only the cards whose look changes',
+    testWidgets('opening the search rebuilds the diagram but not its cards',
         (t) async {
       await t.binding.setSurfaceSize(const material.Size(1200, 800));
       final wide = FakeSqlExecutionDelegate(onExecute: (sql) {
@@ -1054,12 +1055,15 @@ void main() {
       await t.pump();
       await t.pump();
 
+      // Ctrl+F sets state on the diagram; no card looks different afterwards.
       erdCardBuilds = 0;
-      await t.tap(find.byKey(const material.ValueKey('erd_table_t5')));
+      await t.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await t.sendKeyEvent(LogicalKeyboardKey.keyF);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
       await t.pump();
-      expect(erdCardBuilds, greaterThan(0));
-      expect(erdCardBuilds, lessThan(20),
-          reason: 'the diagram rebuilt, the cards that did not change did not');
+      expect(find.byType(ErdSearchPanel), findsOneWidget);
+      expect(erdCardBuilds, 0,
+          reason: 'the diagram rebuilt, the 20 cards were reused');
     });
 
     testWidgets('Copy Mermaid puts the diagram on the clipboard', (t) async {
