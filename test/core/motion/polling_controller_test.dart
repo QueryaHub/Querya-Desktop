@@ -50,7 +50,6 @@ void main() {
           running--;
         },
       );
-      addTearDown(c.dispose);
 
       c.setActive(true);
       await tester.pump(second);
@@ -64,6 +63,7 @@ void main() {
       await tester.pump(second);
       expect(started, 2);
       expect(maxRunning, 1);
+      c.dispose();
     });
 
     testWidgets('failures back off up to the cap and a success recovers',
@@ -78,7 +78,6 @@ void main() {
           if (fail) throw StateError('down');
         },
       );
-      addTearDown(c.dispose);
 
       c.setActive(true);
       await tester.pump(second);
@@ -103,6 +102,7 @@ void main() {
       expect(c.status.value.isStale, isFalse);
       expect(c.status.value.lastSuccess, isNotNull);
       expect(c.nextDelay, second);
+      c.dispose();
     });
 
     testWidgets('stopping while a tick runs does not schedule another',
@@ -116,7 +116,6 @@ void main() {
           await gate.future;
         },
       );
-      addTearDown(c.dispose);
 
       c.setActive(true);
       await tester.pump(second);
@@ -125,6 +124,7 @@ void main() {
       await tester.pump(const Duration(seconds: 10));
       expect(calls, 1);
       expect(c.isActive, isFalse);
+      c.dispose();
     });
 
     testWidgets('a result that lands after a stop is not reported',
@@ -137,7 +137,6 @@ void main() {
           throw StateError('late');
         },
       );
-      addTearDown(c.dispose);
 
       c.setActive(true);
       await tester.pump(second);
@@ -146,17 +145,18 @@ void main() {
       gate.complete();
       await tester.pump();
       expect(c.status.value.failures, 0);
+      c.dispose();
     });
 
     testWidgets('changing the interval reschedules', (tester) async {
       var calls = 0;
       final c = PollingController(interval: second, tick: () async => calls++);
-      addTearDown(c.dispose);
 
       c.setActive(true);
       c.setInterval(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
       expect(calls, 1);
+      c.dispose();
     });
   });
 
@@ -180,6 +180,7 @@ void main() {
       await tester.pumpWidget(app(enabled: true));
       await tester.pump(const Duration(milliseconds: 150));
       expect(ticks, greaterThan(frozen));
+      await tester.pumpWidget(const SizedBox.shrink());
     });
 
     testWidgets('stops when the view is disposed', (tester) async {
