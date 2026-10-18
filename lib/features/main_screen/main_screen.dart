@@ -15,14 +15,12 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/extensions/sandbox/unsandboxed_launch_consent_gate.dart';
 import 'package:querya_desktop/features/extensions/presentation/widgets/unsandboxed_driver_consent_dialog.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
-import 'package:querya_desktop/core/ui/querya_shell_status.dart';
-import 'package:querya_desktop/features/main_screen/querya_status_bar.dart';
-import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
 import 'package:querya_desktop/features/macos/querya_platform_menu_bar.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'main_screen_workspace_state.dart';
 import 'main_content_split.dart';
+import 'main_screen_chrome.dart';
 import 'main_screen_dialogs.dart';
 import 'main_screen_navigator.dart';
 import 'main_screen_shortcuts.dart';
@@ -163,6 +161,10 @@ class _MainScreenState extends State<MainScreen> {
     return true;
   }
 
+  /// Runs [intent] on the focused editor, if one handles it.
+  void _invoke(Intent intent) => Actions.maybeInvoke(
+      FocusManager.instance.primaryFocus?.context ?? context, intent);
+
   @override
   material.Widget build(material.BuildContext context) {
     final wb = context.workbench;
@@ -224,56 +226,32 @@ class _MainScreenState extends State<MainScreen> {
                 LogicalKeyboardKey.keyN,
                 meta: true,
                 shift: true,
-              ): () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const NewSqlIntent());
-              },
+              ): () => _invoke(const NewSqlIntent()),
               const material.SingleActivator(
                 LogicalKeyboardKey.keyN,
                 control: true,
                 shift: true,
-              ): () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const NewSqlIntent());
-              },
+              ): () => _invoke(const NewSqlIntent()),
 
               // Open SQL File: Ctrl+O / Cmd+O
               const material.SingleActivator(
                 LogicalKeyboardKey.keyO,
                 meta: true,
-              ): () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const OpenSqlIntent());
-              },
+              ): () => _invoke(const OpenSqlIntent()),
               const material.SingleActivator(
                 LogicalKeyboardKey.keyO,
                 control: true,
-              ): () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const OpenSqlIntent());
-              },
+              ): () => _invoke(const OpenSqlIntent()),
 
               // Save SQL File: Ctrl+S / Cmd+S
               const material.SingleActivator(
                 LogicalKeyboardKey.keyS,
                 meta: true,
-              ): () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const SaveSqlIntent());
-              },
+              ): () => _invoke(const SaveSqlIntent()),
               const material.SingleActivator(
                 LogicalKeyboardKey.keyS,
                 control: true,
-              ): () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const SaveSqlIntent());
-              },
+              ): () => _invoke(const SaveSqlIntent()),
 
               // Toggle Left Sidebar: Ctrl+B / Cmd+B
               const material.SingleActivator(
@@ -332,21 +310,9 @@ class _MainScreenState extends State<MainScreen> {
             child: QueryaPlatformMenuBar(
               onNewConnection: () =>
                   unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
-              onNewQueryTab: () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const NewSqlIntent());
-              },
-              onOpenSqlScript: () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const OpenSqlIntent());
-              },
-              onSaveQuery: () {
-                final ctx =
-                    FocusManager.instance.primaryFocus?.context ?? context;
-                Actions.maybeInvoke(ctx, const SaveSqlIntent());
-              },
+              onNewQueryTab: () => _invoke(const NewSqlIntent()),
+              onOpenSqlScript: () => _invoke(const OpenSqlIntent()),
+              onSaveQuery: () => _invoke(const SaveSqlIntent()),
               onExecuteQuery: () =>
                   SqlEditorCommandBridge.instance.invokeExecute(),
               onToggleSidebar: () => _splitKey.currentState?.toggleSidebar(),
@@ -363,55 +329,14 @@ class _MainScreenState extends State<MainScreen> {
                 width: 1,
                 child: Column(
                   children: [
-                    ValueListenableBuilder<bool>(
-                      valueListenable: _isSidebarVisible,
-                      builder: (context, isSidebarVisible, _) {
-                        return QueryaWindowTitleBar(
-                          onNewDatabaseConnection:
-                              _dialogs.onNewDatabaseConnectionFromMenu,
-                          onNewDatabaseConnectionFromUrl:
-                              _dialogs.onNewDatabaseConnectionFromUrl,
-                          activeConnection: workspace.activeConnection,
-                          isReadOnly: workspace.isReadOnly,
-                          isSidebarVisible: isSidebarVisible,
-                          onToggleSidebar: () =>
-                              _splitKey.currentState?.toggleSidebar(),
-                          onOpenWelcomeTour: _dialogs.onOpenWelcomeTour,
-                          onGoHome: _nav.onGoHome,
-                          onReadOnlyChanged: () => unawaited(_dialogs.toggleReadOnly()),
-                          onConnect: () {
-                            final active = workspace.activeConnection;
-                            if (active != null && active.id != null) {
-                              _connectionsPanelKey.currentState
-                                  ?.connect(active.id!);
-                            }
-                          },
-                          onReconnect: () {
-                            final active = workspace.activeConnection;
-                            if (active != null) {
-                              _connectionsPanelKey.currentState
-                                  ?.reconnect(active);
-                            }
-                          },
-                          onDisconnect: () {
-                            final active = workspace.activeConnection;
-                            if (active != null) {
-                              _connectionsPanelKey.currentState
-                                  ?.disconnect(active);
-                            }
-                          },
-                          onDisconnectAll: () {
-                            _connectionsPanelKey.currentState?.disconnectAll();
-                          },
-                          onDisconnectOthers: () {
-                            final active = workspace.activeConnection;
-                            if (active != null) {
-                              _connectionsPanelKey.currentState
-                                  ?.disconnectOthers(active);
-                            }
-                          },
-                        );
-                      },
+                    ShellTitleBar(
+                      workspace: workspace,
+                      isSidebarVisible: _isSidebarVisible,
+                      connectionsPanelKey: _connectionsPanelKey,
+                      onToggleSidebar: () =>
+                          _splitKey.currentState?.toggleSidebar(),
+                      dialogs: _dialogs,
+                      nav: _nav,
                     ),
                     QueryaDivider(
                         height: 1,
@@ -444,30 +369,11 @@ class _MainScreenState extends State<MainScreen> {
                         initialMongoCollection: _nav.pendingMongoCollection,
                       ),
                     ),
-                    ValueListenableBuilder<bool>(
-                      valueListenable: _isSidebarVisible,
-                      builder: (context, isSidebarVisible, _) {
-                        return ListenableBuilder(
-                          listenable: QueryaShellStatus.instance,
-                          builder: (context, _) {
-                            final status = QueryaShellStatus.instance;
-                            return QueryaStatusBar(
-                              activeConnection: workspace.activeConnection,
-                              isReadOnly: workspace.isReadOnly,
-                              isSidebarVisible: isSidebarVisible,
-                              onToggleSidebar: () =>
-                                  _splitKey.currentState?.toggleSidebar(),
-                              onOpenPreferences: () =>
-                                  showPreferencesDialog(context),
-                              isBusy: status.isBusy,
-                              statusMessage: status.statusMessage,
-                              rowCount: status.rowCount,
-                              columnCount: status.columnCount,
-                              lastQueryDuration: status.lastQueryDuration,
-                            );
-                          },
-                        );
-                      },
+                    ShellStatusBar(
+                      workspace: workspace,
+                      isSidebarVisible: _isSidebarVisible,
+                      onToggleSidebar: () =>
+                          _splitKey.currentState?.toggleSidebar(),
                     ),
                   ],
                 ),
