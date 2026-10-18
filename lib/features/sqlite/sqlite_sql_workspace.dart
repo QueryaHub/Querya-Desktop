@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/database/compact_result_dataset.dart';
+import 'package:querya_desktop/core/database/result_columns_builder.dart';
 import 'package:querya_desktop/core/database/sql_limit.dart';
 import 'package:querya_desktop/core/database/sql_table_target_extractor.dart';
 import 'package:querya_desktop/core/database/sqlite_service.dart';
@@ -105,19 +105,20 @@ class SqliteSqlExecutionDelegate extends BaseSqlExecutionDelegate {
     final limitCount = truncated ? cap : results.length;
     final injectedLimit = effectiveSql != sql;
 
-    final rawRows = <List<Object?>>[];
+    final builder = ResultColumnsBuilder(
+      cols,
+      cellFormatter: (val, _) => sqliteResultCellToDisplayString(val),
+    );
     var count = 0;
     for (final row in results) {
       if (count >= limitCount) break;
-      rawRows.add([for (final col in cols) row[col]]);
+      for (var i = 0; i < cols.length; i++) {
+        builder.addCell(i, row[cols[i]]);
+      }
+      builder.endRow();
       count++;
     }
-
-    final dataset = CompactResultDataset.fromRawRows(
-      cols,
-      rawRows,
-      cellFormatter: (val, _) => sqliteResultCellToDisplayString(val),
-    );
+    final dataset = builder.build();
 
     final isTruncated = truncated || (injectedLimit && results.length >= cap);
     final statusMsg = formatStatusMessage(

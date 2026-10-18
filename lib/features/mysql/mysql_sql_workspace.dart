@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/database/compact_result_dataset.dart';
+import 'package:querya_desktop/core/database/result_columns_builder.dart';
 import 'package:querya_desktop/core/database/mysql_result_cells.dart';
 import 'package:querya_desktop/core/database/mysql_service.dart';
 import 'package:querya_desktop/core/database/result_row_string_convert.dart';
@@ -98,32 +98,30 @@ class MysqlSqlExecutionDelegate extends BaseSqlExecutionDelegate {
       cols.add(c.name.isNotEmpty ? c.name : 'col_${cols.length}');
     }
 
-    final taken = await takeThenDrain(
+    final colList = rs.cols.toList();
+    final builder = ResultColumnsBuilder(
+      cols,
+      cellFormatter: (val, colIndex) {
+        final col = colIndex < colList.length ? colList[colIndex] : null;
+        return mysqlResultCellToDisplayString(val, column: col);
+      },
+    );
+    final taken = await forEachThenDrain(
       rs.rowsStream,
       cap,
+      onItem: (row) {
+        for (var i = 0; i < row.numOfColumns; i++) {
+          builder.addCell(i, row.colAt(i));
+        }
+        builder.endRow();
+      },
       onProgress: (n) async {
         if (n % kResultStringConvertYieldEvery == 0) {
           await Future<void>.delayed(Duration.zero);
         }
       },
     );
-    final colList = rs.cols.toList();
-    final rawRows = <List<Object?>>[];
-    for (var r = 0; r < taken.items.length; r++) {
-      final row = taken.items[r];
-      rawRows.add([
-        for (var i = 0; i < row.numOfColumns; i++) row.colAt(i),
-      ]);
-    }
-
-    final dataset = CompactResultDataset.fromRawRows(
-      cols,
-      rawRows,
-      cellFormatter: (val, colIndex) {
-        final col = colIndex < colList.length ? colList[colIndex] : null;
-        return mysqlResultCellToDisplayString(val, column: col);
-      },
-    );
+    final dataset = builder.build();
 
     final truncated =
         taken.truncated || (effectiveSql != sql && dataset.rowCount >= cap);
