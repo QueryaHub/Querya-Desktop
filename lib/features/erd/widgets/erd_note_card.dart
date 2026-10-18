@@ -59,7 +59,7 @@ class ErdNoteCard extends material.StatelessWidget {
     final color = n.color == null ? null : slotColor(n.color!);
     final lines = parseErdNote(n.text);
     final base = material.TextStyle(
-        fontSize: 12, color: Theme.of(context).colorScheme.foreground);
+        fontSize: 12, color: context.colors.foreground);
     return material.Positioned(
       left: n.x,
       top: n.y,

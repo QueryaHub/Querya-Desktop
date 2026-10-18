@@ -172,6 +172,10 @@ class ThemeController extends ChangeNotifier with WidgetsBindingObserver {
   ThemeData get darkShadcnTheme => _cachedDarkShadcnTheme ??=
       _resolvedThemeForBrightness(Brightness.dark).toShadcnThemeData();
 
+  /// Active Material theme aligned with [activeTheme].
+  material.ThemeData get activeMaterialTheme =>
+      materialThemeFor(activeTheme.colorScheme);
+
   /// Cached Material theme for dialogs/dropdowns (avoids rebuild churn).
   material.ThemeData materialThemeFor(ColorScheme scheme) {
     if (_cachedMaterialTheme != null && _cachedMaterialThemeScheme == scheme) {

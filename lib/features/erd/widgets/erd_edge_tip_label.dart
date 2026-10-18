@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/erd/erd_model.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 
 /// "orders.customer_id → customers.id" next to the pointer.
 class ErdEdgeTipLabel extends material.StatelessWidget {
@@ -11,7 +11,7 @@ class ErdEdgeTipLabel extends material.StatelessWidget {
   @override
   material.Widget build(material.BuildContext context) {
     final r = relation;
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     return material.DecoratedBox(
       decoration: material.BoxDecoration(
         color: cs.popover,

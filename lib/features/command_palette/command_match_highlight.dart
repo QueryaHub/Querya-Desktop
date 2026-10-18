@@ -19,7 +19,7 @@ class CommandMatchHighlight extends StatelessWidget {
     final needle = q.toLowerCase();
     final index = lower.indexOf(needle);
     if (index < 0) return Text(text);
-    final theme = Theme.of(context).colorScheme;
+    final colors = context.colors;
     return Text.rich(
       TextSpan(
         children: [
@@ -28,7 +28,7 @@ class CommandMatchHighlight extends StatelessWidget {
             text: text.substring(index, index + needle.length),
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: theme.primary,
+              color: colors.primary,
             ),
           ),
           TextSpan(text: text.substring(index + needle.length)),

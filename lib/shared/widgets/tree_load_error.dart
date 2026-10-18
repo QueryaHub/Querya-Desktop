@@ -31,9 +31,9 @@ class TreeLoadError extends material.StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
-    final theme = Theme.of(context);
-    final destructive = theme.colorScheme.destructive;
-    final muted = theme.colorScheme.mutedForeground;
+    final colors = context.colors;
+    final destructive = colors.destructive;
+    final muted = colors.mutedForeground;
 
     return material.Padding(
       padding: padding,

@@ -23,7 +23,6 @@ class QueryaApp extends StatelessWidget {
       listenable: themeController,
       builder: (context, __) {
         final queryaTheme = themeController.activeTheme;
-        final colorScheme = queryaTheme.colorScheme;
 
         return ListenableBuilder(
           listenable: uiScaleController,
@@ -58,7 +57,7 @@ class QueryaApp extends StatelessWidget {
                   theme: themeController.lightShadcnTheme,
                   darkTheme: themeController.darkShadcnTheme,
                   themeMode: themeController.themeMode,
-                  materialTheme: themeController.materialThemeFor(colorScheme),
+                  materialTheme: themeController.activeMaterialTheme,
                   debugShowCheckedModeBanner: false,
                   menuHandler: const PopoverOverlayHandler(
                     defaultShowDuration: Duration(milliseconds: 60),

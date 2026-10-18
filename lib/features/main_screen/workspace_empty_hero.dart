@@ -98,7 +98,7 @@ class _WorkspaceEmptyHeroState extends State<WorkspaceEmptyHero> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final wb = context.workbench;
     final showRecent = _loaded && _recent.isNotEmpty;
 
@@ -325,7 +325,7 @@ class _RecentConnectionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final wb = context.workbench;
 
     return material.Container(
@@ -380,7 +380,7 @@ class _RecentConnectionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final subtitle = _connectionSubtitle(connection);
 
     return material.Material(
@@ -473,7 +473,7 @@ class _InteractiveQuickStartRowState extends State<_InteractiveQuickStartRow> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final wb = context.workbench;
 
     return material.MouseRegion(

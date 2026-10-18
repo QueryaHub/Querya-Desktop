@@ -8,15 +8,25 @@ import 'package:flutter_test/flutter_test.dart';
 /// [migrated] in the PR that moves it; at the end the list is all of `lib/`.
 void main() {
   const migrated = <String>[
+    'lib/app',
+    'lib/features/command_palette',
     'lib/features/connections',
+    'lib/features/erd',
     'lib/features/extensions',
+    'lib/features/help',
+    'lib/features/main_screen',
     'lib/features/mongodb',
     'lib/features/mysql',
+    'lib/features/onboarding',
     'lib/features/postgresql',
+    'lib/features/recovery',
     'lib/features/redis',
+    'lib/features/results',
     'lib/features/settings',
     'lib/features/sqlite',
+    'lib/features/updater',
     'lib/features/workspace',
+    'lib/shared',
   ];
 
   final banned = RegExp(r'\bcolorScheme\b|\bColorScheme\b');

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/layout/window_layout.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
+import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
 import 'package:querya_desktop/core/theme/querya_workbench_theme.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
@@ -80,7 +81,7 @@ class KbdBadge extends StatelessWidget {
                 fontWeight: material.FontWeight.w600,
                 fontFamily: QueryaTypography.mono,
                 fontFamilyFallback: QueryaTypography.monoFontFamilyFallback,
-                color: Theme.of(context).colorScheme.foreground,
+                color: context.colors.foreground,
               ),
             ),
           ),
@@ -205,7 +206,7 @@ class _WelcomeTourDialogState extends State<WelcomeTourDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final wb = context.workbench;
 
     final isMac = Platform.isMacOS;
@@ -399,7 +400,7 @@ onPressed: _finish,
   Widget _buildSlideContent({
     required int step,
     required String cmdCtrl,
-    required ColorScheme cs,
+    required QueryaUiColors cs,
     required QueryaWorkbenchTheme wb,
   }) {
     switch (step) {
@@ -601,9 +602,7 @@ class _TourSlideView extends StatelessWidget {
                   tipText,
                   style: TextStyle(
                     fontSize: 12.5,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .foreground
+                    color: context.colors.foreground
                         .withValues(alpha: 0.9),
                     height: 1.35,
                   ),
@@ -750,7 +749,7 @@ class _HotkeysMatrixSlideView extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Theme.of(context).colorScheme.foreground,
+            color: context.colors.foreground,
             fontWeight: material.FontWeight.w500,
           ),
         ),

@@ -4,8 +4,6 @@ import 'package:querya_desktop/core/erd/erd_model.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/erd/erd_export.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn
-    hide TextExtension;
 
 /// Turns what the diagram shows on screen (header tints, notes, group frames,
 /// theme colours) into the plain values the SVG / DBML export takes (#1362).
@@ -93,7 +91,7 @@ abstract final class ErdExportData {
       border: hex(wb.borderSubtle),
       header: hex(material.Color.alphaBlend(
           wb.accent.withValues(alpha: 0.10), wb.surface)),
-      text: hex(shadcn.Theme.of(context).colorScheme.foreground),
+      text: hex(context.colors.foreground),
       muted: hex(wb.mutedForeground),
       edge: hex(wb.mutedForeground),
       primaryKey: hex(palette.type1),

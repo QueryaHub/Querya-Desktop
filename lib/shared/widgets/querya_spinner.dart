@@ -48,11 +48,11 @@ class QueryaSpinner extends material.StatelessWidget {
   material.Widget build(material.BuildContext context) {
     final theme = QueryaThemeScope.maybeOf(context);
     final workbench = theme?.workbench;
-    final fallback = material.Theme.of(context).colorScheme;
+    final colors = context.colors;
 
     final dimension = customDimension ?? size.dimension;
     final stroke = strokeWidth ?? size.strokeWidth;
-    final effectiveColor = color ?? workbench?.accent ?? fallback.primary;
+    final effectiveColor = color ?? workbench?.accent ?? colors.primary;
 
     final spinner = material.SizedBox(
       width: dimension,
@@ -77,7 +77,7 @@ class QueryaSpinner extends material.StatelessWidget {
           label!,
           style: material.TextStyle(
             fontSize: size == QueryaSpinnerSize.sm ? 11 : 12,
-            color: workbench?.mutedForeground ?? fallback.onSurfaceVariant,
+            color: workbench?.mutedForeground ?? colors.mutedForeground,
           ),
         ),
       ],

@@ -1,7 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart' as material;
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
+import 'package:flutter/widgets.dart' show StatelessWidget, Text;
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/shared/widgets/querya_text.dart';
 
 /// Lightweight Markdown-ish renderer for GitHub release notes.
@@ -86,7 +87,7 @@ class UpdateChangelogView extends StatelessWidget {
     return material.SelectionArea(
       child: material.DefaultTextStyle(
         style: material.TextStyle(
-          color: Theme.of(context).colorScheme.foreground,
+          color: context.colors.foreground,
           height: 1.45,
         ),
         child: material.Column(

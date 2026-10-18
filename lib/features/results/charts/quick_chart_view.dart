@@ -597,7 +597,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
       material.BuildContext context, List<ChartPoint> points, double width) {
     final palette = context.semanticPalette;
     final wb = context.workbench;
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colors;
     final label = material.TextStyle(color: wb.mutedForeground, fontSize: 10);
     final step = (points.length / 8).ceil().clamp(1, 1000);
     // Labels shown: one per step. Rotate them when a slot is too narrow.

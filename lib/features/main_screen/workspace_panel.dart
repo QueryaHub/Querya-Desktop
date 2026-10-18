@@ -207,7 +207,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final activeConn = widget.activeConnection;
 
     final empty = material.Align(
@@ -227,7 +227,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
       activeBody = _cachedActiveBody ?? const material.SizedBox.expand();
     } else {
       _lastConnectedId = activeConn.id;
-      activeBody = _buildActiveConnectionBody(theme, activeConn);
+      activeBody = _buildActiveConnectionBody(activeConn);
       _cachedActiveBody = activeBody;
     }
 
@@ -236,7 +236,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
     final connKey = activeConn?.id ?? _lastConnectedId ?? 0;
 
     return material.Container(
-      color: theme.colorScheme.background,
+      color: colors.background,
       child: QueryaSwitchingBody(
         index: activeConn == null ? 0 : 1,
         children: [
@@ -253,7 +253,6 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
   }
 
   material.Widget _buildActiveConnectionBody(
-    ThemeData theme,
     ConnectionRow activeConn,
   ) {
     material.Widget? driverWorkspace;
@@ -436,7 +435,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
             material.Icon(
               material.Icons.error_outline_rounded,
               size: 36,
-              color: theme.colorScheme.mutedForeground,
+              color: context.colors.mutedForeground,
             ),
             const material.SizedBox(height: 12),
             const Text('Unsupported connection type').semiBold(),

@@ -65,13 +65,13 @@ class QueryaWindowTitleBar extends StatelessWidget {
   @visibleForTesting
   static WindowButtonColors windowButtonColors(BuildContext context) {
     final wb = context.workbench;
-    final cs = Theme.of(context).colorScheme;
+    final colors = context.colors;
     return WindowButtonColors(
       iconNormal: wb.mutedForeground,
       mouseOver: wb.surface.withValues(alpha: 0.85),
       mouseDown: wb.borderSubtle.withValues(alpha: 0.55),
-      iconMouseOver: cs.foreground,
-      iconMouseDown: cs.foreground,
+      iconMouseOver: colors.foreground,
+      iconMouseDown: colors.foreground,
     );
   }
 

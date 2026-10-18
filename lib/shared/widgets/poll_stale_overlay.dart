@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:querya_desktop/core/motion/polling_controller.dart';
+import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 
 /// Shows [child] with a small "out of date" note in the top-right corner while
 /// the latest poll failed, so a dashboard that kept its last good numbers does
@@ -30,13 +31,13 @@ class PollStaleOverlay extends StatelessWidget {
             valueListenable: status,
             builder: (context, s, _) {
               if (!s.isStale) return const SizedBox.shrink();
-              final scheme = Theme.of(context).colorScheme;
+              final colors = context.colors;
               return Tooltip(
                 message: '${s.lastError}',
                 child: DecoratedBox(
                   key: const ValueKey('poll_stale_hint'),
                   decoration: BoxDecoration(
-                    color: scheme.errorContainer,
+                    color: colors.destructive.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Padding(
@@ -46,7 +47,7 @@ class PollStaleOverlay extends StatelessWidget {
                       message(s),
                       style: TextStyle(
                         fontSize: 12,
-                        color: scheme.onErrorContainer,
+                        color: colors.destructive,
                       ),
                     ),
                   ),
