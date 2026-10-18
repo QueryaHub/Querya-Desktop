@@ -9,27 +9,21 @@ import 'package:querya_desktop/features/command_palette/command_palette_dialog.d
 import 'package:querya_desktop/core/actions/sql_editor_actions.dart';
 import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/core/actions/sql_editor_global_actions.dart';
-import 'package:querya_desktop/core/demo/demo_playground_service.dart';
 import 'package:querya_desktop/core/platform/file_launch_service.dart';
-import 'package:querya_desktop/core/security/safe_mode.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/extensions/sandbox/unsandboxed_launch_consent_gate.dart';
 import 'package:querya_desktop/features/extensions/presentation/widgets/unsandboxed_driver_consent_dialog.dart';
-import 'package:querya_desktop/features/connections/connection_creation_flow.dart';
-import 'package:querya_desktop/features/connections/new_connection_url_dialog.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
-import 'package:querya_desktop/features/connections/sqlite_connection_form.dart';
 import 'package:querya_desktop/core/ui/querya_shell_status.dart';
 import 'package:querya_desktop/features/main_screen/querya_status_bar.dart';
-import 'package:querya_desktop/features/main_screen/safe_mode_unlock_dialog.dart';
 import 'package:querya_desktop/features/main_screen/querya_window_title_bar.dart';
 import 'package:querya_desktop/features/macos/querya_platform_menu_bar.dart';
-import 'package:querya_desktop/features/onboarding/welcome_tour_dialog.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'main_screen_workspace_state.dart';
 import 'main_content_split.dart';
+import 'main_screen_dialogs.dart';
 import 'main_screen_navigator.dart';
 import 'main_screen_shortcuts.dart';
 
@@ -49,7 +43,13 @@ class _MainScreenState extends State<MainScreen> {
   final ValueNotifier<MainScreenWorkspaceState> _workspace =
       ValueNotifier(MainScreenWorkspaceState.empty);
   final ValueNotifier<bool> _isSidebarVisible = ValueNotifier(true);
-  bool _openingConnectionDialog = false;
+  late final MainScreenDialogs _dialogs = MainScreenDialogs(
+    workspace: _workspace,
+    nav: _nav,
+    connectionsPanelKey: _connectionsPanelKey,
+    context: () => context,
+    mounted: () => mounted,
+  );
   late final MainScreenNavigator _nav = MainScreenNavigator(
     workspace: _workspace,
     context: () => context,
@@ -78,17 +78,17 @@ class _MainScreenState extends State<MainScreen> {
         if (connections.isEmpty &&
             mounted &&
             !FileLaunchService.instance.hasPendingTargets) {
-          _onOpenWelcomeTour();
+          _dialogs.onOpenWelcomeTour();
         }
       }
       if (mounted) {
-        await _handlePendingFileLaunch();
+        await _dialogs.handlePendingFileLaunch();
       }
     });
   }
 
   void _onFilesQueued() {
-    if (mounted) unawaited(_handlePendingFileLaunch());
+    if (mounted) unawaited(_dialogs.handlePendingFileLaunch());
   }
 
   @override
@@ -96,52 +96,10 @@ class _MainScreenState extends State<MainScreen> {
     FileLaunchService.instance.pendingRevision.removeListener(_onFilesQueued);
     HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
     UnsandboxedLaunchConsentGate.instance.handler = null;
-    _safeModeRelockTimer?.cancel();
+    _dialogs.dispose();
     _workspace.dispose();
     _isSidebarVisible.dispose();
     super.dispose();
-  }
-
-  Timer? _safeModeRelockTimer;
-
-  /// Toggles the read-only lock. Turning it off for a Production connection
-  /// (Safe Mode) needs a typed confirmation and re-locks after
-  /// [kSafeModeUnlockDuration].
-  Future<void> _toggleReadOnly() async {
-    final ws = _workspace.value;
-    final connection = ws.activeConnection;
-    if (connection == null) return;
-
-    if (ws.isReadOnly &&
-        safeModeRequiresConfirmation(connection.environment)) {
-      final confirmed = await showSafeModeUnlockDialog(
-        context: context,
-        connectionName: connection.name,
-      );
-      if (!confirmed || !mounted) return;
-      final current = _workspace.value;
-      if (current.activeConnection?.id != connection.id || !current.isReadOnly) {
-        return;
-      }
-      _workspace.value = current.toggleReadOnly();
-      _safeModeRelockTimer?.cancel();
-      _safeModeRelockTimer = Timer(kSafeModeUnlockDuration, () {
-        if (!mounted) return;
-        final latest = _workspace.value;
-        if (latest.activeConnection?.id == connection.id &&
-            !latest.isReadOnly) {
-          _workspace.value = latest.toggleReadOnly();
-          showAppToast(
-            context: context,
-            message: '${connection.name} is read-only again',
-          );
-        }
-      });
-      return;
-    }
-
-    _safeModeRelockTimer?.cancel();
-    _workspace.value = ws.toggleReadOnly();
   }
 
   bool _handleGlobalKeyEvent(KeyEvent event) {
@@ -182,7 +140,7 @@ class _MainScreenState extends State<MainScreen> {
       case MainShortcut.quickSwitcher:
         _nav.openQuickSwitcher();
       case MainShortcut.newConnection:
-        unawaited(_onNewDatabaseConnectionFromMenu());
+        unawaited(_dialogs.onNewDatabaseConnectionFromMenu());
       case MainShortcut.newQuery:
         Actions.maybeInvoke(focused(), const NewSqlIntent());
       case MainShortcut.newQueryTab:
@@ -198,131 +156,11 @@ class _MainScreenState extends State<MainScreen> {
       case MainShortcut.saveSql:
         Actions.maybeInvoke(focused(), const SaveSqlIntent());
       case MainShortcut.welcomeTour:
-        _onOpenWelcomeTour();
+        _dialogs.onOpenWelcomeTour();
       case MainShortcut.goHome:
         _nav.onGoHome();
     }
     return true;
-  }
-
-  Future<void> _openNewConnectionFromHero() async {
-    final row = await promptCreateConnection(context);
-    if (!mounted || row == null) return;
-    await LocalDb.instance.addConnection(row);
-    await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
-  }
-
-  Future<void> _onNewDatabaseConnectionFromMenu() async {
-    if (_openingConnectionDialog) return;
-    _openingConnectionDialog = true;
-    try {
-      // Menu overlay context is torn down before the connection form opens.
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (!mounted) return;
-      final row = await promptCreateConnection(context, folderId: null);
-      if (!mounted || row == null) return;
-      await LocalDb.instance.addConnection(row);
-      await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
-    } finally {
-      _openingConnectionDialog = false;
-    }
-  }
-
-  Future<void> _onNewDatabaseConnectionFromUrl() async {
-    if (_openingConnectionDialog) return;
-    _openingConnectionDialog = true;
-    try {
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (!mounted) return;
-      final row = await showNewConnectionUrlDialog(context);
-      if (!mounted || row == null) return;
-      await LocalDb.instance.addConnection(row);
-      await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
-    } finally {
-      _openingConnectionDialog = false;
-    }
-  }
-
-  Future<void> _openSqliteFromHero() async {
-    final row = await showSqliteConnectionForm(context);
-    if (!mounted || row == null) return;
-    await LocalDb.instance.addConnection(row);
-    await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
-  }
-
-  void _onOpenWelcomeTour() {
-    showWelcomeTourDialog(
-      context,
-      onLaunchDemo: _onLaunchDemoPlayground,
-      onGoHome: _workspace.value.activeConnection != null ? _nav.onGoHome : null,
-    );
-  }
-
-  Future<void> _onLaunchDemoPlayground() async {
-    try {
-      final demoConn = await DemoPlaygroundService.getOrCreateDemoConnection();
-      if (!mounted) return;
-      await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
-      _workspace.value = _workspace.value.selectConnection(demoConn);
-      _nav.onSqliteOpenSqlWorkspace(demoConn);
-    } catch (_) {}
-  }
-
-  Future<void> _handlePendingFileLaunch() async {
-    final targets = FileLaunchService.instance.consumePendingTargets();
-    if (targets.isEmpty || !mounted) return;
-
-    for (final target in targets) {
-      if (!mounted) return;
-      try {
-        if (target.kind == FileLaunchKind.sqlite) {
-          final conn = await FileLaunchService.instance
-              .resolveOrRegisterSqliteConnection(target);
-          if (!mounted) return;
-          await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
-          _workspace.value = _workspace.value.selectConnection(conn);
-          _nav.onSqliteOpenSqlWorkspace(conn);
-        } else if (target.kind == FileLaunchKind.sql) {
-          final sql = await FileLaunchService.instance.readSqlContent(target);
-          if (!mounted) return;
-
-          var conn = _workspace.value.activeConnection;
-          if (conn == null) {
-            final connections = await LocalDb.instance.getConnections();
-            if (connections.isNotEmpty) {
-              conn = connections.first;
-            } else {
-              final scratchRow = ConnectionRow(
-                name: 'Local Scratch (${target.fileName})',
-                type: 'sqlite',
-                host: '',
-                createdAt: DateTime.now().toUtc().toIso8601String(),
-              );
-              final id = await LocalDb.instance.addConnection(scratchRow);
-              conn = scratchRow.copyWith(id: id);
-              await _connectionsPanelKey.currentState?.reloadConnectionsFromDb();
-            }
-          }
-
-          if (mounted) {
-            _workspace.value = _workspace.value.selectConnection(conn);
-            _nav.openSqlWorkspaceForConnection(conn);
-            SqlEditorCommandBridge.instance.openFileWithContent(
-              sql: sql,
-              filePath: target.path,
-              title: target.fileName,
-            );
-          }
-        }
-      } catch (e) {
-        if (!mounted) return;
-        showAppToast(
-          context: context,
-          message: 'Failed to open file "${target.fileName}": $e',
-          variant: AppToastVariant.error,
-        );
-      }
-    }
   }
 
   @override
@@ -333,7 +171,7 @@ class _MainScreenState extends State<MainScreen> {
       builder: (context, workspace, _) {
         return QueryaCommandHost(
           onToggleSidebar: () => _splitKey.currentState?.toggleSidebar(),
-          onNewConnection: () => unawaited(_onNewDatabaseConnectionFromMenu()),
+          onNewConnection: () => unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
           onReloadConnections: () => unawaited(
               _connectionsPanelKey.currentState?.reloadConnectionsFromDb() ??
                   Future<void>.value()),
@@ -363,9 +201,9 @@ class _MainScreenState extends State<MainScreen> {
                   )
               : null,
           onToggleReadOnly: workspace.activeConnection != null
-              ? () => unawaited(_toggleReadOnly())
+              ? () => unawaited(_dialogs.toggleReadOnly())
               : null,
-          onOpenWelcomeTour: _onOpenWelcomeTour,
+          onOpenWelcomeTour: _dialogs.onOpenWelcomeTour,
           selectedConnectionId: workspace.activeConnection?.id,
           child: FocusScope(
           autofocus: true,
@@ -375,11 +213,11 @@ class _MainScreenState extends State<MainScreen> {
               const material.SingleActivator(
                 LogicalKeyboardKey.keyN,
                 meta: true,
-              ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
+              ): () => unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
               const material.SingleActivator(
                 LogicalKeyboardKey.keyN,
                 control: true,
-              ): () => unawaited(_onNewDatabaseConnectionFromMenu()),
+              ): () => unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
 
               // New Query Tab: Ctrl+Shift+N / Cmd+Shift+N
               const material.SingleActivator(
@@ -467,17 +305,17 @@ class _MainScreenState extends State<MainScreen> {
               // Welcome Tour & Tutorial: F1 / Cmd+Shift+H / Ctrl+Shift+H
               const material.SingleActivator(
                 LogicalKeyboardKey.f1,
-              ): () => _onOpenWelcomeTour(),
+              ): () => _dialogs.onOpenWelcomeTour(),
               const material.SingleActivator(
                 LogicalKeyboardKey.keyH,
                 meta: true,
                 shift: true,
-              ): () => _onOpenWelcomeTour(),
+              ): () => _dialogs.onOpenWelcomeTour(),
               const material.SingleActivator(
                 LogicalKeyboardKey.keyH,
                 control: true,
                 shift: true,
-              ): () => _onOpenWelcomeTour(),
+              ): () => _dialogs.onOpenWelcomeTour(),
 
               // Return to Start / Home Screen: Cmd+Shift+0 / Ctrl+Shift+0
               const material.SingleActivator(
@@ -493,7 +331,7 @@ class _MainScreenState extends State<MainScreen> {
             },
             child: QueryaPlatformMenuBar(
               onNewConnection: () =>
-                  unawaited(_onNewDatabaseConnectionFromMenu()),
+                  unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
               onNewQueryTab: () {
                 final ctx =
                     FocusManager.instance.primaryFocus?.context ?? context;
@@ -513,7 +351,7 @@ class _MainScreenState extends State<MainScreen> {
                   SqlEditorCommandBridge.instance.invokeExecute(),
               onToggleSidebar: () => _splitKey.currentState?.toggleSidebar(),
               onOpenPreferences: () => showPreferencesDialog(context),
-              onOpenWelcomeTour: () => _onOpenWelcomeTour(),
+              onOpenWelcomeTour: () => _dialogs.onOpenWelcomeTour(),
               onGoHome: _nav.onGoHome,
               child: SqlEditorGlobalActions(
                 activeConnection: workspace.activeConnection,
@@ -530,17 +368,17 @@ class _MainScreenState extends State<MainScreen> {
                       builder: (context, isSidebarVisible, _) {
                         return QueryaWindowTitleBar(
                           onNewDatabaseConnection:
-                              _onNewDatabaseConnectionFromMenu,
+                              _dialogs.onNewDatabaseConnectionFromMenu,
                           onNewDatabaseConnectionFromUrl:
-                              _onNewDatabaseConnectionFromUrl,
+                              _dialogs.onNewDatabaseConnectionFromUrl,
                           activeConnection: workspace.activeConnection,
                           isReadOnly: workspace.isReadOnly,
                           isSidebarVisible: isSidebarVisible,
                           onToggleSidebar: () =>
                               _splitKey.currentState?.toggleSidebar(),
-                          onOpenWelcomeTour: _onOpenWelcomeTour,
+                          onOpenWelcomeTour: _dialogs.onOpenWelcomeTour,
                           onGoHome: _nav.onGoHome,
-                          onReadOnlyChanged: () => unawaited(_toggleReadOnly()),
+                          onReadOnlyChanged: () => unawaited(_dialogs.toggleReadOnly()),
                           onConnect: () {
                             final active = workspace.activeConnection;
                             if (active != null && active.id != null) {
@@ -596,12 +434,12 @@ class _MainScreenState extends State<MainScreen> {
                         onPostgresOpenSqlWorkspace: _nav.onPostgresOpenSqlWorkspace,
                         onMysqlOpenSqlWorkspace: _nav.onMysqlOpenSqlWorkspace,
                         onSqliteOpenSqlWorkspace: _nav.onSqliteOpenSqlWorkspace,
-                        onRequestNewConnection: _openNewConnectionFromHero,
+                        onRequestNewConnection: _dialogs.openNewConnectionFromHero,
                         onRequestNewConnectionFromUrl:
-                            _onNewDatabaseConnectionFromUrl,
-                        onRequestOpenSqlite: _openSqliteFromHero,
-                        onRequestLaunchDemo: _onLaunchDemoPlayground,
-                        onRequestOpenTour: _onOpenWelcomeTour,
+                            _dialogs.onNewDatabaseConnectionFromUrl,
+                        onRequestOpenSqlite: _dialogs.openSqliteFromHero,
+                        onRequestLaunchDemo: _dialogs.onLaunchDemoPlayground,
+                        onRequestOpenTour: _dialogs.onOpenWelcomeTour,
                         onOpenConnection: _nav.onConnectionSelected,
                         initialMongoCollection: _nav.pendingMongoCollection,
                       ),
