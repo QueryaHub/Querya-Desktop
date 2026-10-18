@@ -429,15 +429,9 @@ class _ErdViewState extends material.State<ErdView>
     final schema = _schema;
     if (schema == null || id == _c.activeView) return;
     _captureCurrent();
-    if (id == null) {
-      _showState(null, _c.base);
-      return;
-    }
-    final view = _c.viewById(id);
-    if (view == null) return;
-    _showState(
-        id,
-        view.asLayout({for (final t in schema.tables) t.name}, _c.headerColors));
+    final target =
+        _c.stateOfView(id, {for (final t in schema.tables) t.name});
+    if (target != null) _showState(id, target);
   }
 
   /// Saves what the diagram shows as a new view and moves into it.
@@ -449,24 +443,12 @@ class _ErdViewState extends material.State<ErdView>
         action: 'Save',
         name: 'View ${_c.views.length + 1}');
     if (name == null || !mounted) return;
-    final fromAll = _c.viewById(_c.activeView) == null;
     _captureCurrent();
-    // The tables hidden by hand now belong to the view; All tables shows
-    // every table, always.
-    if (fromAll) _c.base = _c.base.showingAll();
-    final id = _c.nextViewId();
-    setState(() {
-      _c.views.add(ErdSavedView(
-        id: id,
-        name: name,
-        tables: {
-          for (final t in schema.tables)
-            if (!_c.hidden.contains(t.name)) t.name,
-        },
-        layout: _current(),
-      ));
-      _c.activeView = id;
-    });
+    setState(() => _c.addViewFromCurrent(
+          name: name,
+          current: _current(),
+          tableNames: [for (final t in schema.tables) t.name],
+        ));
     _scheduleSave();
   }
 
@@ -614,40 +596,18 @@ class _ErdViewState extends material.State<ErdView>
   }
 
   /// What the diagram shows and how it is arranged right now.
-  ErdSavedLayout _current() {
-    return ErdSavedLayout(
-      positions: Map.of(_layout?.positions ?? const {}),
-      collapsed: Set.of(_c.collapsed),
-      hidden: Set.of(_c.hidden),
-      detail: _c.detail,
-      headerColors: Map.of(_c.headerColors),
-      groups: List.of(_c.groups),
-      notes: List.of(_c.notes),
-      scale: _viewport.scale,
-      translation: _viewport.translation,
-    );
-  }
+  ErdSavedLayout _current() => _c.snapshot(
+        positions: _layout?.positions ?? const {},
+        scale: _viewport.scale,
+        translation: _viewport.translation,
+      );
 
   /// Writes the current state to where it belongs: the active view, or the
   /// diagram's own (*All tables*) state.
   void _captureCurrent() {
     final schema = _schema;
     if (schema == null || _layout == null) return;
-    final cur = _current();
-    final i = _c.views.indexWhere((v) => v.id == _c.activeView);
-    if (i < 0) {
-      _c.base = cur;
-      return;
-    }
-    _c.views[i] = ErdSavedView(
-      id: _c.views[i].id,
-      name: _c.views[i].name,
-      tables: {
-        for (final t in schema.tables)
-          if (!_c.hidden.contains(t.name)) t.name,
-      },
-      layout: cur,
-    );
+    _c.capture(_current(), [for (final t in schema.tables) t.name]);
   }
 
   Future<void> _saveNow() async {
@@ -655,12 +615,7 @@ class _ErdViewState extends material.State<ErdView>
     if (!_persists || layout == null) return;
     _captureCurrent();
     try {
-      await widget.layoutStore!.write(
-        widget.layoutKey!,
-        // The diagram's own state, with the header colours as they are now.
-        _c.base.withViews(List.of(_c.views), _c.activeView,
-            headerColors: Map.of(_c.headerColors)),
-      );
+      await widget.layoutStore!.write(widget.layoutKey!, _c.toStore());
     } catch (_) {
       // Keeping the layout is a convenience: a failed write is not an error
       // the user can act on.

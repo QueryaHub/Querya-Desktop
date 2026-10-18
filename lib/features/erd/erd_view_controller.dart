@@ -251,6 +251,83 @@ class ErdViewController {
 
   void removeView(String id) => views.removeWhere((v) => v.id == id);
 
+  /// What the diagram shows and how it is arranged: this state with the card
+  /// [positions] and the viewport.
+  ErdSavedLayout snapshot({
+    required Map<String, Offset> positions,
+    required double scale,
+    required Offset translation,
+  }) =>
+      ErdSavedLayout(
+        positions: Map.of(positions),
+        collapsed: Set.of(collapsed),
+        hidden: Set.of(hidden),
+        detail: detail,
+        headerColors: Map.of(headerColors),
+        groups: List.of(groups),
+        notes: List.of(notes),
+        scale: scale,
+        translation: translation,
+      );
+
+  /// Writes [current] to where it belongs: the active view, or the diagram's
+  /// own (*All tables*) state. [tableNames] is every table of the diagram, to
+  /// keep the view's tables in step with what is hidden.
+  void capture(ErdSavedLayout current, Iterable<String> tableNames) {
+    final i = views.indexWhere((v) => v.id == activeView);
+    if (i < 0) {
+      base = current;
+      return;
+    }
+    views[i] = ErdSavedView(
+      id: views[i].id,
+      name: views[i].name,
+      tables: {
+        for (final t in tableNames)
+          if (!hidden.contains(t)) t,
+      },
+      layout: current,
+    );
+  }
+
+  /// The document to store: the diagram's own state with its views and the
+  /// header colours as they are now.
+  ErdSavedLayout toStore() => base.withViews(List.of(views), activeView,
+      headerColors: Map.of(headerColors));
+
+  /// The state to show for the view [id] (null: *All tables*), or null when
+  /// there is no such view. Call [capture] first.
+  ErdSavedLayout? stateOfView(String? id, Set<String> tableNames) {
+    if (id == null) return base;
+    final view = viewById(id);
+    return view?.asLayout(tableNames, headerColors);
+  }
+
+  /// Saves what the diagram shows as a new view named [name] and moves into
+  /// it; returns its id. Call [capture] first.
+  String addViewFromCurrent({
+    required String name,
+    required ErdSavedLayout current,
+    required Iterable<String> tableNames,
+  }) {
+    final fromAll = viewById(activeView) == null;
+    // The tables hidden by hand now belong to the view; All tables shows
+    // every table, always.
+    if (fromAll) base = base.showingAll();
+    final id = nextViewId();
+    views.add(ErdSavedView(
+      id: id,
+      name: name,
+      tables: {
+        for (final t in tableNames)
+          if (!hidden.contains(t)) t,
+      },
+      layout: current,
+    ));
+    activeView = id;
+    return id;
+  }
+
   // ---- Pick and focus ------------------------------------------------------
 
   /// A click on a card with no modifier: picks it and drops a picked relation.

@@ -274,4 +274,89 @@ void main() {
       expect(other.column, isNull);
     });
   });
+
+  group('saving and views', () {
+    const here = Offset(10, 20);
+
+    test('a snapshot copies the state with the positions and the viewport', () {
+      c
+        ..collapsed.add('users')
+        ..hidden.add('tags')
+        ..detail = ErdDetail.keys
+        ..headerColors['users'] = 'type2';
+      final snap = c.snapshot(
+          positions: {'users': here}, scale: 1.5, translation: const Offset(3, 4));
+      expect(snap.positions, {'users': here});
+      expect(snap.collapsed, {'users'});
+      expect(snap.hidden, {'tags'});
+      expect(snap.detail, ErdDetail.keys);
+      expect(snap.scale, 1.5);
+      expect(snap.translation, const Offset(3, 4));
+
+      // A copy: later changes do not reach it.
+      c.collapsed.add('orders');
+      expect(snap.collapsed, {'users'});
+    });
+
+    test('with no active view the snapshot becomes the diagram own state', () {
+      final snap = c.snapshot(positions: {}, scale: 1, translation: Offset.zero);
+      c.capture(snap, names);
+      expect(c.base, same(snap));
+    });
+
+    test('with a view active the snapshot goes to that view, tables minus hidden',
+        () {
+      final id = c.addViewFromCurrent(
+        name: 'Sales',
+        current: c.snapshot(positions: {}, scale: 1, translation: Offset.zero),
+        tableNames: names,
+      );
+      c.hidden.add('tags');
+      final snap = c.snapshot(
+          positions: {'users': here}, scale: 2, translation: Offset.zero);
+      c.capture(snap, names);
+      final view = c.viewById(id)!;
+      expect(view.layout.positions, {'users': here});
+      expect(view.tables, {'users', 'orders', 'items'});
+      expect(view.name, 'Sales');
+    });
+
+    test('a new view from All tables shows every table there afterwards', () {
+      c.hidden.add('tags');
+      c.base = c.snapshot(positions: {}, scale: 1, translation: Offset.zero);
+      final id = c.addViewFromCurrent(
+        name: 'Core',
+        current: c.snapshot(positions: {}, scale: 1, translation: Offset.zero),
+        tableNames: names,
+      );
+      expect(c.activeView, id);
+      expect(c.base.hidden, isEmpty, reason: 'All tables always shows all');
+      expect(c.viewById(id)!.tables, isNot(contains('tags')));
+    });
+
+    test('stateOfView: null is All tables, an id is its view, a stranger is none',
+        () {
+      expect(c.stateOfView(null, names.toSet()), same(c.base));
+      final id = c.addViewFromCurrent(
+        name: 'V',
+        current: c.snapshot(positions: {}, scale: 1, translation: Offset.zero),
+        tableNames: names,
+      );
+      expect(c.stateOfView(id, names.toSet()), isNotNull);
+      expect(c.stateOfView('v99', names.toSet()), isNull);
+    });
+
+    test('toStore carries the views, the active one and the colours', () {
+      c.headerColors['users'] = 'type4';
+      final id = c.addViewFromCurrent(
+        name: 'V',
+        current: c.snapshot(positions: {}, scale: 1, translation: Offset.zero),
+        tableNames: names,
+      );
+      final stored = c.toStore();
+      expect(stored.views.single.id, id);
+      expect(stored.activeView, id);
+      expect(stored.headerColors, {'users': 'type4'});
+    });
+  });
 }
