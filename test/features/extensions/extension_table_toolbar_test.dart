@@ -1,8 +1,6 @@
-import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/extensions/extension_table_toolbar.dart';
-import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 void main() {
   group('ExtensionTableToolbar', () {

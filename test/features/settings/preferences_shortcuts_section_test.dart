@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/querya_typography.dart';
 import 'package:querya_desktop/features/settings/preferences_shortcuts_section.dart';
-import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
