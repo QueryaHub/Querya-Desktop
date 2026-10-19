@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/theme/querya_typography.dart';

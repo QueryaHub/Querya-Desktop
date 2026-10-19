@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
@@ -7,7 +8,6 @@ import 'package:querya_desktop/core/editor/syntax_highlight_service.dart';
 import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
 import 'package:gap/gap.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide Gap, TextExtension;
 import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/shared/widgets/querya_button.dart';
 import 'package:querya_desktop/shared/widgets/querya_text.dart';

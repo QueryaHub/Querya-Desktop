@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/features/extensions/extension_table_toolbar.dart';
-import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 void main() {
   group('ExtensionTableToolbar', () {
@@ -16,7 +15,7 @@ void main() {
         material.MaterialApp(
           theme: material.ThemeData.light(),
           home: material.Scaffold(
-            body: ShadcnApp(
+            body: material.MaterialApp(
               home: ExtensionTableToolbar(
                 title: 'Table · analytics.events',
                 paginationLabel: 'Rows 1–200 of 5,000',
@@ -71,7 +70,7 @@ void main() {
         material.MaterialApp(
           theme: material.ThemeData.light(),
           home: material.Scaffold(
-            body: ShadcnApp(
+            body: material.MaterialApp(
               home: ExtensionTableToolbar(
                 title: 'View · analytics.summary',
                 paginationLabel: 'Loading data...',

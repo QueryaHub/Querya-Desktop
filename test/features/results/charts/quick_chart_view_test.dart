@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'dart:math' show max, min, sqrt1_2;
 import 'dart:typed_data';
 
@@ -10,7 +11,6 @@ import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
 import 'package:querya_desktop/features/results/charts/quick_chart_view.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../../support/querya_theme_test_shell.dart';
 

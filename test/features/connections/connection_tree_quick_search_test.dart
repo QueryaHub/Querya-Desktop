@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
@@ -8,7 +9,6 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:flutter/material.dart' show MaterialApp;
 import '../../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 String _isoNow() => DateTime.now().toUtc().toIso8601String();
 

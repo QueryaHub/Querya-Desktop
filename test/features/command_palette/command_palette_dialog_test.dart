@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'dart:ui';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart' as material;
@@ -8,7 +9,6 @@ import 'package:querya_desktop/core/actions/querya_command_registry.dart';
 import 'package:querya_desktop/core/motion/querya_motion.dart';
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
 import 'package:querya_desktop/features/command_palette/command_palette_dialog.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -94,7 +94,7 @@ void main() {
       find.descendant(of: inkWellFinder, matching: find.byType(DecoratedBox)),
     );
     final boxDecoration = decoratedBox.decoration as BoxDecoration;
-    expect(boxDecoration.color, isNot(equals(Colors.transparent)));
+    expect(boxDecoration.color, isNot(equals(material.Colors.transparent)));
 
     await gesture.removePointer();
   });

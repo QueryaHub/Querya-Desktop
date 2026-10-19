@@ -2,7 +2,7 @@
 
 A high-level map of the codebase for contributors. The app is a Flutter desktop
 client with a custom window frame ([bitsdojo_window](https://pub.dev/packages/bitsdojo_window))
-and [shadcn_flutter](https://pub.dev/packages/shadcn_flutter) UI components.
+and Material with the Querya UI kit (`lib/shared/`).
 
 ## Layered layout
 
@@ -61,7 +61,7 @@ MCP (`ErdCatalog`, `ErdSchema`, `ErdTableNames`) is in `core/erd/`.
 
 | Path | Responsibility |
 |------|----------------|
-| `shared/widgets/` | shadcn re-exports, `QueryaDropdown`, app dialog, shared tokens. |
+| `shared/widgets/` | `QueryaDropdown`, app dialog, shared tokens. |
 
 ## Cross-cutting systems
 

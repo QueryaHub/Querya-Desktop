@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'dart:async';
 
 import 'package:querya_desktop/core/actions/querya_command.dart';

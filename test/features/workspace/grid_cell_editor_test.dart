@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,7 +8,6 @@ import 'package:querya_desktop/features/workspace/grid_cell_popover_inspector.da
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
 import 'package:querya_desktop/shared/widgets/querya_spinner.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 

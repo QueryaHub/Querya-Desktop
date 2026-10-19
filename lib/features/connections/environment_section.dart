@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/security/connection_environment.dart';
 import 'package:querya_desktop/shared/widgets/connection_environment_badge.dart';

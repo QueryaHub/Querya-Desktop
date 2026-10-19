@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
 /// Bold/primary span for the first case-insensitive [query] hit in [text].

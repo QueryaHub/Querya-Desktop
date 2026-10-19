@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -5,7 +6,6 @@ import 'package:querya_desktop/core/theme/parser/color_parser.dart';
 import 'package:querya_desktop/core/theme/parser/querya_theme_color_scheme.dart';
 import 'package:querya_desktop/core/theme/parser/querya_theme_manifest.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 void main() {
   group('uiColorsFromQueryaThemeColors', () {

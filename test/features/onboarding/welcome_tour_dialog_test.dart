@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
@@ -7,7 +8,6 @@ import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 import 'package:querya_desktop/features/onboarding/welcome_tour_dialog.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 import '../../support/querya_theme_test_shell.dart';
 

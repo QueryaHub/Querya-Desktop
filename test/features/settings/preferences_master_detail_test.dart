@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart' as material;
@@ -11,7 +12,6 @@ import '../../support/querya_theme_test_shell.dart';
 import 'package:querya_desktop/core/updater/installers/update_install_context.dart';
 import 'package:querya_desktop/features/settings/preferences_controls.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' hide TextExtension;
 
 class _FakePathProvider extends PathProviderPlatform {
   _FakePathProvider(this._root);
