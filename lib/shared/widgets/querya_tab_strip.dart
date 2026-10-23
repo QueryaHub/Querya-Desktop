@@ -62,8 +62,9 @@ class QueryaTabStrip extends material.StatefulWidget {
         textDirection: material.TextDirection.ltr,
         maxLines: 1,
       )..layout();
-      // Border 2 + 2, side padding, the 2 px gap and 24 px close target.
-      width += text.width + 4 + (closable ? 10 + 2 + 24 + 5 : 24);
+      // Border 2 + 2, side padding, the 2 px gap and 24 px close target, and 4 px
+      // of slack: the measured strip is ~2 px per tab wider than the sum.
+      width += text.width + 4 + 4 + (closable ? 10 + 2 + 24 + 5 : 24);
       if (i > 0) width += 6;
     }
     // 4 px gap and the add button: 16 px icon with 6 px padding.
