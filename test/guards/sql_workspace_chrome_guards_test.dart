@@ -42,10 +42,11 @@ void main() {
     expect(explain, isNot(diagram));
   });
 
-  test('the tab strip and the toolbar share one surface decoration', () {
+  test('the run controls live in the tab strip, not in a row of their own', () {
     expect(code('lib/features/workspace/sql_query_tab_bar.dart'),
         contains('SqlEditorChrome.sqlToolbarDecoration'));
-    expect(code('lib/features/workspace/generic_sql_workspace.dart'),
-        contains('SqlEditorChrome.sqlToolbarDecoration'));
+    final workspace = code('lib/features/workspace/generic_sql_workspace.dart');
+    expect(workspace, isNot(contains('_SqlWorkspaceToolbarContainer')));
+    expect(workspace, contains('actions: _activeSession.isDiagram'));
   });
 }

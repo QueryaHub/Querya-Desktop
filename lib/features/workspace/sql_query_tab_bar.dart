@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
@@ -14,6 +16,7 @@ class SqlQueryTabBar extends material.StatelessWidget {
     required this.onSelect,
     required this.onAdd,
     this.onClose,
+    this.actions,
     this.trailing,
   });
 
@@ -23,33 +26,76 @@ class SqlQueryTabBar extends material.StatelessWidget {
   final material.VoidCallback onAdd;
   final material.ValueChanged<int>? onClose;
 
+  /// The run controls of the active query tab, right of the tabs. They get
+  /// what the tabs leave ([minTabsWidth] stays with the tabs), so the strip is
+  /// the only control row above the editor (#1558).
+  final material.Widget? actions;
+
   /// Shown at the right end of the strip (the schema diagram button).
   final material.Widget? trailing;
 
+  /// Width kept for the tabs when the actions are wide: at least this much,
+  /// and enough for every tab and the add button as tabs are added, up to
+  /// [maxTabsShare] of the strip, so a new tab and the add button are not pushed
+  /// out of view by the controls.
+  static const double minTabsWidth = 180;
+  static const double maxTabsShare = 0.6;
+
   @override
   material.Widget build(material.BuildContext context) {
-    // The same strip as the toolbar under it: workbench surface, hairline.
+    // The same surface as the rest of the SQL pane: workbench surface, hairline.
     return material.Container(
       height: 40,
       padding: const material.EdgeInsets.symmetric(horizontal: 8),
       decoration: SqlEditorChrome.sqlToolbarDecoration(context),
-      child: material.Row(
-        children: [
-          material.Expanded(
-            child: QueryaTabStrip(
-              labels: sessions.map((s) => s.title).toList(),
-              selectedIndex: selectedIndex,
-              onSelected: onSelect,
-              onClose: onClose,
-              onAdd: onAdd,
-              canClose: sessions.length > 1 ? (_) => true : (_) => false,
+      child: material.LayoutBuilder(
+        builder: (context, constraints) {
+          final tabsWidth = math.min(
+            math.max(
+              minTabsWidth,
+              QueryaTabStrip.naturalWidth(
+                [for (final s in sessions) s.title],
+                closable: sessions.length > 1,
+              ),
             ),
-          ),
-          if (trailing != null) ...[
-            const material.SizedBox(width: 8),
-            trailing!,
-          ],
-        ],
+            constraints.maxWidth * maxTabsShare,
+          );
+          final tail = material.Row(
+            mainAxisSize: material.MainAxisSize.min,
+            children: [
+              // Flexible: the actions are measured against what is left after
+              // the trailing button, and size their labels to it.
+              if (actions != null) material.Flexible(child: actions!),
+              if (actions != null && trailing != null)
+                const material.SizedBox(width: 8),
+              if (trailing != null) trailing!,
+            ],
+          );
+          return material.Row(
+            children: [
+              material.Expanded(
+                child: QueryaTabStrip(
+                  labels: sessions.map((s) => s.title).toList(),
+                  selectedIndex: selectedIndex,
+                  onSelected: onSelect,
+                  onClose: onClose,
+                  onAdd: onAdd,
+                  canClose: sessions.length > 1 ? (_) => true : (_) => false,
+                ),
+              ),
+              if (actions != null || trailing != null) ...[
+                const material.SizedBox(width: 8),
+                material.ConstrainedBox(
+                  constraints: material.BoxConstraints(
+                    maxWidth: (constraints.maxWidth - tabsWidth - 8)
+                        .clamp(0.0, double.infinity),
+                  ),
+                  child: tail,
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
