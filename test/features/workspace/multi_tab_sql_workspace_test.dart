@@ -154,6 +154,47 @@ void main() {
       tab2.dispose();
     });
 
+    testWidgets('actions sit right of the tabs and leave them their width (#1558)',
+        (tester) async {
+      final tab = SqlQueryTabSession(id: '1', title: 'Orders');
+      double? seenMaxWidth;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: material.SizedBox(
+              width: 600,
+              child: SqlQueryTabBar(
+                sessions: [tab],
+                selectedIndex: 0,
+                onSelect: (_) {},
+                onAdd: () {},
+                actions: material.LayoutBuilder(
+                  builder: (context, constraints) {
+                    seenMaxWidth = constraints.maxWidth;
+                    return const material.SizedBox(
+                      key: material.ValueKey('wide_actions'),
+                      width: 900,
+                      height: 32,
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 600 less the strip padding, the gap and the width kept for the tabs.
+      expect(seenMaxWidth, lessThanOrEqualTo(600 - SqlQueryTabBar.minTabsWidth));
+      final actions = tester.getRect(find.byKey(const material.ValueKey('wide_actions')));
+      final tabs = tester.getRect(find.text('Orders'));
+      expect(actions.left, greaterThanOrEqualTo(tabs.right));
+
+      tab.dispose();
+    });
+
     testWidgets('shows unsaved tab changes dialog when closing dirty tab', (tester) async {
       final buffer = DataGridStagingBuffer(
         columns: ['id', 'name'],

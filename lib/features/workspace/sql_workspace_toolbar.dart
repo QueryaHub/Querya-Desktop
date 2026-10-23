@@ -31,7 +31,8 @@ class OpenPreferencesChoice extends SqlWorkspaceSessionChoice {
   const OpenPreferencesChoice();
 }
 
-/// Standalone single-row toolbar for SQL workspaces.
+/// The run controls of a SQL workspace. They sit right of the query tabs in
+/// the tab strip, so they size themselves to the width the tabs leave (#1558).
 ///
 /// Encapsulates statement and script execution controls, explain/cancel actions,
 /// history, format, file operations, active database/transaction indicators,
@@ -84,9 +85,10 @@ class SqlWorkspaceToolbar extends StatelessWidget {
   final void Function(int? seconds) onTimeoutChanged;
 
   /// Below this width only the run button keeps its label; the rest are
-  /// icons. Below [iconOnlyWidth] the run button is an icon too.
-  static const double labelsWidth = 900;
-  static const double iconOnlyWidth = 620;
+  /// icons. Below [iconOnlyWidth] the run button is an icon too. The widths are
+  /// of the room the tab strip leaves, not of the window.
+  static const double labelsWidth = 640;
+  static const double iconOnlyWidth = 420;
   static String get _modLabel => Platform.isMacOS ? '⌘' : 'Ctrl+';
 
   List<QueryaActionMenuItem<SqlWorkspaceSessionChoice>> _sessionMenuItems() => [

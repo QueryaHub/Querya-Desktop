@@ -1247,6 +1247,9 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
                 onClose: _sessions.length > 1
                     ? (index) => unawaited(closeTab(index))
                     : null,
+                actions: _activeSession.isDiagram
+                    ? null
+                    : _buildToolbar(context, _activeSession),
                 trailing: widget.showDiagram
                     ? QueryaButton.secondary(
                         key: const material.ValueKey('open_diagram_tab'),
@@ -1273,6 +1276,40 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
           ),
         ),
       ),
+    );
+  }
+
+  /// The run controls of [session], shown in the tab strip.
+  material.Widget _buildToolbar(
+    material.BuildContext context,
+    SqlQueryTabSession session,
+  ) {
+    return SqlWorkspaceToolbar(
+      session: session,
+      delegate: widget.delegate,
+      effectiveDatabase: effectiveDatabase,
+      autocommit: _autocommit,
+      supportsAutocommit: widget.supportsAutocommit,
+      supportsStmtTimeout: widget.supportsStmtTimeout,
+      txOpen: _txOpen,
+      queryTimeoutSeconds: _queryTimeoutSeconds,
+      headerBadge: widget.headerBadge,
+      extraTrailing: widget.extraToolbarTrailing?.call(context, session),
+      historyEnabled: widget.connectionRow.id != null && !session.running,
+      onExecute: (statementAtCursor) =>
+          unawaited(execute(session, statementAtCursor)),
+      onExplain: () => unawaited(explain(session)),
+      onCancel: () => unawaited(cancelRunning(session)),
+      onOpenHistory: () => _openHistory(session),
+      onOpenFile: () => unawaited(openSqlFile()),
+      onSaveFile: () => unawaited(saveSqlFile()),
+      onRunTxCommand: (cmd) => unawaited(runTxCommand(cmd)),
+      onToggleAutocommit: () {
+        invalidateAllPanes();
+        setState(() => _autocommit = !_autocommit);
+        widget.onAutocommitChanged?.call(_autocommit);
+      },
+      onTimeoutChanged: _onStmtTimeoutChanged,
     );
   }
 
@@ -1306,45 +1343,9 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       key: material.ValueKey(session.id),
       fraction: session.topFraction,
       maxFraction: 0.85,
-      top: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _SqlWorkspaceToolbarContainer(
-            child: SqlWorkspaceToolbar(
-              session: session,
-              delegate: widget.delegate,
-              effectiveDatabase: effectiveDatabase,
-              autocommit: _autocommit,
-              supportsAutocommit: widget.supportsAutocommit,
-              supportsStmtTimeout: widget.supportsStmtTimeout,
-              txOpen: _txOpen,
-              queryTimeoutSeconds: _queryTimeoutSeconds,
-              headerBadge: widget.headerBadge,
-              extraTrailing: widget.extraToolbarTrailing?.call(context, session),
-              historyEnabled: widget.connectionRow.id != null && !session.running,
-              onExecute: (statementAtCursor) => unawaited(execute(session, statementAtCursor)),
-              onExplain: () => unawaited(explain(session)),
-              onCancel: () => unawaited(cancelRunning(session)),
-              onOpenHistory: () => _openHistory(session),
-              onOpenFile: () => unawaited(openSqlFile()),
-              onSaveFile: () => unawaited(saveSqlFile()),
-              onRunTxCommand: (cmd) => unawaited(runTxCommand(cmd)),
-              onToggleAutocommit: () {
-                invalidateAllPanes();
-                setState(() => _autocommit = !_autocommit);
-                widget.onAutocommitChanged?.call(_autocommit);
-              },
-              onTimeoutChanged: _onStmtTimeoutChanged,
-            ),
-          ),
-          const QueryaDivider(height: 1),
-          Expanded(
-            child: QueryEditorTab(
-              controller: session.controller,
-              fontSize: _editorFontSize,
-            ),
-          ),
-        ],
+      top: QueryEditorTab(
+        controller: session.controller,
+        fontSize: _editorFontSize,
       ),
       bottom: material.Padding(
         // The results sit in a card like the editor above them.
@@ -1399,21 +1400,6 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _SqlWorkspaceToolbarContainer extends StatelessWidget {
-  const _SqlWorkspaceToolbarContainer({required this.child});
-
-  final material.Widget child;
-
-  @override
-  material.Widget build(material.BuildContext context) {
-    return material.Container(
-      padding: const material.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: SqlEditorChrome.sqlToolbarDecoration(context),
-      child: child,
     );
   }
 }
