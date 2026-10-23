@@ -88,4 +88,46 @@ void main() {
     expect(svg, isNot(contains('NaN')));
     expect(svg, isNot(contains('Infinity')));
   });
+
+  test('axis ticks and tooltips use the screen formatting', () {
+    final svg = build(QuickChartType.bar, const [
+      ChartPoint('a', 1500000),
+      ChartPoint('b', 3000000),
+    ]);
+    expect(svg, contains('>3M</text>'));
+    expect(svg, contains('<title>a: 1,500,000</title>'));
+    expect(svg, isNot(contains('3000000')));
+  });
+
+  test('the axes carry their names when given', () {
+    final svg = ChartSvg.build(
+      points: points,
+      type: QuickChartType.bar,
+      colors: colors,
+      xName: 'title',
+      yName: 'price',
+    );
+    expect(svg, contains('>title</text>'));
+    expect(svg, contains('rotate(-90 '));
+    expect(svg, contains('>price</text>'));
+  });
+
+  test('labels that do not fit side by side are turned, not overlapped', () {
+    final svg = build(QuickChartType.bar, [
+      for (var i = 0; i < 10; i++)
+        ChartPoint('Noise-Cancelling-Studio-Headphones-$i', i + 1),
+    ]);
+    expect(svg, contains('rotate(-45 '));
+    // Every point keeps its label, cut with an ellipsis.
+    expect('rotate(-45 '.allMatches(svg).length, 10);
+    expect(svg, contains('…'));
+  });
+
+  test('labels with spaces wrap onto a second line', () {
+    final svg = build(QuickChartType.bar, [
+      for (var i = 0; i < 8; i++) ChartPoint('Ergonomic Keyboard $i', i + 1),
+    ]);
+    expect(svg, contains('<tspan '));
+    expect(svg, isNot(contains('rotate(-45 ')));
+  });
 }
