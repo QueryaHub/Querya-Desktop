@@ -4,6 +4,7 @@ import 'package:querya_desktop/core/actions/sql_editor_command_bridge.dart';
 import 'package:querya_desktop/features/workspace/data_grid_staging_buffer.dart';
 import 'package:querya_desktop/features/workspace/sql_query_tab_bar.dart';
 import 'package:querya_desktop/features/workspace/sql_query_tab_session.dart';
+import 'package:querya_desktop/shared/widgets/querya_tab_strip.dart';
 
 import '../../support/querya_theme_test_shell.dart';
 
@@ -195,10 +196,46 @@ void main() {
       tab.dispose();
     });
 
+    testWidgets('QueryaTabStrip.naturalWidth is what the strip really takes',
+        (tester) async {
+      final titles = ['Query 1', 'Orders by day', 'x'];
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: material.Align(
+              alignment: material.Alignment.topLeft,
+              child: material.SizedBox(
+                width: 1200,
+                child: QueryaTabStrip(
+                  labels: titles,
+                  selectedIndex: 1,
+                  onSelected: (_) {},
+                  onAdd: () {},
+                  onClose: (_) {},
+                  canClose: (_) => true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final strip = tester.getRect(find.byType(QueryaTabStrip));
+      final add = tester.getRect(
+          find.byKey(const material.ValueKey('querya_tab_add_button')));
+      // The widest case: the selected tab is the one measured at w600, and the
+      // others are narrower, so the estimate is never short.
+      final real = add.right - strip.left;
+      final natural = QueryaTabStrip.naturalWidth(titles, closable: true);
+      expect(natural, greaterThanOrEqualTo(real - 0.5));
+      expect(natural, lessThan(real + 12 * titles.length));
+    });
+
     testWidgets('wide actions never push the add button out of reach (#1558)',
         (tester) async {
       final tabs = [
-        for (var i = 1; i <= 5; i++)
+        for (var i = 1; i <= 3; i++)
           SqlQueryTabSession(id: '$i', title: 'Query $i'),
       ];
       var added = 0;

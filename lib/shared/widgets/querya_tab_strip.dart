@@ -39,6 +39,38 @@ class QueryaTabStrip extends material.StatefulWidget {
   final bool Function(int index)? canClose;
   final material.ScrollController? scrollController;
 
+  /// Width the strip needs to show every tab and the add button without
+  /// scrolling: each tab at its widest (selected, with its close target) and
+  /// the add button. Mirrors the metrics of the tabs below; a test keeps the
+  /// two in step.
+  static double naturalWidth(
+    List<String> labels, {
+    required bool closable,
+    bool addButton = true,
+  }) {
+    var width = 0.0;
+    for (var i = 0; i < labels.length; i++) {
+      final text = material.TextPainter(
+        text: material.TextSpan(
+          text: labels[i],
+          style: const material.TextStyle(
+            fontSize: 14,
+            height: 20 / 14,
+            fontWeight: material.FontWeight.w600,
+          ),
+        ),
+        textDirection: material.TextDirection.ltr,
+        maxLines: 1,
+      )..layout();
+      // Border 2 + 2, side padding, the 2 px gap and 24 px close target.
+      width += text.width + 4 + (closable ? 10 + 2 + 24 + 5 : 24);
+      if (i > 0) width += 6;
+    }
+    // 4 px gap and the add button: 16 px icon with 6 px padding.
+    if (addButton) width += 4 + 28;
+    return width;
+  }
+
   /// Tighter strip for toolbars: the same as [QueryaControlSize.sm], as tall
   /// as a dense icon button instead of a full tab row.
   final bool dense;

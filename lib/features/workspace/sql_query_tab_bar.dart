@@ -35,12 +35,11 @@ class SqlQueryTabBar extends material.StatelessWidget {
   final material.Widget? trailing;
 
   /// Width kept for the tabs when the actions are wide: at least this much,
-  /// and more as tabs are added ([tabSlotWidth] each, plus the add button), up
-  /// to half the strip, so a new tab and the add button are never pushed out of
-  /// view by the controls.
+  /// and enough for every tab and the add button as tabs are added, up to
+  /// [maxTabsShare] of the strip, so a new tab and the add button are not pushed
+  /// out of view by the controls.
   static const double minTabsWidth = 180;
-  static const double tabSlotWidth = 120;
-  static const double addButtonWidth = 40;
+  static const double maxTabsShare = 0.6;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -54,9 +53,12 @@ class SqlQueryTabBar extends material.StatelessWidget {
           final tabsWidth = math.min(
             math.max(
               minTabsWidth,
-              sessions.length * tabSlotWidth + addButtonWidth,
+              QueryaTabStrip.naturalWidth(
+                [for (final s in sessions) s.title],
+                closable: sessions.length > 1,
+              ),
             ),
-            constraints.maxWidth / 2,
+            constraints.maxWidth * maxTabsShare,
           );
           final tail = material.Row(
             mainAxisSize: material.MainAxisSize.min,
