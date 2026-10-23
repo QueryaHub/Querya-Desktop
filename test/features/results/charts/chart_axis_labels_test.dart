@@ -16,7 +16,7 @@ void main() {
     final p = plan(['Jan', 'Feb', 'Mar', 'Apr'], 400);
     expect(p.layout, XLabelLayout.horizontal);
     expect(p.step, 1);
-    expect(p.reserved, 23);
+    expect(p.reserved, 28);
   });
 
   test('labels with spaces wrap to two lines before they are turned', () {
@@ -29,7 +29,7 @@ void main() {
     ], 400);
     expect(p.layout, XLabelLayout.wrapped);
     expect(p.step, 1);
-    expect(p.reserved, 13 * 2 + 10);
+    expect(p.reserved, 13 * 2 + 15);
   });
 
   test('a long word cannot wrap, so the labels are turned and all kept', () {
@@ -43,8 +43,8 @@ void main() {
     final p = plan(['x' * 100, 'y' * 100], 120);
     expect(p.layout, XLabelLayout.rotated);
     expect(p.labelMaxWidth, ChartAxisLabels.maxRotatedWidth);
-    // (140 + 13) * sin(45 deg) + 10
-    expect(p.reserved, closeTo(118.2, 0.1));
+    // (110 + 13) * sin(45 deg) + 10
+    expect(p.reserved, closeTo(97.0, 0.1));
   });
 
   test('many points thin the turned labels out, as the last resort', () {
@@ -52,8 +52,8 @@ void main() {
     final p = plan(labels, 700);
     expect(p.layout, XLabelLayout.rotated);
     expect(p.step, greaterThan(1));
-    // Two drawn labels are at least a line and a third apart.
-    expect(p.slot, greaterThanOrEqualTo(13 * 1.3));
+    // Two drawn labels are at least 1.5 lines apart.
+    expect(p.slot, greaterThanOrEqualTo(13 * 1.5));
   });
 
   test('no labels give a plan without dividing by zero', () {

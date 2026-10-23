@@ -41,7 +41,7 @@ class XLabelPlan {
 /// so the two read the same. Pure: text widths come from a callback.
 abstract final class ChartAxisLabels {
   /// A rotated label is cut at this width.
-  static const double maxRotatedWidth = 140;
+  static const double maxRotatedWidth = 110;
 
   /// Space kept between two neighbouring labels.
   static const double gap = 8;
@@ -63,7 +63,7 @@ abstract final class ChartAxisLabels {
         step: 1,
         slot: plotWidth,
         labelMaxWidth: plotWidth,
-        reserved: lineHeight + 10,
+        reserved: lineHeight + 15,
       );
     }
     final slot = plotWidth / count;
@@ -77,7 +77,7 @@ abstract final class ChartAxisLabels {
         step: 1,
         slot: slot,
         labelMaxWidth: slot,
-        reserved: lineHeight + 10,
+        reserved: lineHeight + 15,
       );
     }
 
@@ -87,12 +87,13 @@ abstract final class ChartAxisLabels {
         step: 1,
         slot: slot,
         labelMaxWidth: slot,
-        reserved: lineHeight * 2 + 10,
+        reserved: lineHeight * 2 + 15,
       );
     }
 
-    // A turned label needs about a line and a third of height between two.
-    final step = math.max(1, (lineHeight * 1.3 / slot).ceil());
+    // Two neighbours turned 45° clear each other when they are a line height
+    // over sin 45° apart; 1.5 lines leaves a little air.
+    final step = math.max(1, (lineHeight * 1.5 / slot).ceil());
     final cap = math.min(widest, maxRotatedWidth);
     return XLabelPlan(
       layout: XLabelLayout.rotated,
