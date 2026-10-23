@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/features/workspace/sql_editor_chrome.dart';
@@ -32,8 +34,13 @@ class SqlQueryTabBar extends material.StatelessWidget {
   /// Shown at the right end of the strip (the schema diagram button).
   final material.Widget? trailing;
 
-  /// Width kept for the tabs when the actions are wide.
+  /// Width kept for the tabs when the actions are wide: at least this much,
+  /// and more as tabs are added ([tabSlotWidth] each, plus the add button), up
+  /// to half the strip, so a new tab and the add button are never pushed out of
+  /// view by the controls.
   static const double minTabsWidth = 180;
+  static const double tabSlotWidth = 120;
+  static const double addButtonWidth = 40;
 
   @override
   material.Widget build(material.BuildContext context) {
@@ -44,6 +51,13 @@ class SqlQueryTabBar extends material.StatelessWidget {
       decoration: SqlEditorChrome.sqlToolbarDecoration(context),
       child: material.LayoutBuilder(
         builder: (context, constraints) {
+          final tabsWidth = math.min(
+            math.max(
+              minTabsWidth,
+              sessions.length * tabSlotWidth + addButtonWidth,
+            ),
+            constraints.maxWidth / 2,
+          );
           final tail = material.Row(
             mainAxisSize: material.MainAxisSize.min,
             children: [
@@ -71,7 +85,7 @@ class SqlQueryTabBar extends material.StatelessWidget {
                 const material.SizedBox(width: 8),
                 material.ConstrainedBox(
                   constraints: material.BoxConstraints(
-                    maxWidth: (constraints.maxWidth - minTabsWidth - 8)
+                    maxWidth: (constraints.maxWidth - tabsWidth - 8)
                         .clamp(0.0, double.infinity),
                   ),
                   child: tail,

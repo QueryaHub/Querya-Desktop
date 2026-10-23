@@ -195,6 +195,40 @@ void main() {
       tab.dispose();
     });
 
+    testWidgets('wide actions never push the add button out of reach (#1558)',
+        (tester) async {
+      final tabs = [
+        for (var i = 1; i <= 5; i++)
+          SqlQueryTabSession(id: '$i', title: 'Query $i'),
+      ];
+      var added = 0;
+
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: material.SizedBox(
+              width: 800,
+              child: SqlQueryTabBar(
+                sessions: tabs,
+                selectedIndex: 0,
+                onSelect: (_) {},
+                onAdd: () => added++,
+                actions: const material.SizedBox(width: 900, height: 32),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const material.ValueKey('querya_tab_add_button')));
+      expect(added, 1);
+
+      for (final t in tabs) {
+        t.dispose();
+      }
+    });
+
     testWidgets('shows unsaved tab changes dialog when closing dirty tab', (tester) async {
       final buffer = DataGridStagingBuffer(
         columns: ['id', 'name'],
