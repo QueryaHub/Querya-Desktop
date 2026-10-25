@@ -1,3 +1,5 @@
+import 'package:querya_desktop/core/util/querya_log.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -459,16 +461,23 @@ class DataExportService {
       await sink.close();
       sink = null;
       return SaveExportOutcome.written;
-    } on Object {
+    } on Object catch (error, stack) {
+      // The caller gets the outcome; the reason goes to the log.
+      QueryaLog.instance.error('DataExportService', 'export to a file failed',
+          error: error, stack: stack);
       try {
         await sink?.close();
-      } catch (_) {}
+      } catch (e, st) {
+        logIgnored('DataExportService.closeSink', e, st);
+      }
       try {
         final partial = File(path);
         if (await partial.exists()) {
           await partial.delete();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        logIgnored('DataExportService.deletePartial', e, st);
+      }
       return SaveExportOutcome.error;
     }
   }

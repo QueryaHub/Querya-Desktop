@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'package:querya_desktop/shared/report_error.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
@@ -138,7 +139,8 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
           _viewMode = MongoDocumentsViewMode.fromString(saved);
         });
       }
-    } catch (_) {
+    } catch (e, st) {
+      logIgnored('MongoDocumentsView.viewMode', e, st);
       // Keep current mode
     }
   }
@@ -227,7 +229,8 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
       );
       if (!mounted || seq != _loadSeq) return;
       setState(() => _totalCount = count);
-    } catch (_) {
+    } catch (e, st) {
+      logIgnored('MongoDocumentsView.count', e, st);
       // Keep the "maybe more" pagination.
     }
   }

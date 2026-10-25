@@ -1,3 +1,4 @@
+import 'package:querya_desktop/shared/report_error.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async';
 
@@ -140,7 +141,18 @@ class MainScreenDialogs {
       await connectionsPanelKey.currentState?.reloadConnectionsFromDb();
       workspace.value = workspace.value.selectConnection(demoConn);
       nav.onSqliteOpenSqlWorkspace(demoConn);
-    } catch (_) {}
+    } catch (e, st) {
+      // A silent nothing after the user asked for the demo reads as a dead
+      // button.
+      if (!_mounted()) return;
+      reportError(
+        _context(),
+        e,
+        stack: st,
+        where: 'MainScreenDialogs.onLaunchDemoPlayground',
+        action: 'The demo playground could not be opened',
+      );
+    }
   }
 
   Future<void> handlePendingFileLaunch() async {

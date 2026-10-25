@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'package:querya_desktop/shared/report_error.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
@@ -520,7 +521,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       } catch (e) {
         try {
           await widget.connection.lrem(_cmdKey, 1, sentinel);
-        } catch (_) {}
+        } catch (cleanupError, cleanupStack) {
+          logIgnored('RedisKeyEditor.cleanup sentinel', cleanupError, cleanupStack);
+        }
         rethrow;
       }
       await _load();
