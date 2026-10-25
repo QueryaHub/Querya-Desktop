@@ -1,3 +1,5 @@
+import 'package:querya_desktop/shared/report_error.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async' show unawaited;
 
@@ -176,12 +178,15 @@ class _MongoIndexesViewState extends material.State<MongoIndexesView> {
         variant: AppToastVariant.success,
       );
       unawaited(_load());
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      showAppToast(
-        context: context,
-        message: 'Failed to drop index: $e',
-        variant: AppToastVariant.error,
+      reportError(
+        context,
+        e,
+        stack: st,
+        where: 'MongoIndexesView',
+        action: 'Failed to drop index',
+        driver: DatabaseDriver.mongodb,
       );
     }
   }

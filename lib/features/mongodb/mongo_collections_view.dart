@@ -1,3 +1,5 @@
+import 'package:querya_desktop/shared/report_error.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:math' show min;
 
@@ -177,10 +179,10 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
       );
       _newCollController.clear();
       await _load();
-    } catch (e) {
+    } catch (e, st) {
       if (mounted) {
         setState(() {
-          _error = 'Failed to create collection: $e';
+          _error = failureMessage('Failed to create collection', e, where: 'MongoCollectionsView', stack: st, driver: DatabaseDriver.mongodb);
         });
       }
     }
@@ -203,10 +205,10 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
         name,
       );
       await _load();
-    } catch (e) {
+    } catch (e, st) {
       if (mounted) {
         setState(() {
-          _error = 'Failed to drop collection: $e';
+          _error = failureMessage('Failed to drop collection', e, where: 'MongoCollectionsView', stack: st, driver: DatabaseDriver.mongodb);
         });
       }
     }
