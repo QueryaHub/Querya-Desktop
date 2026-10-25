@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'querya_motion.dart';
 import 'querya_motion_context.dart';
 
-/// Like [IndexedStack] but cross-fades the active child; off-screen children
+/// Like [IndexedStack] but fades through to the active child (the old one out,
+/// then the new one in); off-screen children
 /// stay mounted (preserves SQL editor state, etc.).
 ///
 /// Enter/exit curves and index clamping match [QueryaSwitchingBody] (without
@@ -37,10 +38,15 @@ class QueryaCrossFadeStack extends StatelessWidget {
                 excluding: i != safeIndex,
                 child: ExcludeSemantics(
                   excluding: i != safeIndex,
+                  // Fade through: the outgoing child is gone by the half-way
+                  // point and the incoming one starts there, so the two pages
+                  // are never seen through each other.
                   child: AnimatedOpacity(
                     opacity: i == safeIndex ? 1 : 0,
                     duration: duration,
-                    curve: i == safeIndex ? inCurve : outCurve,
+                    curve: i == safeIndex
+                        ? Interval(0.5, 1.0, curve: inCurve)
+                        : Interval(0.0, 0.5, curve: outCurve),
                     child: TickerMode(
                       enabled: i == safeIndex,
                       child: RepaintBoundary(child: children[i]),

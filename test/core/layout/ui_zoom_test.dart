@@ -161,5 +161,34 @@ void main() {
       expect(midway, lessThan(1.5));
       expect(seen.last, closeTo(1.5, 1e-9));
     });
+
+    testWidgets('the layout is made once for the zoom a change ends at',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1800, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final sizes = <Size>[];
+      Widget build(double scale) => app(
+            scale: scale,
+            duration: const Duration(milliseconds: 200),
+            child: Builder(builder: (context) {
+              // Depends on the zoom scope too, so it rebuilds every frame.
+              QueryaUiZoomScope.maybeOf(context);
+              sizes.add(MediaQuery.sizeOf(context));
+              return const SizedBox.shrink();
+            }),
+          );
+
+      await tester.pumpWidget(build(1.0));
+      await tester.pumpWidget(build(1.5));
+      sizes.clear();
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 150));
+
+      // Only the painting animates: every frame lays out at the final size,
+      // so text does not re-wrap on each frame.
+      expect(sizes, isNotEmpty);
+      expect(sizes, everyElement(const Size(1200, 800)));
+    });
   });
 }

@@ -308,12 +308,17 @@ void main() {
       await tester.pump();
 
       // Intermediate animation frames while expanding: workspace constraints
-      // must remain held stable at constraints.maxWidth instead of shrinking every frame.
+      // stay held at the width the layout ends with (not shrinking every
+      // frame, and not the full window width, which ran the content past the
+      // window edge until the animation finished).
       for (var i = 0; i < 8; i++) {
         await tester.pump(const Duration(milliseconds: 16));
         final intermediateBox =
             tester.renderObject<RenderBox>(find.byType(WorkspacePanel));
-        expect(intermediateBox.constraints.maxWidth, totalWidth);
+        expect(
+          intermediateBox.constraints.maxWidth,
+          closeTo(expectedExpandedWidth, 0.5),
+        );
       }
 
       await tester.pumpAndSettle();

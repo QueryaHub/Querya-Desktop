@@ -91,12 +91,14 @@ class QueryaUiZoom extends StatelessWidget {
           curve: curve,
           child: child,
           builder: (context, animated, child) {
-            // The window cap applies at once: a resize must not lag behind.
-            final effective =
-                effectiveUiScale(requested: animated, window: window);
+            // The layout is done once, for the zoom the change ends at; only
+            // the painting follows the animation. Laying out at every step
+            // re-wrapped text and moved cards on each frame, which read as
+            // jumps. The window cap applies at once: a resize must not lag.
             return _Zoomed(
               requested: scale,
-              effective: effective,
+              layoutZoom: effectiveUiScale(requested: scale, window: window),
+              paintZoom: effectiveUiScale(requested: animated, window: window),
               window: window,
               child: child!,
             );
@@ -110,31 +112,37 @@ class QueryaUiZoom extends StatelessWidget {
 class _Zoomed extends StatelessWidget {
   const _Zoomed({
     required this.requested,
-    required this.effective,
+    required this.layoutZoom,
+    required this.paintZoom,
     required this.window,
     required this.child,
   });
 
   final double requested;
-  final double effective;
+
+  /// The zoom the layout is made for: the one an animation ends at.
+  final double layoutZoom;
+
+  /// The zoom the layout is painted at this frame.
+  final double paintZoom;
   final Size window;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final logical = Size(window.width / effective, window.height / effective);
+    final logical = Size(window.width / layoutZoom, window.height / layoutZoom);
     final media = MediaQuery.maybeOf(context) ?? const MediaQueryData();
     final inner = MediaQuery(
       data: media.copyWith(
         size: logical,
-        padding: media.padding / effective,
-        viewPadding: media.viewPadding / effective,
-        viewInsets: media.viewInsets / effective,
-        systemGestureInsets: media.systemGestureInsets / effective,
+        padding: media.padding / layoutZoom,
+        viewPadding: media.viewPadding / layoutZoom,
+        viewInsets: media.viewInsets / layoutZoom,
+        systemGestureInsets: media.systemGestureInsets / layoutZoom,
       ),
       child: QueryaUiZoomScope(
         requested: requested,
-        effective: effective,
+        effective: paintZoom,
         child: child,
       ),
     );
@@ -150,7 +158,7 @@ class _Zoomed extends StatelessWidget {
           maxHeight: double.infinity,
           child: Transform(
             alignment: Alignment.topLeft,
-            transform: Matrix4.diagonal3Values(effective, effective, 1),
+            transform: Matrix4.diagonal3Values(paintZoom, paintZoom, 1),
             child: SizedBox(
               width: logical.width,
               height: logical.height,

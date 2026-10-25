@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'querya_motion.dart';
 import 'querya_motion_context.dart';
 
-/// Fades and optionally slides [child] when the keyed child changes.
+/// Fades through (out, then in) and optionally slides [child] when the keyed
+/// child changes.
 ///
 /// Uses duration-token cubic curves ([QueryaMotion.standard] / [QueryaMotion.enter]),
 /// not [QueryaSpring] — reserve springs for interruptible physics (tab indicator,
@@ -43,8 +44,14 @@ class QueryaFadeSlide extends StatelessWidget {
       transitionBuilder: (child, animation) {
         final slide = Tween<Offset>(begin: offset, end: Offset.zero)
             .animate(animation);
+        // Fade through, not cross-fade: the outgoing child (its animation runs
+        // back from 1) is gone by the half-way point and the incoming one only
+        // shows after it, so two pages are never seen through each other.
         return FadeTransition(
-          opacity: animation,
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: const Interval(0.5, 1.0),
+          ),
           child: SlideTransition(
             position: slide,
             child: child,
