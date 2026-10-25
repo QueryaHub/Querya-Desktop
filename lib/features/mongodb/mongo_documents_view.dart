@@ -1,3 +1,5 @@
+import 'package:querya_desktop/shared/report_error.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async' show unawaited;
 
@@ -297,10 +299,10 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
         doc,
       );
       await _load();
-    } catch (e) {
+    } catch (e, st) {
       if (mounted) {
         setState(() {
-          _error = 'Failed to insert: $e';
+          _error = failureMessage('Failed to insert', e, where: 'MongoDocumentsView', stack: st, driver: DatabaseDriver.mongodb);
         });
       }
     }
@@ -356,10 +358,10 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
         {'_id': id},
       );
       await _load();
-    } catch (e) {
+    } catch (e, st) {
       if (mounted) {
         setState(() {
-          _error = 'Failed to delete: $e';
+          _error = failureMessage('Failed to delete', e, where: 'MongoDocumentsView', stack: st, driver: DatabaseDriver.mongodb);
         });
       }
     }

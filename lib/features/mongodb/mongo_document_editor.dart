@@ -1,3 +1,5 @@
+import 'package:querya_desktop/shared/report_error.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async' show unawaited;
 
@@ -112,9 +114,9 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
       setState(() {
         _dirty = false;
       });
-    } catch (e) {
+    } catch (e, st) {
       if (mounted) {
-        setState(() => _error = 'Failed to reload: $e');
+        setState(() => _error = failureMessage('Failed to reload', e, where: 'MongoDocumentEditor', stack: st, driver: DatabaseDriver.mongodb));
       }
     }
   }
@@ -196,11 +198,11 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) setState(() => _success = null);
       });
-    } catch (e) {
+    } catch (e, st) {
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = 'Failed to save: $e';
+          _error = failureMessage('Failed to save', e, where: 'MongoDocumentEditor', stack: st, driver: DatabaseDriver.mongodb);
         });
       }
     }
@@ -234,11 +236,11 @@ class _MongoDocumentEditorState extends material.State<MongoDocumentEditor> {
       );
       if (!mounted) return;
       widget.onDocumentDeleted?.call();
-    } catch (e) {
+    } catch (e, st) {
       if (mounted) {
         setState(() {
           _deleting = false;
-          _error = 'Failed to delete: $e';
+          _error = failureMessage('Failed to delete', e, where: 'MongoDocumentEditor', stack: st, driver: DatabaseDriver.mongodb);
         });
       }
     }

@@ -1,3 +1,5 @@
+import 'package:querya_desktop/shared/report_error.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
@@ -136,7 +138,7 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } catch (e, st) {
       final fallback = _connection?.effectiveDatabase;
       if (fallback != null &&
           fallback.isNotEmpty &&
@@ -152,7 +154,7 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
       }
       if (mounted) {
         setState(() {
-          _error = 'Failed to list databases: $e';
+          _error = failureMessage('Failed to list databases', e, where: 'MongoDatabasesView', stack: st, driver: DatabaseDriver.mongodb);
           _isLoading = false;
         });
       }
@@ -181,10 +183,10 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
       );
       _newDbController.clear();
       await _loadDatabases();
-    } catch (e) {
+    } catch (e, st) {
       if (mounted) {
         setState(() {
-          _error = 'Failed to create database: $e';
+          _error = failureMessage('Failed to create database', e, where: 'MongoDatabasesView', stack: st, driver: DatabaseDriver.mongodb);
         });
       }
     }
@@ -209,10 +211,10 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
         {'dropDatabase': 1},
       );
       await _loadDatabases();
-    } catch (e) {
+    } catch (e, st) {
       if (mounted) {
         setState(() {
-          _error = 'Failed to drop database: $e';
+          _error = failureMessage('Failed to drop database', e, where: 'MongoDatabasesView', stack: st, driver: DatabaseDriver.mongodb);
         });
       }
     }
