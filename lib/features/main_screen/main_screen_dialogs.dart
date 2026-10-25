@@ -79,11 +79,15 @@ class MainScreenDialogs {
     workspace.value = ws.toggleReadOnly();
   }
 
+  Future<void> _saveNewConnection(ConnectionRow row) async {
+    if (!await saveNewConnection(_context(), row)) return;
+    await connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+  }
+
   Future<void> openNewConnectionFromHero() async {
     final row = await promptCreateConnection(_context());
     if (!_mounted() || row == null) return;
-    await LocalDb.instance.addConnection(row);
-    await connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+    await _saveNewConnection(row);
   }
 
   Future<void> onNewDatabaseConnectionFromMenu() async {
@@ -95,8 +99,7 @@ class MainScreenDialogs {
       if (!_mounted()) return;
       final row = await promptCreateConnection(_context(), folderId: null);
       if (!_mounted() || row == null) return;
-      await LocalDb.instance.addConnection(row);
-      await connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+      await _saveNewConnection(row);
     } finally {
       _openingConnectionDialog = false;
     }
@@ -110,8 +113,7 @@ class MainScreenDialogs {
       if (!_mounted()) return;
       final row = await showNewConnectionUrlDialog(_context());
       if (!_mounted() || row == null) return;
-      await LocalDb.instance.addConnection(row);
-      await connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+      await _saveNewConnection(row);
     } finally {
       _openingConnectionDialog = false;
     }
@@ -120,8 +122,7 @@ class MainScreenDialogs {
   Future<void> openSqliteFromHero() async {
     final row = await showSqliteConnectionForm(_context());
     if (!_mounted() || row == null) return;
-    await LocalDb.instance.addConnection(row);
-    await connectionsPanelKey.currentState?.reloadConnectionsFromDb();
+    await _saveNewConnection(row);
   }
 
   void onOpenWelcomeTour() {
