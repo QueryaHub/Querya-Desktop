@@ -58,6 +58,11 @@ abstract final class McpMongoGuard {
         }
       } else if (node is List) {
         for (final item in node) {
+          // A huge `$in` list is as heavy as as many keys.
+          if (++keys > maxKeys) {
+            return McpMongoRefusal('mongo_too_large',
+                '$what has more than $maxKeys fields or list items.');
+          }
           final inner = walk(item, depth + 1);
           if (inner != null) return inner;
         }

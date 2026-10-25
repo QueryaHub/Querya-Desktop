@@ -36,8 +36,18 @@ class McpAccessStore implements McpAccessSettings {
     return {};
   }
 
+  /// Two quick toggles each read the list, change it and write it back; run
+  /// one at a time so the second sees the first (it used to overwrite it).
+  Future<void> _writes = Future<void>.value();
+
   @override
-  Future<void> setReadable(int connectionId, bool readable) async {
+  Future<void> setReadable(int connectionId, bool readable) {
+    final run = _writes.then((_) => _setReadable(connectionId, readable));
+    _writes = run.then<void>((_) {}, onError: (Object _) {});
+    return run;
+  }
+
+  Future<void> _setReadable(int connectionId, bool readable) async {
     final ids = await readableIds();
     if (readable) {
       ids.add(connectionId);

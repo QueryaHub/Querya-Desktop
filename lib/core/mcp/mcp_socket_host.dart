@@ -18,6 +18,8 @@ class McpSocketHost {
     this.handshakeTimeout = const Duration(seconds: 5),
     this.maxUnauthenticated = 16,
     this.maxHandshakeBytes = 4096,
+    this.maxLineBytes = 4 * 1024 * 1024,
+    this.maxSessions = 16,
   });
 
   final File endpointFile;
@@ -30,6 +32,13 @@ class McpSocketHost {
 
   /// Bytes accepted before the token line is complete (a token is ~44).
   final int maxHandshakeBytes;
+
+  /// Bytes of one line from an authenticated client; a longer line (or one
+  /// that never ends) closes the connection instead of growing in memory.
+  final int maxLineBytes;
+
+  /// Authenticated connections that may be open at once.
+  final int maxSessions;
 
   ServerSocket? _server;
   String? _token;
@@ -99,6 +108,7 @@ class McpSocketHost {
     var authed = false;
     var waiting = true;
     var handshakeBytes = 0;
+    var lineBytes = 0;
     void stopWaiting() {
       if (!waiting) return;
       waiting = false;
@@ -124,6 +134,16 @@ class McpSocketHost {
             _reject(socket, 'Handshake too long.');
             return const <int>[];
           }
+          if (authed) {
+            final newline = chunk.lastIndexOf(0x0A);
+            lineBytes =
+                newline >= 0 ? chunk.length - newline - 1 : lineBytes + chunk.length;
+            if (lineBytes > maxLineBytes) {
+              sub.cancel();
+              _closed(socket, incoming, outgoing, authed);
+              return const <int>[];
+            }
+          }
           return chunk;
         })
         .transform(utf8.decoder)
@@ -142,7 +162,15 @@ class McpSocketHost {
           _reject(socket, 'Invalid Querya MCP token. Restart the MCP client.');
           return;
         }
+        if (_sessions >= maxSessions) {
+          timer.cancel();
+          sub.cancel();
+          stopWaiting();
+          _reject(socket, 'Too many Querya MCP sessions.');
+          return;
+        }
         authed = true;
+        lineBytes = 0;
         stopWaiting();
         timer.cancel();
         _sessions++;
