@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/models/extension_contributions.dart';
@@ -10,6 +10,7 @@ import 'package:querya_desktop/features/mongodb/mongodb_connection_form.dart';
 import 'package:querya_desktop/features/mysql/mysql_connection_form.dart';
 import 'package:querya_desktop/features/postgresql/postgresql_connection_form.dart';
 import 'package:querya_desktop/features/redis/redis_connection_form.dart';
+import 'package:querya_desktop/shared/report_error.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
 
 export 'package:querya_desktop/features/connections/connection_edit_secrets.dart';
@@ -26,15 +27,13 @@ Future<bool> saveNewConnection(
     await LocalDb.instance.addConnection(row);
     return true;
   } catch (e, st) {
-    debugPrint('saveNewConnection: "${row.name}" failed: '
-        '${e.runtimeType}: $e\n$st');
-    if (context.mounted) {
-      showAppToast(
-        context: context,
-        message: 'The connection was not saved. $e',
-        variant: AppToastVariant.error,
-      );
-    }
+    reportError(
+      context,
+      e,
+      stack: st,
+      where: 'saveNewConnection',
+      action: 'The connection was not saved',
+    );
     return false;
   }
 }

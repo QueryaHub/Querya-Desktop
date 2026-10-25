@@ -1,0 +1,38 @@
+import 'package:flutter/widgets.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
+import 'package:querya_desktop/core/mcp/mcp_redaction.dart';
+import 'package:querya_desktop/core/util/querya_log.dart';
+import 'package:querya_desktop/shared/widgets/app_toast.dart';
+
+/// The text a user reads for [error]: the mapped message with its hint for a
+/// driver error, the error's own text otherwise, without credentials.
+String describeError(Object error, {DatabaseDriver? driver}) =>
+    McpRedaction.redact(describeDatabaseError(error, driver: driver));
+
+/// The one way to tell the user that an action failed: writes the failure to
+/// the log (with its stack) and shows an error toast, `<action>. <reason>`.
+///
+/// Use it for a failed user action. A lazy load that fails inside a tree uses
+/// `TreeLoadError`, and a query uses `QueryErrorView`; they should still log
+/// through [QueryaLog].
+///
+/// [action] is a short sentence without the final full stop (`'The connection
+/// was not saved'`). [where] names the place for the log (`'saveNewConnection'`).
+/// Safe to call when [context] has been unmounted: the log is still written and
+/// the toast is skipped.
+void reportError(
+  BuildContext context,
+  Object error, {
+  required String where,
+  required String action,
+  StackTrace? stack,
+  DatabaseDriver? driver,
+}) {
+  QueryaLog.instance.error(where, action, error: error, stack: stack);
+  if (!context.mounted) return;
+  showAppToast(
+    context: context,
+    variant: AppToastVariant.error,
+    message: '$action. ${describeError(error, driver: driver)}',
+  );
+}

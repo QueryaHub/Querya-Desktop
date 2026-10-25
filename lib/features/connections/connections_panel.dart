@@ -90,6 +90,7 @@ import 'package:querya_desktop/features/connections/connection_creation_flow.dar
 import 'package:querya_desktop/features/connections/connection_databases_folder.dart';
 import 'package:querya_desktop/features/connections/driver_icon.dart';
 import 'package:querya_desktop/features/connections/querya_connection_tree_row.dart';
+import 'package:querya_desktop/shared/report_error.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 import 'package:querya_desktop/core/database/redis_service.dart';
 import 'package:querya_desktop/app/app_shutdown.dart';
@@ -721,10 +722,11 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     } on SecretsStoreUnavailableException catch (e) {
       // Saving would write the secrets it could not read as empty ones.
       if (mounted) {
-        showAppToast(
-          context: context,
-          variant: AppToastVariant.error,
-          message: 'The connection was not saved. ${e.toString()}',
+        reportError(
+          context,
+          e,
+          where: 'ConnectionsPanel._editConnection',
+          action: 'The connection was not saved',
         );
       }
       return;
