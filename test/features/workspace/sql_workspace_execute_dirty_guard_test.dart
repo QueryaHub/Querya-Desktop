@@ -38,6 +38,18 @@ class _FakePathProvider extends PathProviderPlatform {
   Future<String?> getDownloadsPath() async => _root;
 }
 
+/// Lets the real async work of a Run (the settings read in sqflite) finish:
+/// `pumpAndSettle` alone runs on fake time and never waits for it.
+Future<void> _settleRealAsync(WidgetTester tester) async {
+  for (var i = 0; i < 10; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
+  }
+  await tester.pumpAndSettle();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -143,8 +155,7 @@ void main() {
 
     expect(find.text('Unsaved changes in "Query 1"'), findsOneWidget);
     await tester.tap(find.text('Discard'));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 150)));
-    await tester.pumpAndSettle();
+    await _settleRealAsync(tester);
 
     // Query was allowed to run, previous dirty buffer was discarded
     expect(find.text('Unsaved changes in "Query 1"'), findsNothing);
@@ -194,7 +205,7 @@ void main() {
     await tester.tap(find.widgetWithText(QueryaButton, 'Execute (F5)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Discard'));
-    await tester.pumpAndSettle();
+    await _settleRealAsync(tester);
 
     expect(find.text('Destructive Operation Detected'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
