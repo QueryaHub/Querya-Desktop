@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:querya_desktop/core/theme/parser/vscode_theme_manifest.dart';
@@ -9,6 +11,126 @@ import 'highlighter_theme_from_querya.dart';
 import 'querya_code_language.dart';
 import 'querya_highlight_controller.dart';
 
+/// A TextMate grammar [json] that Dart's RegExp can run: a regex that starts
+/// with the inline flag `(?i)` (Oniguruma) has no Dart form that works.
+/// `(?i)` itself is rejected ("Invalid group"), and `(?i:a|b)` applies the
+/// flag to the last alternative only (checked on Dart 3.13), so each ASCII
+/// letter becomes a class instead: `select` -> `[sS][eE][lL]...`.
+@visibleForTesting
+String normalizeGrammarJson(String json) {
+  Object? fix(Object? node) {
+    if (node is List) return [for (final item in node) fix(item)];
+    if (node is Map) {
+      return {
+        for (final entry in node.entries)
+          entry.key: switch (entry.key) {
+            'match' || 'begin' || 'end' || 'while'
+                when entry.value is String =>
+              _withoutInlineIgnoreCase(entry.value as String),
+            _ => fix(entry.value),
+          },
+      };
+    }
+    return node;
+  }
+
+  return jsonEncode(fix(jsonDecode(json)));
+}
+
+/// [pattern] without a leading `(?i)`, with every ASCII letter outside
+/// escapes and group syntax matching both cases. Other patterns are returned
+/// as they are.
+@visibleForTesting
+String withoutInlineIgnoreCase(String pattern) =>
+    _withoutInlineIgnoreCase(pattern);
+
+String _withoutInlineIgnoreCase(String pattern) {
+  if (!pattern.startsWith('(?i)')) return pattern;
+  final src = pattern.substring(4);
+  final out = StringBuffer();
+  bool isLetter(String c) =>
+      (c.compareTo('a') >= 0 && c.compareTo('z') <= 0) ||
+      (c.compareTo('A') >= 0 && c.compareTo('Z') <= 0);
+  String swap(String c) =>
+      c == c.toLowerCase() ? c.toUpperCase() : c.toLowerCase();
+
+  var inClass = false;
+  var i = 0;
+  while (i < src.length) {
+    final c = src[i];
+    if (c == r'\') {
+      // An escape (`\b`, `\s`, `\.`): copied as it is.
+      out.write(c);
+      if (i + 1 < src.length) out.write(src[i + 1]);
+      i += 2;
+      continue;
+    }
+    if (inClass) {
+      if (c == ']') {
+        inClass = false;
+        out.write(c);
+      } else if (isLetter(c) &&
+          i + 2 < src.length &&
+          src[i + 1] == '-' &&
+          isLetter(src[i + 2])) {
+        // A range such as a-z also gets its other-case twin.
+        out
+          ..write('$c-${src[i + 2]}')
+          ..write('${swap(c)}-${swap(src[i + 2])}');
+        i += 3;
+        continue;
+      } else if (isLetter(c)) {
+        out
+          ..write(c)
+          ..write(swap(c));
+      } else {
+        out.write(c);
+      }
+      i++;
+      continue;
+    }
+    if (c == '[') {
+      inClass = true;
+      out.write(c);
+      i++;
+      if (i < src.length && src[i] == '^') {
+        out.write('^');
+        i++;
+      }
+      // A `]` right after `[` / `[^` is a literal member.
+      if (i < src.length && src[i] == ']') {
+        out.write(']');
+        i++;
+      }
+      continue;
+    }
+    if (c == '(' && i + 1 < src.length && src[i + 1] == '?') {
+      // Group syntax: `(?:`, `(?=`, `(?!`, `(?<=`, `(?<!`, `(?<name>`.
+      var j = i + 2;
+      if (j < src.length && src[j] == '<' && j + 1 < src.length) {
+        if (src[j + 1] == '=' || src[j + 1] == '!') {
+          j += 2;
+        } else {
+          j = src.indexOf('>', j) + 1;
+          if (j == 0) j = src.length;
+        }
+      } else if (j < src.length) {
+        j += 1;
+      }
+      out.write(src.substring(i, j));
+      i = j;
+      continue;
+    }
+    if (isLetter(c)) {
+      out.write('[$c${swap(c)}]');
+    } else {
+      out.write(c);
+    }
+    i++;
+  }
+  return out.toString();
+}
+
 /// Global syntax highlighter setup for [QueryaCodeEditor].
 abstract final class SyntaxHighlightService {
   static bool _initialized = false;
@@ -17,13 +139,18 @@ abstract final class SyntaxHighlightService {
 
   static Future<void> ensureInitialized() async {
     if (_initialized) return;
-    await Highlighter.initialize(['sql', 'json']);
-    _sqlGrammarJson = await rootBundle.loadString(
+    // Not `Highlighter.initialize`: it compiles the grammars as shipped, and 17
+    // of the 27 rules of the SQL one start with `(?i)`, which Dart's RegExp
+    // rejects ("Invalid group"), so those rules were dropped and no SQL
+    // keyword was ever coloured (#1814). The grammars are fixed first.
+    _sqlGrammarJson = normalizeGrammarJson(await rootBundle.loadString(
       'packages/syntax_highlight/grammars/sql.json',
-    );
-    _jsonGrammarJson = await rootBundle.loadString(
+    ));
+    _jsonGrammarJson = normalizeGrammarJson(await rootBundle.loadString(
       'packages/syntax_highlight/grammars/json.json',
-    );
+    ));
+    Highlighter.addLanguage('sql', _sqlGrammarJson!);
+    Highlighter.addLanguage('json', _jsonGrammarJson!);
     _initialized = true;
   }
 
