@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/database/sql_mutation_classifier.dart';
 import 'package:querya_desktop/shared/report_error.dart';
 import 'package:flutter/widgets.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
@@ -611,6 +612,22 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     // One statement goes to the driver as the run text, with its ';' when the
     // whole script is one statement.
     final sent = texts.length == 1 ? [runSql] : texts;
+
+    // Read-only is a guarantee, not a session default: the server setting can
+    // be switched off by a script, so the editor does not send such a script.
+    if (widget.isReadOnly) {
+      final why = readOnlyScriptRefusal(
+        scope,
+        backslashEscapes: widget.dialect.backslashEscapesQuotes,
+      );
+      if (why != null) {
+        setState(() {
+          session.error = 'Read-only mode is on and $why. '
+              'Turn Read-only off to run it.';
+        });
+        return;
+      }
+    }
 
     final safeToProceed = await confirmDiscardTableEditsIfDirty(
       context: context,
