@@ -185,11 +185,7 @@ class McpMongoService {
 
   Future<List<String>> listCollections(int connectionId) {
     return _withSession(connectionId, (session) async {
-      final names = await session.listCollections();
-      return [
-        for (final n in names)
-          if (!n.startsWith('system.')) n,
-      ]..sort();
+      return (await _visibleCollections(session)).toList()..sort();
     });
   }
 
@@ -243,9 +239,16 @@ class McpMongoService {
     }
   }
 
+  /// The collections the model may see and name; `system.*` ones (profile,
+  /// views) hold past queries and stay hidden from every tool.
+  Future<Iterable<String>> _visibleCollections(McpMongoSession session) async {
+    final names = await session.listCollections();
+    return names.where((n) => !n.startsWith('system.'));
+  }
+
   /// The collection must exist, so model input never names one unchecked.
   Future<String> _knownCollection(McpMongoSession session, String name) async {
-    final names = await session.listCollections();
+    final names = (await _visibleCollections(session)).toList();
     if (names.contains(name)) return name;
     final lower = name.toLowerCase();
     final loose = names.where((n) => n.toLowerCase() == lower).toList();
