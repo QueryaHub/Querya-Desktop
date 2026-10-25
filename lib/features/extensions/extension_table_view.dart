@@ -1,3 +1,5 @@
+import 'package:querya_desktop/shared/report_error.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async' show unawaited;
 
@@ -353,14 +355,14 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
         _restartingDriver = false;
       });
       await state.refresh();
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
       setState(() {
         _restartingDriver = false;
       });
       showAppToast(
         context: context,
-        message: 'Driver restart failed: $e',
+        message: failureMessage('Driver restart failed', e, where: 'ExtensionTableView', stack: st, driver: DatabaseDriver.extension),
         variant: AppToastVariant.error,
       );
     }
@@ -432,12 +434,12 @@ class _ExtensionTableViewState extends material.State<ExtensionTableView> {
           ),
         ),
       );
-    } catch (e) {
+    } catch (e, st) {
       if (navigator.canPop()) navigator.pop();
       if (!mounted) return;
       showAppToast(
         context: context,
-        message: 'Failed to fetch DDL: $e',
+        message: failureMessage('Failed to fetch DDL', e, where: 'ExtensionTableView', stack: st, driver: DatabaseDriver.extension),
         variant: AppToastVariant.error,
       );
     }

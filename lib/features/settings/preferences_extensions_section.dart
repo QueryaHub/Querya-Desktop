@@ -1,3 +1,4 @@
+import 'package:querya_desktop/shared/report_error.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async' show unawaited;
 
@@ -70,9 +71,9 @@ class PreferencesExtensionsSectionState
     } on MarketplaceException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      setState(() => _error = 'Failed to install extension: $e');
+      setState(() => _error = failureMessage('Failed to install extension', e, where: 'PreferencesExtensionsSection', stack: st));
     } finally {
       if (mounted) setState(() => _installing = false);
     }

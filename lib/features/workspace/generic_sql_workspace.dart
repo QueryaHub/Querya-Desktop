@@ -1,3 +1,4 @@
+import 'package:querya_desktop/shared/report_error.dart';
 import 'package:flutter/widgets.dart';
 import 'package:querya_desktop/core/erd/erd_saved_layout.dart';
 import 'package:querya_desktop/core/database/query_error_text.dart';
@@ -967,10 +968,10 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
     if (!session.running || !widget.delegate.supportsCancel) return;
     try {
       await widget.delegate.cancelQuery();
-    } catch (e) {
+    } catch (e, st) {
       if (mounted) {
         invalidatePane(session);
-        setState(() => session.error = 'Cancel failed: $e');
+        setState(() => session.error = failureMessage('Cancel failed', e, where: 'GenericSqlWorkspace', stack: st));
       }
     }
   }
@@ -1088,11 +1089,11 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       } else {
         addNewTab(initialSql: text, title: file.name, filePath: file.path);
       }
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
       showAppToast(
         context: context,
-        message: 'Failed to open SQL file: $e',
+        message: failureMessage('Failed to open SQL file', e, where: 'GenericSqlWorkspace', stack: st),
         variant: AppToastVariant.error,
       );
     }
@@ -1137,11 +1138,11 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         message: 'Saved to ${session.title}',
         variant: AppToastVariant.success,
       );
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
       showAppToast(
         context: context,
-        message: 'Failed to save SQL file: $e',
+        message: failureMessage('Failed to save SQL file', e, where: 'GenericSqlWorkspace', stack: st),
         variant: AppToastVariant.error,
       );
     }

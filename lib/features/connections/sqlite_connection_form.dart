@@ -1,3 +1,5 @@
+import 'package:querya_desktop/shared/report_error.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async';
 import 'package:file_selector/file_selector.dart';
@@ -165,9 +167,9 @@ class _SqliteConnectionFormContentState
           'error:${result.error ?? 'Failed to open SQLite database.'}',
         );
       }
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      _showTestResult('error:$e');
+      _showTestResult(failureMessage('error', e, where: 'SqliteConnectionForm', stack: st, driver: DatabaseDriver.sqlite));
     }
   }
 
@@ -177,9 +179,9 @@ class _SqliteConnectionFormContentState
     if (!_isEditing) {
       try {
         await SqliteConnection.createFileIfMissing(path);
-      } catch (e) {
+      } catch (e, st) {
         if (!mounted) return;
-        _showTestResult('error:$e');
+        _showTestResult(failureMessage('error', e, where: 'SqliteConnectionForm', stack: st, driver: DatabaseDriver.sqlite));
         return;
       }
     }
