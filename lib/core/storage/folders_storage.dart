@@ -26,11 +26,13 @@ class FoldersStorage {
     try {
       await _migrateFromLegacyIfNeeded();
       _folders = await LocalDb.instance.getFolders();
+      _loaded = true;
     } catch (e) {
+      // Not marked loaded: the next call reads again instead of caching an
+      // empty list for the rest of the session.
       debugPrint('FoldersStorage.load: $e');
       _folders = [];
     }
-    _loaded = true;
     return folders;
   }
 
@@ -64,11 +66,8 @@ class FoldersStorage {
   }
 
   Future<void> save(List<String> folders) async {
-    _folders = List.from(folders);
-    await LocalDb.instance.clearFolders();
-    for (final name in _folders) {
-      await LocalDb.instance.addFolder(name);
-    }
+    await LocalDb.instance.replaceFolders(folders);
+    _folders = await LocalDb.instance.getFolders();
   }
 
   Future<void> add(String name) async {

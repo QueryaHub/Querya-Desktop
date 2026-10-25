@@ -51,6 +51,33 @@ void main() {
     expect(rows.single['folder_id'], isNull);
   });
 
+  test('folders: replaceFolders is all-or-nothing and keeps the connections',
+      () async {
+    final folders = FolderRepository(open);
+    await folders.addFolder('work');
+    await folders.addFolder('home');
+    final workId = await folders.getFolderIdByName('work');
+    final homeId = await folders.getFolderIdByName('home');
+    final inWork = await insertConnection(folderId: workId);
+    final inHome = await insertConnection(folderId: homeId);
+
+    await folders.replaceFolders(['work', ' new ', '', 'work']);
+
+    expect(await folders.getFolders(), ['new', 'work']);
+    expect(await folders.getFolderIdByName('work'), workId);
+    final kept = await db.query('connections', where: 'id = ?', whereArgs: [inWork]);
+    expect(kept.single['folder_id'], workId);
+    final released = await db.query('connections', where: 'id = ?', whereArgs: [inHome]);
+    expect(released.single['folder_id'], isNull);
+
+    // A name the table refuses mid-way rolls the whole replace back.
+    await db.execute(
+        'CREATE TRIGGER no_boom BEFORE INSERT ON folders '
+        "WHEN NEW.name = 'boom' BEGIN SELECT RAISE(ABORT, 'boom'); END");
+    await expectLater(folders.replaceFolders(['zzz', 'boom']), throwsA(anything));
+    expect(await folders.getFolders(), ['new', 'work']);
+  });
+
   test('app settings: set, replace, delete and ER layouts per scope', () async {
     final settings = AppSettingsRepository(open);
     expect(await settings.getAppSetting('k'), isNull);
