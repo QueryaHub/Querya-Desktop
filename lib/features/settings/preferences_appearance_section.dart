@@ -1,3 +1,4 @@
+import 'package:querya_desktop/shared/report_error.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async' show unawaited;
 
@@ -163,7 +164,7 @@ class _PreferencesAppearanceSectionState
             control: PreferencesDropdownMenu<material.ThemeMode>(
               value: c.themeMode,
               onSelected: (v) {
-                if (v != null) unawaited(_setThemeMode(v));
+                if (v != null) runReported(context, () => _setThemeMode(v), where: 'PreferencesAppearanceSection', failedAction: 'The setting was not saved');
               },
               entries: const [
                 material.DropdownMenuEntry(
@@ -189,7 +190,7 @@ class _PreferencesAppearanceSectionState
               selectedThemeId: c.effectiveSelectedThemeId,
               expandToParent: true,
               isLoading: refreshingThemes,
-              onSelected: (id) => unawaited(_setThemeById(id)),
+              onSelected: (id) => runReported(context, () => _setThemeById(id), where: 'PreferencesAppearanceSection', failedAction: 'The setting was not saved'),
               onPreviewTheme: _previewThemeById,
             ),
           ),
@@ -234,7 +235,7 @@ class _PreferencesAppearanceSectionState
             subtitle: const Text(
               'Smooth transitions when switching dark/light or presets. Requires Motion Full or Reduced.',
             ).muted().xSmall(),
-            onChanged: (v) => unawaited(_setThemeAnimation(v)),
+            onChanged: (v) => runReported(context, () => _setThemeAnimation(v), where: 'PreferencesAppearanceSection', failedAction: 'The setting was not saved'),
           ),
           const material.SizedBox(height: 12),
           PreferencesFieldRow(

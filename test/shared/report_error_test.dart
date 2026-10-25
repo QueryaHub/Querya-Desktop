@@ -85,4 +85,39 @@ void main() {
 
     await tester.pump(const Duration(seconds: 6));
   });
+
+  testWidgets('runReported tells the user when the action fails', (tester) async {
+    final host = await pumpHost(tester);
+
+    runReported(
+      host,
+      () async => throw StateError('disk full'),
+      where: 'Somewhere.save',
+      failedAction: 'The setting was not saved',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(
+      find.text('The setting was not saved. Bad state: disk full'),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(seconds: 6));
+  });
+
+  testWidgets('runReported is quiet when the action succeeds', (tester) async {
+    final host = await pumpHost(tester);
+    var ran = false;
+
+    runReported(
+      host,
+      () async => ran = true,
+      where: 'Somewhere.save',
+      failedAction: 'The setting was not saved',
+    );
+    await tester.pump();
+
+    expect(ran, isTrue);
+    expect(find.textContaining('not saved'), findsNothing);
+  });
 }

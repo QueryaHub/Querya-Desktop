@@ -278,7 +278,7 @@ class PreferencesMcpSectionState extends material.State<PreferencesMcpSection> {
                       'Production: the model can read all data this user can.',
                     ).muted().xSmall()
                   : null,
-              onChanged: (v) => unawaited(_setShared(c.id!, v)),
+              onChanged: (v) => runReported(context, () => _setShared(c.id!, v), where: 'PreferencesMcpSection', failedAction: 'The setting was not saved'),
             ),
       ],
     );
