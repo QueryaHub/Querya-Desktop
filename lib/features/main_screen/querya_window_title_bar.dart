@@ -79,8 +79,9 @@ class QueryaWindowTitleBar extends StatelessWidget {
     required bool isMacOS,
     required double Function(double designPx) scale,
   }) {
-    // macOS traffic lights sit in the transparent titlebar (bitsdojo custom frame).
-    return scale(isMacOS ? 72 : 16);
+    // macOS traffic lights sit in the transparent titlebar (bitsdojo custom
+    // frame) and are native, so they ignore the in-app UI scale.
+    return isMacOS ? 80 : scale(16);
   }
 
   /// Bitsdojo chrome buttons duplicate system traffic lights on macOS.
