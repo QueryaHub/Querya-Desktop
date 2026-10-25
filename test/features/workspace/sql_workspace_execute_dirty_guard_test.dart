@@ -166,6 +166,8 @@ void main() {
 
     material.FocusManager.instance.primaryFocus?.unfocus();
     await tester.pumpWidget(const SizedBox());
+    // The connection pool arms a release timer when the workspace goes away.
+    await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
   });
 
