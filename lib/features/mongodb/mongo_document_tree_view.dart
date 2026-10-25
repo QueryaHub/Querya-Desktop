@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
+import 'package:querya_desktop/features/mongodb/mongo_value_display.dart';
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
 import 'package:querya_desktop/shared/widgets/querya_text_field.dart';
 import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
@@ -708,7 +709,7 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
     if (value is String) return '"$value"';
     if (value is ObjectId) return 'ObjectId("${value.oid}")';
     if (value is DateTime) return 'ISODate("${value.toUtc().toIso8601String()}")';
-    return value.toString();
+    return mongoValueText(value);
   }
 
   Color _leafValueColor(
@@ -718,22 +719,12 @@ class _MongoDocumentTreeViewState extends State<MongoDocumentTreeView> {
   ) {
     if (value == null) return palette.muted;
     if (value is String) return palette.type1;
-    if (value is num) return palette.type2;
+    if (mongoValueIsNumber(value)) return palette.type2;
     if (value is bool) return palette.type3;
     if (value is ObjectId) return cs.primary;
     if (value is DateTime) return palette.type4;
     return cs.foreground;
   }
 
-  String _leafTypeName(Object? value) {
-    if (value == null) return 'null';
-    if (value is String) return 'str';
-    if (value is int) return 'int';
-    if (value is double) return 'dbl';
-    if (value is bool) return 'bool';
-    if (value is ObjectId) return 'oid';
-    if (value is DateTime) return 'date';
-    return value.runtimeType.toString();
-  }
+  String _leafTypeName(Object? value) => mongoValueTypeChip(value);
 }
-
