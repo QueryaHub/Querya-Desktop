@@ -147,4 +147,86 @@ void main() {
       expect(identical(res1, res2), isTrue);
     });
   });
+
+  group('mysqlColumnHoldsRawBytes', () {
+    const binary = mysqlCharsetBinary;
+    const utf8mb4 = 255;
+
+    test('numbers, dates, JSON, ENUM and SET are text even with charset 63',
+        () {
+      // The server reports charset 63 for every non-string column; read as
+      // bytes, an INT 10 showed as 0x3130 in the grid.
+      for (final type in [
+        mysqlColumnTypeTiny,
+        mysqlColumnTypeShort,
+        mysqlColumnTypeLong,
+        mysqlColumnTypeLongLong,
+        mysqlColumnTypeInt24,
+        mysqlColumnTypeNewDecimal,
+        mysqlColumnTypeFloat,
+        mysqlColumnTypeDouble,
+        mysqlColumnTypeDate,
+        mysqlColumnTypeTime,
+        mysqlColumnTypeDateTime,
+        mysqlColumnTypeTimestamp,
+        mysqlColumnTypeYear,
+        0xf5, // JSON
+        mysqlColumnTypeEnum,
+        mysqlColumnTypeSet,
+      ]) {
+        expect(
+          mysqlColumnHoldsRawBytes(columnType: type, charset: binary),
+          isFalse,
+          reason: 'type 0x${type.toRadixString(16)}',
+        );
+      }
+    });
+
+    test('BINARY, VARBINARY and BLOB (charset 63) are bytes', () {
+      for (final type in [
+        mysqlColumnTypeString,
+        mysqlColumnTypeVarString,
+        mysqlColumnTypeVarChar,
+        mysqlColumnTypeTinyBlob,
+        mysqlColumnTypeBlob,
+        mysqlColumnTypeMediumBlob,
+        mysqlColumnTypeLongBlob,
+      ]) {
+        expect(
+          mysqlColumnHoldsRawBytes(columnType: type, charset: binary),
+          isTrue,
+          reason: 'type 0x${type.toRadixString(16)}',
+        );
+      }
+    });
+
+    test('CHAR, VARCHAR and TEXT with a text charset are text', () {
+      for (final type in [
+        mysqlColumnTypeString,
+        mysqlColumnTypeVarString,
+        mysqlColumnTypeBlob, // TEXT is a BLOB type
+        mysqlColumnTypeMediumBlob,
+        mysqlColumnTypeLongBlob,
+      ]) {
+        expect(
+          mysqlColumnHoldsRawBytes(columnType: type, charset: utf8mb4),
+          isFalse,
+          reason: 'type 0x${type.toRadixString(16)}',
+        );
+      }
+    });
+
+    test('BIT and GEOMETRY are always bytes', () {
+      expect(
+        mysqlColumnHoldsRawBytes(
+            columnType: mysqlColumnTypeBit, charset: binary),
+        isTrue,
+      );
+      expect(
+        mysqlColumnHoldsRawBytes(
+            columnType: mysqlColumnTypeGeometry, charset: binary),
+        isTrue,
+      );
+    });
+  });
 }

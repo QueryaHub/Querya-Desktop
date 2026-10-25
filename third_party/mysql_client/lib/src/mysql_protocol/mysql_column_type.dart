@@ -42,16 +42,23 @@ bool mysqlColumnHoldsRawBytes({
   required int columnType,
   required int charset,
 }) {
-  if (charset == mysqlCharsetBinary) {
-    return true;
-  }
   switch (columnType) {
     case mysqlColumnTypeBit:
+    case mysqlColumnTypeGeometry:
+      return true;
+    // A string or BLOB column holds bytes only with the binary character set
+    // (BINARY, VARBINARY, BLOB); TEXT is a BLOB type with a text character set.
+    case mysqlColumnTypeVarChar:
+    case mysqlColumnTypeVarString:
+    case mysqlColumnTypeString:
     case mysqlColumnTypeTinyBlob:
     case mysqlColumnTypeMediumBlob:
     case mysqlColumnTypeLongBlob:
     case mysqlColumnTypeBlob:
-      return true;
+      return charset == mysqlCharsetBinary;
+    // Numbers, dates, JSON, ENUM / SET: the server reports charset 63 for
+    // every non-string column, so it says nothing about bytes here. Taken as
+    // bytes, an INT 10 showed as 0x3130 in the grid.
     default:
       return false;
   }
