@@ -1,4 +1,3 @@
-import 'package:querya_desktop/features/connections/connection_save_gate.dart';
 import 'package:querya_desktop/shared/report_error.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
