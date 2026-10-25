@@ -180,7 +180,7 @@ abstract final class DestructiveSqlDetector {
   );
 
   static final _dropTableRegex = RegExp(
-    _withId(r'^\s*DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:(?:{id}\.)?{id})'),
+    _withId(r'^\s*DROP\s+(?:TEMPORARY\s+|FOREIGN\s+)?TABLE\s+(?:IF\s+EXISTS\s+)?(?:(?:{id}\.)?{id})'),
     caseSensitive: false,
     unicode: true,
   );
@@ -204,7 +204,7 @@ abstract final class DestructiveSqlDetector {
   );
 
   static final _deleteRegex = RegExp(
-    _withId(r'^\s*DELETE\s+(?:(?:LOW_PRIORITY|QUICK|IGNORE)\s+)*(?:[^;]*?\s)?FROM\s+(?:(?:{id}\.)?{id})'),
+    _withId(r'^\s*DELETE\s+(?:[^;]*?\s)??FROM\s+(?:(?:{id}\.)?{id})'),
     caseSensitive: false,
     unicode: true,
   );
@@ -217,7 +217,7 @@ abstract final class DestructiveSqlDetector {
 
   static final _dropOtherRegex = RegExp(
     _withId(
-      r'^\s*DROP\s+(?:UNIQUE\s+)?(?:INDEX|TYPE|FUNCTION|PROCEDURE|ROLE|USER|TRIGGER|SEQUENCE|DOMAIN|EXTENSION|TABLESPACE|PUBLICATION|SUBSCRIPTION|AGGREGATE|POLICY|RULE)\s+(?:CONCURRENTLY\s+)?(?:IF\s+EXISTS\s+)?(?:(?:{id}\.)?{id})',
+      r'^\s*DROP\s+(?:UNIQUE\s+)?(?:INDEX|TYPE|FUNCTION|PROCEDURE|ROLE|USER|TRIGGER|EVENT\s+TRIGGER|SEQUENCE|DOMAIN|EXTENSION|TABLESPACE|PUBLICATION|SUBSCRIPTION|AGGREGATE|POLICY|RULE|SERVER|OWNED\s+BY)\s+(?:CONCURRENTLY\s+)?(?:IF\s+EXISTS\s+)?(?:(?:{id}\.)?{id})',
     ),
     caseSensitive: false,
     unicode: true,
@@ -225,7 +225,7 @@ abstract final class DestructiveSqlDetector {
 
   static final _dropColumnRegex = RegExp(
     _withId(
-      r'^\s*ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?(?:(?:{id}\.)?{id})[^;]*?\bDROP\s+COLUMN\b',
+      r'^\s*ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?(?:(?:{id}\.)?{id})[^;]*?\bDROP\s+(?:COLUMN\b|(?!(?:CONSTRAINT|INDEX|KEY|PRIMARY|FOREIGN|CHECK|DEFAULT|NOT|IDENTITY|EXPRESSION|PARTITION|IF|TRIGGER|RULE|PERIOD)\b)[\p{L}"`_])',
     ),
     caseSensitive: false,
     unicode: true,
@@ -240,31 +240,72 @@ abstract final class DestructiveSqlDetector {
   static final _withRegex =
       RegExp(r'^\s*WITH\s+(?:RECURSIVE\s+)?', caseSensitive: false);
 
-  static final _dmlStartRegex =
-      RegExp(r'^(?:DELETE|UPDATE)\b', caseSensitive: false);
+  /// The keyword that starts the main statement after a `WITH` list.
+  static final _mainStartRegex = RegExp(
+    r'^(?:SELECT|INSERT|UPDATE|DELETE|MERGE|VALUES|TABLE)\b',
+    caseSensitive: false,
+  );
 
-  /// The statement that actually runs: past an `EXPLAIN ANALYZE` prefix and
-  /// the `WITH name AS (...)` list in front of a `DELETE` / `UPDATE`.
-  static String _effectiveStatement(String sanitized) {
+  /// Splits [sanitized] (after an `EXPLAIN ANALYZE` prefix) into the bodies of
+  /// its `WITH name AS (...)` list and the main statement that follows it. A
+  /// statement without `WITH` is its own main statement.
+  static ({List<String> bodies, String main}) _splitWith(String sanitized) {
     var sql = sanitized;
     final explain = _explainAnalyzeRegex.firstMatch(sql);
     if (explain != null) sql = sql.substring(explain.end);
     final withMatch = _withRegex.firstMatch(sql);
-    if (withMatch == null) return sql;
+    if (withMatch == null) return (bodies: const [], main: sql);
+    final bodies = <String>[];
     var depth = 0;
+    var bodyStart = 0;
     for (var i = withMatch.end; i < sql.length; i++) {
       final ch = sql[i];
       if (ch == '(') {
+        if (depth == 0) bodyStart = i + 1;
         depth++;
       } else if (ch == ')') {
         if (depth > 0) depth--;
+        if (depth == 0) bodies.add(sql.substring(bodyStart, i));
       } else if (depth == 0 &&
-          (i == 0 || !RegExp(r'[\w$]').hasMatch(sql[i - 1])) &&
-          _dmlStartRegex.hasMatch(sql.substring(i))) {
-        return sql.substring(i);
+          !RegExp(r'[\w$]').hasMatch(sql[i - 1]) &&
+          _mainStartRegex.hasMatch(sql.substring(i))) {
+        return (bodies: bodies, main: sql.substring(i));
       }
     }
-    return sql;
+    return (bodies: bodies, main: sql);
+  }
+
+  /// An unconditional `DELETE` / `UPDATE` in [sql], or null.
+  static DestructiveSqlOperation? _unconditionalDml(
+    String sql,
+    String rawStatement,
+  ) {
+    String targetOf(RegExpMatch m) {
+      final schema = m.group(1);
+      final table = m.group(2) ?? 'table';
+      return (schema != null && schema.isNotEmpty) ? '$schema.$table' : table;
+    }
+
+    final deleteMatch = _deleteRegex.firstMatch(sql);
+    if (deleteMatch != null) {
+      if (_hasTopLevelWhere(sql)) return null;
+      return DestructiveSqlOperation(
+        type: DestructiveSqlType.unconditionalDelete,
+        targetName: targetOf(deleteMatch),
+        rawStatement: rawStatement,
+      );
+    }
+    final updateMatch = _updateRegex.firstMatch(sql);
+    if (updateMatch != null &&
+        _setRegex.hasMatch(sql) &&
+        !_hasTopLevelWhere(sql)) {
+      return DestructiveSqlOperation(
+        type: DestructiveSqlType.unconditionalUpdate,
+        targetName: targetOf(updateMatch),
+        rawStatement: rawStatement,
+      );
+    }
+    return null;
   }
 
   static final _whereRegex = RegExp(r'\bWHERE\b', caseSensitive: false);
@@ -464,7 +505,8 @@ abstract final class DestructiveSqlDetector {
         backslashEscapes: backslashEscapes,
       ).trim();
       if (sanitized.isEmpty) continue;
-      final effective = _effectiveStatement(sanitized);
+      final withParts = _splitWith(sanitized);
+      final effective = withParts.main;
 
       // 1. DROP DATABASE
       final dropDbMatch = _dropDatabaseRegex.firstMatch(sanitized);
@@ -594,41 +636,11 @@ abstract final class DestructiveSqlDetector {
         continue;
       }
 
-      // 7. DELETE FROM table without WHERE
-      final deleteMatch = _deleteRegex.firstMatch(effective);
-      if (deleteMatch != null) {
-        if (!_hasTopLevelWhere(effective)) {
-          final schema = deleteMatch.group(1);
-          final table = deleteMatch.group(2) ?? 'table';
-          final target =
-              (schema != null && schema.isNotEmpty) ? '$schema.$table' : table;
-          operations.add(
-            DestructiveSqlOperation(
-              type: DestructiveSqlType.unconditionalDelete,
-              targetName: target,
-              rawStatement: rawStmt.trim(),
-            ),
-          );
-        }
-        continue;
-      }
-
-      // 8. UPDATE table SET ... without WHERE
-      final updateMatch = _updateRegex.firstMatch(effective);
-      if (updateMatch != null &&
-          _setRegex.hasMatch(effective) &&
-          !_hasTopLevelWhere(effective)) {
-        final schema = updateMatch.group(1);
-        final table = updateMatch.group(2) ?? 'table';
-        final target =
-            (schema != null && schema.isNotEmpty) ? '$schema.$table' : table;
-        operations.add(
-          DestructiveSqlOperation(
-            type: DestructiveSqlType.unconditionalUpdate,
-            targetName: target,
-            rawStatement: rawStmt.trim(),
-          ),
-        );
+      // 7. DELETE / UPDATE without WHERE: the main statement, and a
+      // data-modifying CTE (`WITH d AS (DELETE FROM t RETURNING *) SELECT ...`).
+      for (final body in [effective, ...withParts.bodies]) {
+        final op = _unconditionalDml(body.trim(), rawStmt.trim());
+        if (op != null) operations.add(op);
       }
     }
 

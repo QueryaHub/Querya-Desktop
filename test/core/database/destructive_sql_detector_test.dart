@@ -316,6 +316,80 @@ void main() {
       }
     });
 
+    test('a data-modifying CTE is inspected (review of #1770)', () {
+      expect(
+        only('WITH d AS (DELETE FROM orders RETURNING *) SELECT * FROM d').type,
+        DestructiveSqlType.unconditionalDelete,
+      );
+      expect(
+        only('WITH u AS (UPDATE t SET a = 1 RETURNING *) SELECT 1').type,
+        DestructiveSqlType.unconditionalUpdate,
+      );
+      expect(
+        DestructiveSqlDetector.inspect(
+                'WITH d AS (DELETE FROM orders WHERE id = 1 RETURNING *) SELECT 1')
+            .isDestructive,
+        isFalse,
+      );
+    });
+
+    test('an upsert or a column called delete after WITH is not flagged', () {
+      for (final sql in [
+        'WITH src AS (SELECT 1 AS id, 2 AS a) INSERT INTO t SELECT * FROM src '
+            'ON CONFLICT (id) DO UPDATE SET a = excluded.a',
+        'WITH a AS (SELECT 1) SELECT f.delete FROM flags f',
+        'WITH a AS (SELECT 1) SELECT * FROM t FOR UPDATE',
+      ]) {
+        expect(DestructiveSqlDetector.inspect(sql).isDestructive, isFalse,
+            reason: sql);
+      }
+    });
+
+    test('the dialog names the table that is deleted from', () {
+      expect(
+        only('DELETE FROM orders o USING (SELECT 1 FROM t WHERE x) s')
+            .targetName,
+        'orders',
+      );
+      expect(
+        only('DELETE FROM orders RETURNING (SELECT max(id) FROM archive)')
+            .targetName,
+        'orders',
+      );
+    });
+
+    test('a long run of modifiers does not freeze the check', () {
+      final sw = Stopwatch()..start();
+      DestructiveSqlDetector.inspect('DELETE ${'QUICK ' * 10000}x');
+      DestructiveSqlDetector.inspect('DELETE ${'LOW_PRIORITY ' * 5000}');
+      expect(sw.elapsed, lessThan(const Duration(seconds: 2)));
+    });
+
+    test('more DROP forms and ALTER TABLE ... DROP column', () {
+      for (final sql in [
+        'DROP FOREIGN TABLE ft',
+        'DROP TEMPORARY TABLE t',
+        'DROP EVENT TRIGGER e',
+        'DROP SERVER s CASCADE',
+        'DROP OWNED BY bob',
+      ]) {
+        expect(DestructiveSqlDetector.inspect(sql).isDestructive, isTrue,
+            reason: sql);
+      }
+      expect(only('ALTER TABLE users DROP email').type,
+          DestructiveSqlType.dropColumn);
+      for (final sql in [
+        'ALTER TABLE t DROP CONSTRAINT c',
+        'ALTER TABLE t DROP PRIMARY KEY',
+        'ALTER TABLE t DROP FOREIGN KEY fk',
+        'ALTER TABLE t ALTER COLUMN c DROP DEFAULT',
+        'ALTER TABLE t ALTER COLUMN c DROP NOT NULL',
+      ]) {
+        expect(DestructiveSqlDetector.inspect(sql).isDestructive, isFalse,
+            reason: sql);
+      }
+    });
+
     test('ALTER TABLE ... DROP COLUMN is a HIGH risk operation', () {
       final op = only('ALTER TABLE public.users DROP COLUMN email');
       expect(op.type, DestructiveSqlType.dropColumn);

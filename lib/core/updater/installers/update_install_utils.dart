@@ -41,6 +41,15 @@ Future<void> extractZipSecurely({
       );
     }
 
+    // A link already on disk would carry this entry out of the root, e.g.
+    // `a -> .`, `a/b -> ..`, then a file under `b/`; the checks above only read
+    // the names.
+    if (await _hasLinkBelowRoot(root, p.dirname(targetPath))) {
+      throw AppUpdaterException(
+        'Security violation: archive entry "$name" is below a symlink',
+      );
+    }
+
     if (entry.isSymbolicLink) {
       // The macOS bundle keeps its framework symlinks (`Versions/Current`);
       // flattened to text files they fail `codesign --verify`.
@@ -69,6 +78,19 @@ Future<void> extractZipSecurely({
       await Directory(targetPath).create(recursive: true);
     }
   }
+}
+
+/// Whether any directory from [root] (exclusive) down to [directory] is a
+/// symlink.
+Future<bool> _hasLinkBelowRoot(String root, String directory) async {
+  final parts = p.split(p.relative(directory, from: root));
+  var current = root;
+  for (final part in parts) {
+    if (part == '.' || part.isEmpty) continue;
+    current = p.join(current, part);
+    if (await FileSystemEntity.isLink(current)) return true;
+  }
+  return false;
 }
 
 /// Restores the permission bits of an extracted file (POSIX only), so helper

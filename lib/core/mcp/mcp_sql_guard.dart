@@ -28,6 +28,76 @@ abstract final class McpSqlGuard {
     'VALUES',
   };
 
+  /// Syntax the comment/string stripper and the server read differently, so
+  /// text after it could hide a call from the denylist: a quoted identifier
+  /// that holds a comment or quote character, a PostgreSQL `U&"..."`
+  /// identifier (escapes spell any name), MySQL `#` comments and `--` without
+  /// a space after it (which MySQL reads as two minus signs).
+  /// Reads [sql] left to right, skipping string literals, and returns whether
+  /// a `"..."` or `` `...` `` identifier holds `--`, `'`, `#` or `/*`, and the
+  /// text with every string literal body removed. Reading in order means a
+  /// closing quote is never taken for an opening one.
+  static ({bool ambiguousIdentifier, String outsideStrings}) _scanQuoting(
+    String sql, {
+    required bool backslashEscapes,
+  }) {
+    final outside = StringBuffer();
+    var ambiguous = false;
+    var i = 0;
+    while (i < sql.length) {
+      final c = sql[i];
+      if (c == "'") {
+        outside.write("''");
+        i++;
+        while (i < sql.length) {
+          if (backslashEscapes && sql[i] == r'\') {
+            i += 2;
+          } else if (sql[i] == "'") {
+            if (i + 1 < sql.length && sql[i + 1] == "'") {
+              i += 2;
+            } else {
+              break;
+            }
+          } else {
+            i++;
+          }
+        }
+        i++;
+      } else if (c == '"' || c == '`') {
+        final start = i + 1;
+        i = start;
+        while (i < sql.length) {
+          if (sql[i] == c) {
+            if (i + 1 < sql.length && sql[i + 1] == c) {
+              i += 2;
+              continue;
+            }
+            break;
+          }
+          i++;
+        }
+        final end = i < sql.length ? i : sql.length;
+        final body = sql.substring(start, end);
+        if (body.contains('--') ||
+            body.contains("'") ||
+            body.contains('#') ||
+            body.contains('/*')) {
+          ambiguous = true;
+        }
+        outside.write(sql.substring(start - 1, i < sql.length ? i + 1 : end));
+        i++;
+      } else {
+        outside.write(c);
+        i++;
+      }
+    }
+    return (ambiguousIdentifier: ambiguous, outsideStrings: outside.toString());
+  }
+
+  static final _unicodeEscapeIdentifier =
+      RegExp(r'\bU&\s*"', caseSensitive: false);
+  static final _mysqlDashDashNoSpace = RegExp(r'--(?!\s)');
+
   static final _firstWord = RegExp(r'^\(*\s*([A-Z_]+)');
 
   /// `SELECT ... INTO` creates a table (Postgres) or writes a file (MySQL
@@ -48,8 +118,9 @@ abstract final class McpSqlGuard {
     r'QUERY_TO_XML\w*|CURSOR_TO_XML|TABLE_TO_XML\w*|PG_(?:TRY_)?ADVISORY_\w*|PG_SLEEP\w*|'
     r'NEXTVAL|SETVAL|DBLINK\w*|SET_CONFIG|LOAD_FILE|LOAD_EXTENSION|WRITEFILE|'
     r'READFILE|FSDIR|SLEEP|BENCHMARK|GET_LOCK|RELEASE_LOCK|RELEASE_ALL_LOCKS|IS_FREE_LOCK|'
-    r'PG_STAT_RESET\w*|PG_SWITCH_WAL|PG_CREATE_RESTORE_POINT|PG_LOGICAL_EMIT_MESSAGE|'
-    r'PG_PROMOTE|PG_DROP_REPLICATION_SLOT)\s*\(',
+    r'PG_STAT_\w*RESET\w*|PG_SWITCH_WAL|PG_CREATE_RESTORE_POINT|PG_LOGICAL_\w*|PG_REPLICATION_\w*|'
+    r'PG_NOTIFY|PG_LS_\w*|PG_PROMOTE|PG_DROP_REPLICATION_SLOT|PG_CREATE_\w*_SLOT|PG_COPY_\w*_SLOT|'
+    r'PG_BACKUP_\w*|PG_START_BACKUP|PG_STOP_BACKUP)\s*\(',
   );
 
   /// SQLite pragmas that only read the schema.
@@ -99,6 +170,14 @@ abstract final class McpSqlGuard {
         RegExp(r'/\*M?!').hasMatch(statement)) {
       return const McpSqlRefusal('mysql_executable_comment', 'MySQL executable comments (/*! ... */) are not allowed.');
     }
+    final quoting = _scanQuoting(statement, backslashEscapes: escapes);
+    if (quoting.ambiguousIdentifier ||
+        _unicodeEscapeIdentifier.hasMatch(quoting.outsideStrings) ||
+        (dialect == SqlDialect.mysql &&
+            _mysqlDashDashNoSpace.hasMatch(quoting.outsideStrings))) {
+      return const McpSqlRefusal('ambiguous_syntax',
+          'Quoted identifiers with comment or quote characters, U&"..." identifiers and "--" without a following space are not allowed over MCP.');
+    }
     final upper = DestructiveSqlDetector.stripCommentsAndStrings(
       statement,
       backslashEscapes: escapes,
@@ -112,6 +191,10 @@ abstract final class McpSqlGuard {
       final m = _pragma.firstMatch(upper.replaceAll(RegExp(r'\s+'), ' '));
       if (m != null && _readPragmas.contains(m.group(1))) return null;
       return McpSqlRefusal('sqlite_pragma', 'Only schema pragmas are allowed (${_readPragmas.map((p) => p.toLowerCase()).join(', ')}).');
+    }
+    if (dialect == SqlDialect.mysql && upper.contains('#')) {
+      return const McpSqlRefusal('ambiguous_syntax',
+          'MySQL "#" comments are not allowed over MCP.');
     }
     if (first == null || !_readStarts.contains(first)) {
       return const McpSqlRefusal('read_only_only', 'Only read-only queries are allowed (SELECT, WITH, EXPLAIN, SHOW, DESCRIBE).');
