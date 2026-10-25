@@ -230,7 +230,8 @@ void main() {
         .bottomTitles
         .sideTitles
         .reservedSize;
-    expect(many, 52);
+    // Turned labels reserve the height they take at 45 degrees, not a fixed 52.
+    expect(many, greaterThan(80));
 
     await pumpView(t, columns, rows);
     await t.tap(find.bySemanticsLabel('Bar'));
@@ -315,7 +316,8 @@ void main() {
 
     final labels = find.textContaining('a long category label number');
     final n = labels.evaluate().length;
-    expect(n, inInclusiveRange(2, 8), reason: 'one label per step of five');
+    expect(n, inInclusiveRange(2, 20),
+        reason: 'every nth label, as many as clear each other at 45 degrees');
     final xs = [for (var i = 0; i < n; i++) t.getCenter(labels.at(i)).dx]
       ..sort();
     final lineHeight = t.getSize(labels.first).height;

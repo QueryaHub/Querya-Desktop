@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'dart:async' show unawaited;
 import 'dart:convert' show utf8;
-import 'dart:math' show min, pi;
+import 'dart:math' show max, min, pi;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -11,6 +11,8 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/rendering.dart';
 import 'package:querya_desktop/core/export/svg_png.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
+import 'package:querya_desktop/core/ui/querya_tooltip.dart';
+import 'package:querya_desktop/features/results/charts/chart_axis_labels.dart';
 import 'package:querya_desktop/features/results/charts/chart_data.dart';
 import 'package:querya_desktop/features/results/charts/chart_format.dart';
 import 'package:querya_desktop/features/results/charts/chart_svg.dart';
@@ -226,6 +228,8 @@ class _QuickChartViewState extends material.State<QuickChartView> {
       points: _series(valueCol).points,
       type: _type,
       title: _chartTitle(),
+      xName: _xName,
+      yName: _yName,
       colors: currentTheme
           ? ChartSvgColors(
               background: ChartSvgColors.hex(wb.surface.toARGB32()),
@@ -490,9 +494,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
       final p = points[i];
       final share = total > 0 ? p.value / total * 100 : 0.0;
       final hovered = _hoveredSlice == i;
-      final valueText = p.value == p.value.roundToDouble()
-          ? p.value.toInt().toString()
-          : p.value.toStringAsFixed(2);
+      final valueText = ChartFormat.full(p.value);
       return material.MouseRegion(
         onEnter: (_) => setState(() => _hoveredSlice = i),
         onExit: (_) => setState(() => _hoveredSlice = null),
@@ -505,10 +507,14 @@ class _QuickChartViewState extends material.State<QuickChartView> {
                   width: 10, height: 10, color: colorOf(i)),
               const material.SizedBox(width: 6),
               material.Expanded(
-                child: material.Text(p.label,
-                    maxLines: 1,
-                    overflow: material.TextOverflow.ellipsis,
-                    style: const material.TextStyle(fontSize: 12)),
+                child: material.Tooltip(
+                  message: p.label,
+                  waitDuration: kQueryaTooltipWait,
+                  child: material.Text(p.label,
+                      maxLines: 1,
+                      overflow: material.TextOverflow.ellipsis,
+                      style: const material.TextStyle(fontSize: 12)),
+                ),
               ),
               const material.SizedBox(width: 8),
               material.Text(valueText,
@@ -593,18 +599,29 @@ class _QuickChartViewState extends material.State<QuickChartView> {
         builder: (context, box) => _axisChart(context, points, box.maxWidth));
   }
 
-  /// Bar and line charts. [width] decides whether X labels fit or rotate.
+  /// Bar and line charts. [width] decides how the X labels are laid out
+  /// ([ChartAxisLabels.planX]).
   material.Widget _axisChart(
       material.BuildContext context, List<ChartPoint> points, double width) {
     final palette = context.semanticPalette;
     final wb = context.workbench;
     final cs = context.colors;
     final label = material.TextStyle(color: wb.mutedForeground, fontSize: 10);
-    final step = (points.length / 8).ceil().clamp(1, 1000);
-    // Labels shown: one per step. Rotate them when a slot is too narrow.
-    final shown = (points.length / step).ceil().clamp(1, 1000);
-    final slot = (width - 60) / shown;
-    final rotate = slot < 60;
+    // The left axis takes 52 px and the axis name 18; the rest is the plot.
+    final plotWidth = max(width - 70, 1.0);
+    double measure(String text) => (TextPainter(
+      text: TextSpan(text: text, style: label),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..layout())
+        .width;
+    final plan = ChartAxisLabels.planX(
+      labels: [for (final p in points) p.label],
+      plotWidth: plotWidth,
+      measure: measure,
+      lineHeight: (label.fontSize ?? 10) * 1.3,
+    );
+    final step = plan.step;
 
     // Line charts on a date X column place points at their real distance; the
     // axis then shows dates instead of point labels.
@@ -634,25 +651,29 @@ class _QuickChartViewState extends material.State<QuickChartView> {
       final text = material.Text(
         points[i].label,
         style: label,
-        maxLines: 1,
+        maxLines: plan.layout == XLabelLayout.wrapped ? 2 : 1,
+        textAlign: TextAlign.center,
+        softWrap: plan.layout == XLabelLayout.wrapped,
         overflow: material.TextOverflow.ellipsis,
       );
       return SideTitleWidget(
         meta: meta,
-        child: rotate
-            ? material.Transform.rotate(
-                angle: -pi / 4,
-                alignment: material.Alignment.topRight,
-                child: material.ConstrainedBox(
-                  constraints:
-                      const material.BoxConstraints(maxWidth: 120),
-                  child: text,
-                ),
-              )
-            : material.ConstrainedBox(
-                constraints: material.BoxConstraints(maxWidth: slot),
+        child: switch (plan.layout) {
+          XLabelLayout.rotated => material.Transform.rotate(
+              angle: -pi / 4,
+              alignment: material.Alignment.topRight,
+              child: material.ConstrainedBox(
+                constraints:
+                    material.BoxConstraints(maxWidth: plan.labelMaxWidth),
                 child: text,
               ),
+            ),
+          _ => material.ConstrainedBox(
+              constraints: material.BoxConstraints(
+                  maxWidth: max(plan.slot - ChartAxisLabels.gap, 1.0)),
+              child: text,
+            ),
+        },
       );
     }
 
@@ -665,7 +686,7 @@ class _QuickChartViewState extends material.State<QuickChartView> {
         axisNameWidget: material.Text(_xName, style: axisLabel),
         sideTitles: SideTitles(
             showTitles: true,
-            reservedSize: rotate ? 52 : 28,
+            reservedSize: plan.reserved,
             interval: timeTick,
             getTitlesWidget: bottom),
       ),
@@ -675,9 +696,17 @@ class _QuickChartViewState extends material.State<QuickChartView> {
         sideTitles: SideTitles(
           showTitles: true,
           reservedSize: 52,
-          getTitlesWidget: (v, meta) => SideTitleWidget(
-              meta: meta,
-              child: material.Text(ChartFormat.compact(v), style: label)),
+          getTitlesWidget: (v, meta) {
+            // The axis ends at the data maximum, which is rarely a multiple of
+            // the step; its label would sit among round ones (749.99 over 600).
+            final steps = (v - meta.min) / meta.appliedInterval;
+            if ((steps - steps.round()).abs() > 1e-6) {
+              return const material.SizedBox.shrink();
+            }
+            return SideTitleWidget(
+                meta: meta,
+                child: material.Text(ChartFormat.compact(v), style: label));
+          },
         ),
       ),
     );
