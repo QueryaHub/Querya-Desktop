@@ -91,7 +91,8 @@ class PostgresTableToolbar extends material.StatelessWidget {
             flex: 2,
             // Wraps in a narrow pane: a sideways scroll hid Prev / Next /
             // Refresh and the mouse wheel does not scroll sideways.
-            child: material.Wrap(
+            child: material.LayoutBuilder(
+              builder: (context, constraints) => material.Wrap(
               alignment: material.WrapAlignment.end,
               runAlignment: material.WrapAlignment.end,
               crossAxisAlignment: material.WrapCrossAlignment.center,
@@ -115,7 +116,18 @@ class PostgresTableToolbar extends material.StatelessWidget {
                             ),
                           ),
                         ),
-                        if (editAction != null) ...[editAction!],
+                        if (editAction != null)
+                          // Never wider than the pane: a long "N pending
+                          // changes" row shrinks instead of overflowing.
+                          material.ConstrainedBox(
+                            constraints: material.BoxConstraints(
+                                maxWidth: constraints.maxWidth),
+                            child: material.FittedBox(
+                              fit: material.BoxFit.scaleDown,
+                              alignment: material.Alignment.centerRight,
+                              child: editAction,
+                            ),
+                          ),
                         QueryaButton.secondary(
                           label: 'SQL',
                           icon: material.Icons.code_rounded,
@@ -163,6 +175,7 @@ class PostgresTableToolbar extends material.StatelessWidget {
                           size: QueryaControlSize.sm,
                         ),
               ],
+            ),
             ),
           ),
         ],
