@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -241,13 +242,28 @@ void main() {
       return temp;
     }
 
+    // The encoder always writes "made by MS-DOS"; `ditto` writes UNIX (3),
+    // which is what the decoder needs to treat an entry as a symlink.
+    List<int> asUnixZip(Archive archive) {
+      final bytes = Uint8List.fromList(ZipEncoder().encode(archive));
+      for (var i = 0; i + 5 < bytes.length; i++) {
+        if (bytes[i] == 0x50 &&
+            bytes[i + 1] == 0x4b &&
+            bytes[i + 2] == 0x01 &&
+            bytes[i + 3] == 0x02) {
+          bytes[i + 5] = 3;
+        }
+      }
+      return bytes;
+    }
+
     test('keeps a symlink and the executable bit', () async {
       final temp = await tempDir();
       final archive = Archive()
         ..addFile(ArchiveFile('App/bin/tool', 2, [1, 2])..mode = 0x1ed)
         ..addFile(symlinkEntry('App/bin/current', 'tool'));
       final zipFile = File(p.join(temp.path, 'ok.zip'));
-      await zipFile.writeAsBytes(ZipEncoder().encode(archive));
+      await zipFile.writeAsBytes(asUnixZip(archive));
       final out = Directory(p.join(temp.path, 'out'));
 
       await extractZipSecurely(zipFile: zipFile, destinationDir: out);
@@ -264,7 +280,7 @@ void main() {
       final archive = Archive()
         ..addFile(symlinkEntry('App/evil', '../../outside'));
       final zipFile = File(p.join(temp.path, 'evil.zip'));
-      await zipFile.writeAsBytes(ZipEncoder().encode(archive));
+      await zipFile.writeAsBytes(asUnixZip(archive));
 
       expect(
         () => extractZipSecurely(
@@ -280,7 +296,7 @@ void main() {
       final archive = Archive()
         ..addFile(symlinkEntry('App/abs', '/etc/passwd'));
       final zipFile = File(p.join(temp.path, 'abs.zip'));
-      await zipFile.writeAsBytes(ZipEncoder().encode(archive));
+      await zipFile.writeAsBytes(asUnixZip(archive));
 
       expect(
         () => extractZipSecurely(
