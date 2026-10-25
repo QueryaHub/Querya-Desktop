@@ -9,7 +9,6 @@ import 'package:querya_desktop/core/extensions/harness/extension_protocol_profil
 import 'package:querya_desktop/core/extensions/rpc/json_rpc_stdio_client.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_launch_command.dart';
 import 'package:querya_desktop/core/extensions/sandbox/sandbox_scratch_directory.dart';
-import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// How to start the plugin process.
 final class HarnessLaunchRequest {
@@ -135,7 +134,7 @@ final class _OsPluginProcess implements HarnessPluginProcess {
     try {
       await _process.exitCode.timeout(const Duration(seconds: 2));
     } catch (e) {
-      logIgnored('extension_harness', e);
+      _ignored('extension_harness', e);
     }
   }
 
@@ -541,7 +540,15 @@ Future<int?> _rssKb(int pid) async {
       return r.exitCode == 0 ? int.tryParse('${r.stdout}'.trim()) : null;
     }
   } catch (e) {
-    logIgnored('extension_harness', e);
+    _ignored('extension_harness', e);
   }
   return null;
+}
+
+/// A failure the harness goes on from (killing a process that already exited,
+/// reading `ps`). This file is compiled into the standalone `querya-ext-tester`
+/// from `lib/core/extensions` alone, so it cannot use `logIgnored` (Flutter and
+/// the app's log): the line goes to stderr.
+void _ignored(String where, Object error) {
+  stderr.writeln('[$where] ignored: $error');
 }
