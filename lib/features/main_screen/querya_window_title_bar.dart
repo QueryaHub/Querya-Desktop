@@ -108,6 +108,9 @@ class QueryaWindowTitleBar extends StatelessWidget {
 
   @override
   material.Widget build(material.BuildContext context) {
+    // The menu items' own contexts are deactivated once the menu closes, and
+    // a dialog opens a frame later: dialogs open from this one (#1777).
+    final titleBarContext = context;
     final wb = context.workbench;
     final environment = activeConnection?.environment;
     final buttonColors = windowButtonColors(context);
@@ -222,7 +225,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               trailing: Text(
                                 Platform.isMacOS ? 'Cmd+P' : 'Ctrl+P',
                               ).xSmall().muted(),
-                              onPressed: (ctx) => showCommandPalette(ctx),
+                              onPressed: (_) => showCommandPalette(titleBarContext),
                               child: const Text('Command Palette…'),
                             ),
                             QueryaMenuItem(
@@ -233,12 +236,13 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               trailing: Text(
                                 Platform.isMacOS ? 'Cmd+K' : 'Ctrl+K',
                               ).xSmall().muted(),
-                              onPressed: (ctx) {
-                                final host = QueryaCommandHost.maybeOf(ctx);
+                              onPressed: (_) {
+                                final host =
+                                    QueryaCommandHost.maybeOf(titleBarContext);
                                 if (host?.onShowQuickSwitcher != null) {
                                   host!.onShowQuickSwitcher!('');
                                 } else {
-                                  showQuickSwitcher(ctx);
+                                  showQuickSwitcher(titleBarContext);
                                 }
                               },
                               child: const Text('Go to Object…'),
@@ -248,7 +252,7 @@ class QueryaWindowTitleBar extends StatelessWidget {
                                 material.Icons.tune_rounded,
                                 size: 18,
                               ),
-                              onPressed: (ctx) => showPreferencesDialog(ctx),
+                              onPressed: (_) => showPreferencesDialog(titleBarContext),
                               child: const Text('Preferences…'),
                             ),
                             const QueryaMenuDivider(),
@@ -257,8 +261,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
                                 material.Icons.extension_rounded,
                                 size: 18,
                               ),
-                              onPressed: (ctx) =>
-                                  showExtensionManagerDialog(ctx),
+                              onPressed: (_) =>
+                                  showExtensionManagerDialog(titleBarContext),
                               child: const Text('Extensions…'),
                             ),
                           ],
@@ -332,7 +336,8 @@ class QueryaWindowTitleBar extends StatelessWidget {
                               leading: const material.Icon(
                                   material.Icons.settings_rounded,
                                   size: 18),
-                              onPressed: (ctx) => showDriverManagerDialog(ctx),
+                              onPressed: (_) =>
+                                  showDriverManagerDialog(titleBarContext),
                               child: const Text('Driver Manager'),
                             ),
                             const QueryaMenuDivider(),
@@ -399,10 +404,10 @@ class QueryaWindowTitleBar extends StatelessWidget {
                             ),
                             const QueryaMenuDivider(),
                             QueryaMenuItem(
-                                onPressed: (ctx) => showAboutDialog(ctx),
+                                onPressed: (_) => showAboutDialog(titleBarContext),
                                 child: const Text('About')),
                             QueryaMenuItem(
-                              onPressed: (ctx) => showUpdateDialog(ctx),
+                              onPressed: (_) => showUpdateDialog(titleBarContext),
                               child: const Text('Check for Updates…'),
                             ),
                             QueryaMenuItem(
