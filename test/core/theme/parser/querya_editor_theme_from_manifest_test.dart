@@ -1,9 +1,11 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/theme/parser/color_parser.dart';
 import 'package:querya_desktop/core/theme/parser/querya_editor_theme_from_manifest.dart';
 import 'package:querya_desktop/core/theme/parser/querya_theme_manifest.dart';
+import 'package:querya_desktop/core/theme/parser/querya_workbench_theme_from_manifest.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
 
 void main() {
@@ -57,5 +59,33 @@ void main() {
       expect(editor.selection, fallback.selection);
       expect(editor.keyword, fallback.keyword);
     });
+  });
+
+  test('only keys that neither parser reads are reported', () {
+    final printed = <String>[];
+    final original = debugPrint;
+    debugPrint = (message, {wrapWidth}) => printed.add(message ?? '');
+    addTearDown(() => debugPrint = original);
+
+    editorThemeFromQueryaColors(
+      colors: const {
+        'background': '#000000',
+        'canvas': '#111111',
+        'sidebarBackground': '#222222',
+        'accent': '#333333',
+        'nonsense': '#444444',
+      },
+      fallback: QueryaTheme.darkDefault.editor,
+    );
+    workbenchThemeFromQueryaColors(
+      colors: const {
+        'background': '#000000',
+        'canvas': '#111111',
+        'nonsense': '#444444',
+      },
+      fallback: QueryaTheme.darkDefault.workbench,
+    );
+
+    expect(printed, ['Querya theme: unknown editor_colors key "nonsense"']);
   });
 }
