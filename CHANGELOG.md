@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0-beta.2] - 2026-10-25
+
+Changes since 0.5.0-beta.1.
+
+### Added
+
+- **The interface scale zooms the whole UI**, smoothly and without overflow: it applies at once, animates, and is capped so a 900x600 window always fits.
+- **A rotated log file and Help menu entries** — *Open Logs Folder* and *Copy Diagnostics*; errors that used to be swallowed now leave a line in the log, and the ones the user should know about are shown in plain words (#1760, #1761, #1762, #1507).
+- **Extensions in the Marketplace** — the first extension in the registry, the ClickHouse driver (`queryahub.clickhouse-driver`), installs from Extensions → Marketplace and appears in *New connection* (see [docs/extension-registry.md](docs/extension-registry.md)).
+- **A failed query puts the caret at the driver's error position**; the Mongo query error uses the same panel (#1557).
+- **PostgreSQL: a server that insists on SSL says so**, with an *Enable SSL and retry* button (#1754). A new-connection form stays open when the save is refused (#1758).
+- **SQLite: the table chips on the Overview page open the table** (#1816).
+- **SQL keywords are highlighted** in the editor in any case (`SELECT`, `select`, `Select`; #1814).
+- **SQL workspace: the run controls live in the query tab strip**; toolbar, editor and results share one visual system and the row count sits in the status bar (#1558).
+- **ER diagrams open faster**: a 200-table diagram no longer builds every card in one frame (#1546).
+- **MCP**: `find` and `count` hide `system.*` collections, the schema resource is logged and redacted, Mongo calls get `maxTimeMS` and a total response size cap (#1774, #1775, #1776).
+
+### Changed
+
+- **shadcn_flutter is gone**: `MaterialApp` and the app's own `QueryaUiColors`, text fields, context menus, colour picker, card and slider replace it, and the Geist font ships with the app (#1729–#1736).
+- **Result sets are packed into typed columns while the driver streams rows** (#1552); the table-schema lookup is cached per table (#1171); `refresh_rate` comes from pub.dev instead of a vendored fork (#1584).
+- **Internal structure**: `MainScreen`, `LocalDb`, the ER view, the Redis replies and the SSH tunnel code were split into smaller parts (#1502, #1503, #1508, #1571, #1690).
+- **Overview screens use one polling controller** (#1570). The PostgreSQL overview shows the server's time zone and sizes its memory settings (`128 MB`, not `16384`).
+- **Extension tree** under a connection is indented like the built-in drivers' trees; MySQL's logo is lifted on dark themes; Mongo collections are sorted by name in the list too.
+
+### Fixed
+
+- **MySQL**: numbers, dates and JSON show as values, not as hex bytes. **MongoDB**: the server overview shows MB and real counters; binary, regex and 64-bit values read as values, not as Dart objects (#1826); the documents toolbar wraps in a narrow pane.
+- **PostgreSQL table header** wraps instead of hiding Prev / Next / Refresh behind a sideways scroll.
+- **Shortcuts no longer reach through a dialog** (Ctrl+N over the welcome tour opened a second dialog, #1820); the title-bar menu opens its dialogs again (#1777).
+- **The connection tree keeps its expanded branches and selection** when a connection is added (#1821).
+- **Accessibility**: tree rows, form fields and the database tiles are labelled and work through the semantics tree (#1822).
+- **Staged edits** survive cancelling the destructive-query dialog (#1771) and cannot hit the wrong row when a column is aliased to a key name (#1772); *Read-only* in the SQL editor is a guarantee (#1773); the destructive-query detector covers the gaps of #1770.
+- **Charts**: axis labels fit, wrap or turn instead of overlapping, and the SVG export reads the same.
+- **Storage**: the legacy profile migration writes `querya.db` last and whole (#1766); saving folders is one transaction (#1767); a failed settings write and a failed save of a new connection are reported (#1764).
+- **Updater**: extracting the update zip keeps symlinks and file permissions (#1765).
+- **MCP**: the SQL guard's function denylist also matches quoted names (#1769).
+- **Docker test stack**: the MySQL sample text is stored as UTF-8 (#1823); re-seed with `docker compose down -v`.
+
 ## [0.5.0-beta.1] - 2026-10-18
 
 ### Added
