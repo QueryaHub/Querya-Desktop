@@ -1,3 +1,5 @@
+import 'package:querya_desktop/shared/report_error.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async';
 
@@ -220,8 +222,8 @@ class _RedisConnectionFormContentState
       if (mounted) {
         _showTestResult(result.ok ? 'success' : (result.error ?? 'failed'));
       }
-    } catch (e) {
-      if (mounted) _showTestResult('error: $e');
+    } catch (e, st) {
+      if (mounted) _showTestResult(failureMessage('error', e, where: 'RedisConnectionForm', stack: st, driver: DatabaseDriver.redis));
     }
   }
 

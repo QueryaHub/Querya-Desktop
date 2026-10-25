@@ -36,3 +36,17 @@ void reportError(
     message: '$action. ${describeError(error, driver: driver)}',
   );
 }
+
+/// Logs [error] and returns `<action>: <reason>` for an inline error line (a
+/// view's own error text), where a toast is not the surface. [action] is a
+/// short phrase (`'Delete failed'`); [where] names the place for the log.
+String failureMessage(
+  String action,
+  Object error, {
+  required String where,
+  StackTrace? stack,
+  DatabaseDriver? driver,
+}) {
+  QueryaLog.instance.error(where, action, error: error, stack: stack);
+  return '$action: ${describeError(error, driver: driver)}';
+}

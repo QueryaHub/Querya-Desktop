@@ -50,6 +50,22 @@ void main() {
     expect(text, contains('Cannot reach the database server'));
   });
 
+  test('failureMessage logs and returns the inline error line', () async {
+    await startLog();
+    final text = failureMessage(
+      'Delete failed',
+      StateError('connection reset'),
+      where: 'RedisKeysView',
+      driver: DatabaseDriver.redis,
+    );
+    await QueryaLog.instance.flush();
+
+    expect(text, startsWith('Delete failed: '));
+    final log =
+        await File('${logDir.path}/${QueryaLog.fileName}').readAsString();
+    expect(log, contains('[RedisKeysView] Delete failed'));
+  });
+
   testWidgets('reportError shows the toast', (tester) async {
     final host = await pumpHost(tester);
 
@@ -66,6 +82,7 @@ void main() {
       find.text('The thing was not saved. Bad state: keychain write failed'),
       findsOneWidget,
     );
+
     await tester.pump(const Duration(seconds: 6));
   });
 }
