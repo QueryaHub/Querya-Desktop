@@ -479,6 +479,13 @@ class MainContentSplitState extends State<MainContentSplit>
                           onRestoreLastSelectedObject: () {
                             unawaited(_restoreLastSelectedObject());
                           },
+                          onOpenSqliteTable: ws.activeConnection == null
+                              ? null
+                              : (name) => widget.onSqliteObjectSelected(
+                                    ws.activeConnection!,
+                                    name,
+                                    SqliteObjectKind.table,
+                                  ),
                           isReadOnly: ws.isReadOnly,
                           onRequestNewConnection: widget.onRequestNewConnection,
                           onRequestNewConnectionFromUrl:

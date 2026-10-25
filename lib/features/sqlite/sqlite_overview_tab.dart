@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/motion/querya_hover_surface.dart';
 import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:io';
@@ -17,9 +18,14 @@ class SqliteOverviewTab extends material.StatefulWidget {
   const SqliteOverviewTab({
     super.key,
     required this.connectionRow,
+    this.onOpenTable,
   });
 
   final ConnectionRow connectionRow;
+
+  /// Opens a table in the table browser, as choosing it in the tree does
+  /// (#1816). Without it the chips are a plain list.
+  final void Function(String name)? onOpenTable;
 
   @override
   material.State<SqliteOverviewTab> createState() => _SqliteOverviewTabState();
@@ -391,15 +397,16 @@ class _SqliteOverviewTabState extends material.State<SqliteOverviewTab> {
               spacing: 8,
               runSpacing: 8,
               children: _tables.map((t) {
-                return material.Container(
+                final open = widget.onOpenTable;
+                final chip = QueryaHoverSurface(
+                  borderRadius: material.BorderRadius.circular(6),
                   padding: const material.EdgeInsets.symmetric(
                       horizontal: 10, vertical: 6),
-                  decoration: material.BoxDecoration(
-                    color: cs.muted.withValues(alpha: 0.4),
-                    borderRadius: material.BorderRadius.circular(6),
-                    border: material.Border.all(
-                        color: cs.border.withValues(alpha: 0.3)),
-                  ),
+                  idleColor: cs.muted.withValues(alpha: 0.4),
+                  hoveredColor: cs.muted.withValues(alpha: 0.7),
+                  border: material.Border.all(
+                      color: cs.border.withValues(alpha: 0.3)),
+                  onTap: open == null ? null : () => open(t),
                   child: material.Row(
                     mainAxisSize: material.MainAxisSize.min,
                     children: [
@@ -408,6 +415,18 @@ class _SqliteOverviewTabState extends material.State<SqliteOverviewTab> {
                       const Gap(6),
                       Text(t).small(),
                     ],
+                  ),
+                );
+                if (open == null) return chip;
+                return material.Tooltip(
+                  message: 'Open $t',
+                  excludeFromSemantics: true,
+                  child: material.Semantics(
+                    button: true,
+                    label: t,
+                    onTap: () => open(t),
+                    excludeSemantics: true,
+                    child: chip,
                   ),
                 );
               }).toList(),

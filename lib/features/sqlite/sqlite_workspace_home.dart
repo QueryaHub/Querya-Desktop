@@ -17,6 +17,7 @@ class SqliteWorkspaceHome extends material.StatefulWidget {
     this.sqlTabRequestToken = 0,
     this.lastSelectedSqliteObject,
     this.onRestoreLastSelectedObject,
+    this.onOpenTable,
     this.isReadOnly = false,
   });
 
@@ -27,6 +28,9 @@ class SqliteWorkspaceHome extends material.StatefulWidget {
   /// Remembers the last visited table/view for 1-click return.
   final ({String name, SqliteObjectKind kind})? lastSelectedSqliteObject;
   final VoidCallback? onRestoreLastSelectedObject;
+
+  /// Opens a table from the Overview page.
+  final void Function(String name)? onOpenTable;
 
   @override
   material.State<SqliteWorkspaceHome> createState() =>
@@ -131,6 +135,7 @@ class _SqliteWorkspaceHomeState extends material.State<SqliteWorkspaceHome> {
               SqliteOverviewTab(
                 key: ValueKey('sqlite_overview_${widget.connectionRow.id}'),
                 connectionRow: widget.connectionRow,
+                onOpenTable: widget.onOpenTable,
               ),
               SqliteSqlWorkspace(
                 key: ValueKey('sqlite_sql_${widget.connectionRow.id}'),
