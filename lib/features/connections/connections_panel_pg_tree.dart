@@ -425,7 +425,8 @@ class _PgSchemaNodeState extends State<_PgSchemaNode> {
       List<String> matviews = [];
       try {
         matviews = await conn.listMaterializedViews(schema: widget.schemaName);
-      } catch (_) {
+      } catch (e, st) {
+        logIgnored('PgTree.materializedViews', e, st);
         // pg_matviews / permissions may fail on some servers; keep tree usable.
       }
       final functions = await conn.listFunctions(schema: widget.schemaName);

@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async' show unawaited;
 import 'dart:convert';
@@ -287,7 +288,9 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
           });
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      logIgnored('RedisCliWorkspace.loadHistory', e, st);
+    }
   }
 
   Future<void> _saveHistory() async {
@@ -299,7 +302,9 @@ class _RedisCliWorkspaceState extends material.State<RedisCliWorkspace> {
         _historyStorageKey,
         jsonEncode(capped),
       );
-    } catch (_) {}
+    } catch (e, st) {
+      logIgnored('RedisCliWorkspace.saveHistory', e, st);
+    }
   }
 
   @override

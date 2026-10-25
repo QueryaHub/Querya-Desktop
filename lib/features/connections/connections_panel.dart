@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async' show Timer;
 

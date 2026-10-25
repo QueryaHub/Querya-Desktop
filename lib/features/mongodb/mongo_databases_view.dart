@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'package:querya_desktop/shared/report_error.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
@@ -116,7 +117,9 @@ class _MongoDatabasesViewState extends State<MongoDatabasesView> {
           'admin',
           {'listDatabases': 1},
         );
-      } catch (_) {}
+      } catch (e, st) {
+        logIgnored('MongoDatabasesView.listDatabases sizes', e, st);
+      }
 
       final dbList =
           dbListResult?['databases'] as List<dynamic>? ?? <dynamic>[];

@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'dart:async';
 import 'dart:math' show max;
 import 'dart:typed_data';
@@ -616,7 +617,8 @@ class _ErdViewState extends material.State<ErdView>
     _captureCurrent();
     try {
       await widget.layoutStore!.write(widget.layoutKey!, _c.toStore());
-    } catch (_) {
+    } catch (e, st) {
+      logIgnored('ErdView.saveLayout', e, st);
       // Keeping the layout is a convenience: a failed write is not an error
       // the user can act on.
     }

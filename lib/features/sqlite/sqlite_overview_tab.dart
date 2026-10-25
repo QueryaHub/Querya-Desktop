@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:io';
 import 'dart:math' as math;
@@ -129,7 +130,9 @@ class _SqliteOverviewTabState extends material.State<SqliteOverviewTab> {
           return f.lengthSync();
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      logIgnored('SqliteOverviewTab.fileSize', e, st);
+    }
     return 0;
   }
 

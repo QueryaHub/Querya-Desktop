@@ -140,7 +140,16 @@ class _SqliteConnectionFormContentState
       if (_nameController.text.isEmpty) {
         _nameController.text = p.basenameWithoutExtension(path);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      if (!mounted) return;
+      reportError(
+        context,
+        e,
+        stack: st,
+        where: 'SqliteConnectionForm.pickFile',
+        action: 'The file could not be chosen',
+      );
+    }
   }
 
   Future<void> _testConnection() async {

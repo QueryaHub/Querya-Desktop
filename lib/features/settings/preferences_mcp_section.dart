@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'package:querya_desktop/shared/report_error.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async' show StreamSubscription, unawaited;
@@ -89,7 +90,9 @@ class PreferencesMcpSectionState extends material.State<PreferencesMcpSection> {
     try {
       activity = await (widget.loadActivity ??
           () => LocalDb.instance.listMcpActivity(limit: 50))();
-    } catch (_) {}
+    } catch (e, st) {
+      logIgnored('PreferencesMcpSection.load activity', e, st);
+    }
     if (!mounted) return;
     setState(() {
       _enabled = enabled;
@@ -112,7 +115,9 @@ class PreferencesMcpSectionState extends material.State<PreferencesMcpSection> {
       final list = await (widget.loadActivity ??
           () => LocalDb.instance.listMcpActivity(limit: 50))();
       if (mounted) setState(() => _activity = list);
-    } catch (_) {}
+    } catch (e, st) {
+      logIgnored('PreferencesMcpSection.loadActivity', e, st);
+    }
   }
 
   Future<void> _setEnabled(bool v) async {

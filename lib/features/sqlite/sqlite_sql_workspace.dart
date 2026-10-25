@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
@@ -186,7 +187,9 @@ class SqliteSqlExecutionDelegate extends BaseSqlExecutionDelegate {
           [target.tableName],
         );
         isView = kind.isNotEmpty && kind.first['type'] == 'view';
-      } catch (_) {}
+      } catch (e, st) {
+        logIgnored('SqliteSqlWorkspace.isView probe', e, st);
+      }
 
       return SqlResultGridSchema.fromLoad(
         await loadTableViewSchema(

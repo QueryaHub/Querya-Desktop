@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async' show unawaited;
 
@@ -203,7 +204,8 @@ class _MongoQueryWorkspaceState extends material.State<MongoQueryWorkspace> {
         databaseName: widget.database,
         sqlText: query,
       );
-    } catch (_) {
+    } catch (e, st) {
+      logIgnored('MongoQueryWorkspace.history', e, st);
       // Best-effort history logging
     }
   }

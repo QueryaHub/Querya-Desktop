@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'package:querya_desktop/shared/report_error.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
@@ -125,7 +126,9 @@ class ExtensionTableDataDelegate extends TableDataMutationDelegate {
           if (countResult.rows.isNotEmpty && countResult.rows.first.isNotEmpty) {
             totalRows = int.tryParse(countResult.rows.first.first);
           }
-        } catch (_) {}
+        } catch (e, st) {
+          logIgnored('ExtensionTableView.count fallback', e, st);
+        }
       }
     }
 
