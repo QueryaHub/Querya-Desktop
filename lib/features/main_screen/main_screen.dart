@@ -104,6 +104,9 @@ class _MainScreenState extends State<MainScreen> {
 
   bool _handleGlobalKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
+    // A dialog or sheet is on top: the screen's shortcuts must not reach
+    // through it (Ctrl+N over the welcome tour opened a second dialog, #1820).
+    if (ModalRoute.of(context)?.isCurrent == false) return false;
 
     final keyboard = HardwareKeyboard.instance;
     final shortcut = MainScreenShortcuts.resolve(
@@ -175,14 +178,14 @@ class _MainScreenState extends State<MainScreen> {
       builder: (context, workspace, _) {
         return QueryaCommandHost(
           onToggleSidebar: () => _splitKey.currentState?.toggleSidebar(),
-          onNewConnection: () => unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
+          onNewConnection: () =>
+              unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
           onReloadConnections: () => unawaited(
               _connectionsPanelKey.currentState?.reloadConnectionsFromDb() ??
                   Future<void>.value()),
           onShowQuickSwitcher: _nav.openQuickSwitcher,
           onOpenSchemaObject: _nav.onOpenSchemaObject,
-          onGoHome:
-              workspace.activeConnection != null ? _nav.onGoHome : null,
+          onGoHome: workspace.activeConnection != null ? _nav.onGoHome : null,
           onCloseWorkspace: _nav.hasCloseableWorkspace(workspace)
               ? () => unawaited(_nav.closeWorkspace())
               : null,
@@ -210,185 +213,197 @@ class _MainScreenState extends State<MainScreen> {
           onOpenWelcomeTour: _dialogs.onOpenWelcomeTour,
           selectedConnectionId: workspace.activeConnection?.id,
           child: FocusScope(
-          autofocus: true,
-          child: material.CallbackShortcuts(
-            bindings: {
-              // New Database Connection: Ctrl+N / Cmd+N
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyN,
-                meta: true,
-              ): () => unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyN,
-                control: true,
-              ): () => unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
+            autofocus: true,
+            child: material.CallbackShortcuts(
+              bindings: {
+                // New Database Connection: Ctrl+N / Cmd+N
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyN,
+                  meta: true,
+                ): () => unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyN,
+                  control: true,
+                ): () => unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
 
-              // New Query Tab: Ctrl+Shift+N / Cmd+Shift+N
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyN,
-                meta: true,
-                shift: true,
-              ): () => _invoke(const NewSqlIntent()),
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyN,
-                control: true,
-                shift: true,
-              ): () => _invoke(const NewSqlIntent()),
+                // New Query Tab: Ctrl+Shift+N / Cmd+Shift+N
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyN,
+                  meta: true,
+                  shift: true,
+                ): () => _invoke(const NewSqlIntent()),
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyN,
+                  control: true,
+                  shift: true,
+                ): () => _invoke(const NewSqlIntent()),
 
-              // Open SQL File: Ctrl+O / Cmd+O
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyO,
-                meta: true,
-              ): () => _invoke(const OpenSqlIntent()),
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyO,
-                control: true,
-              ): () => _invoke(const OpenSqlIntent()),
+                // Open SQL File: Ctrl+O / Cmd+O
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyO,
+                  meta: true,
+                ): () => _invoke(const OpenSqlIntent()),
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyO,
+                  control: true,
+                ): () => _invoke(const OpenSqlIntent()),
 
-              // Save SQL File: Ctrl+S / Cmd+S
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyS,
-                meta: true,
-              ): () => _invoke(const SaveSqlIntent()),
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyS,
-                control: true,
-              ): () => _invoke(const SaveSqlIntent()),
+                // Save SQL File: Ctrl+S / Cmd+S
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyS,
+                  meta: true,
+                ): () => _invoke(const SaveSqlIntent()),
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyS,
+                  control: true,
+                ): () => _invoke(const SaveSqlIntent()),
 
-              // Toggle Left Sidebar: Ctrl+B / Cmd+B
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyB,
-                control: true,
-              ): () => _splitKey.currentState?.toggleSidebar(),
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyB,
-                meta: true,
-              ): () => _splitKey.currentState?.toggleSidebar(),
+                // Toggle Left Sidebar: Ctrl+B / Cmd+B
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyB,
+                  control: true,
+                ): () => _splitKey.currentState?.toggleSidebar(),
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyB,
+                  meta: true,
+                ): () => _splitKey.currentState?.toggleSidebar(),
 
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyP,
-                control: true,
-              ): () => unawaited(showCommandPalette(context)),
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyP,
-                meta: true,
-              ): () => unawaited(showCommandPalette(context)),
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyK,
-                control: true,
-              ): () => _nav.openQuickSwitcher(),
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyK,
-                meta: true,
-              ): () => _nav.openQuickSwitcher(),
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyP,
+                  control: true,
+                ): () => unawaited(showCommandPalette(context)),
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyP,
+                  meta: true,
+                ): () => unawaited(showCommandPalette(context)),
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyK,
+                  control: true,
+                ): () => _nav.openQuickSwitcher(),
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyK,
+                  meta: true,
+                ): () => _nav.openQuickSwitcher(),
 
-              // Welcome Tour & Tutorial: F1 / Cmd+Shift+H / Ctrl+Shift+H
-              const material.SingleActivator(
-                LogicalKeyboardKey.f1,
-              ): () => _dialogs.onOpenWelcomeTour(),
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyH,
-                meta: true,
-                shift: true,
-              ): () => _dialogs.onOpenWelcomeTour(),
-              const material.SingleActivator(
-                LogicalKeyboardKey.keyH,
-                control: true,
-                shift: true,
-              ): () => _dialogs.onOpenWelcomeTour(),
+                // Welcome Tour & Tutorial: F1 / Cmd+Shift+H / Ctrl+Shift+H
+                const material.SingleActivator(
+                  LogicalKeyboardKey.f1,
+                ): () => _dialogs.onOpenWelcomeTour(),
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyH,
+                  meta: true,
+                  shift: true,
+                ): () => _dialogs.onOpenWelcomeTour(),
+                const material.SingleActivator(
+                  LogicalKeyboardKey.keyH,
+                  control: true,
+                  shift: true,
+                ): () => _dialogs.onOpenWelcomeTour(),
 
-              // Return to Start / Home Screen: Cmd+Shift+0 / Ctrl+Shift+0
-              const material.SingleActivator(
-                LogicalKeyboardKey.digit0,
-                meta: true,
-                shift: true,
-              ): _nav.onGoHome,
-              const material.SingleActivator(
-                LogicalKeyboardKey.digit0,
-                control: true,
-                shift: true,
-              ): _nav.onGoHome,
-            },
-            child: QueryaPlatformMenuBar(
-              onNewConnection: () =>
-                  unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
-              onNewQueryTab: () => _invoke(const NewSqlIntent()),
-              onOpenSqlScript: () => _invoke(const OpenSqlIntent()),
-              onSaveQuery: () => _invoke(const SaveSqlIntent()),
-              onExecuteQuery: () =>
-                  SqlEditorCommandBridge.instance.invokeExecute(),
-              onToggleSidebar: () => _splitKey.currentState?.toggleSidebar(),
-              onOpenPreferences: () => showPreferencesDialog(context),
-              onOpenWelcomeTour: () => _dialogs.onOpenWelcomeTour(),
-              onOpenLogsFolder: () => unawaited(openLogsFolder(context)),
-              onCopyDiagnostics: () => unawaited(copyDiagnostics(context)),
-              onGoHome: _nav.onGoHome,
-              child: SqlEditorGlobalActions(
-                activeConnection: workspace.activeConnection,
-                onOpenSqlWorkspace: _nav.openSqlWorkspaceForConnection,
-                child: material.Scaffold(
-                backgroundColor: wb.canvas,
-                body: WindowBorder(
-                color: wb.borderSubtle.withValues(alpha: 0.35),
-                width: 1,
-                child: Column(
-                  children: [
-                    ShellTitleBar(
-                      workspace: workspace,
-                      isSidebarVisible: _isSidebarVisible,
-                      connectionsPanelKey: _connectionsPanelKey,
-                      onToggleSidebar: () =>
-                          _splitKey.currentState?.toggleSidebar(),
-                      dialogs: _dialogs,
-                      nav: _nav,
-                    ),
-                    QueryaDivider(
-                        height: 1,
-                        color: wb.borderSubtle.withValues(alpha: 0.22)),
-                    Expanded(
-                      child: MainContentSplit(
-                        key: _splitKey,
-                        connectionsPanelKey: _connectionsPanelKey,
-                        workspace: _workspace,
-                        onSidebarVisibilityChanged: (v) =>
-                            _isSidebarVisible.value = v,
-                        onConnectionSelected: _nav.onConnectionSelected,
-                        onPostgresObjectSelected: _nav.onPostgresObjectSelected,
-                        onMysqlObjectSelected: _nav.onMysqlObjectSelected,
-                        onSqliteObjectSelected: _nav.onSqliteObjectSelected,
-                        onExtensionObjectSelected: _nav.onExtensionObjectSelected,
-                        onRedisDatabaseSelected: _nav.onRedisDatabaseSelected,
-                        onMongoDBDatabaseSelected: _nav.onMongoDBDatabaseSelected,
-                        onMongoCollectionSelected: _nav.onMongoCollectionSelected,
-                        onPostgresOpenSqlWorkspace: _nav.onPostgresOpenSqlWorkspace,
-                        onMysqlOpenSqlWorkspace: _nav.onMysqlOpenSqlWorkspace,
-                        onSqliteOpenSqlWorkspace: _nav.onSqliteOpenSqlWorkspace,
-                        onRequestNewConnection: _dialogs.openNewConnectionFromHero,
-                        onRequestNewConnectionFromUrl:
-                            _dialogs.onNewDatabaseConnectionFromUrl,
-                        onRequestOpenSqlite: _dialogs.openSqliteFromHero,
-                        onRequestLaunchDemo: _dialogs.onLaunchDemoPlayground,
-                        onRequestOpenTour: _dialogs.onOpenWelcomeTour,
-                        onOpenConnection: _nav.onConnectionSelected,
-                        initialMongoCollection: _nav.pendingMongoCollection,
+                // Return to Start / Home Screen: Cmd+Shift+0 / Ctrl+Shift+0
+                const material.SingleActivator(
+                  LogicalKeyboardKey.digit0,
+                  meta: true,
+                  shift: true,
+                ): _nav.onGoHome,
+                const material.SingleActivator(
+                  LogicalKeyboardKey.digit0,
+                  control: true,
+                  shift: true,
+                ): _nav.onGoHome,
+              },
+              child: QueryaPlatformMenuBar(
+                onNewConnection: () =>
+                    unawaited(_dialogs.onNewDatabaseConnectionFromMenu()),
+                onNewQueryTab: () => _invoke(const NewSqlIntent()),
+                onOpenSqlScript: () => _invoke(const OpenSqlIntent()),
+                onSaveQuery: () => _invoke(const SaveSqlIntent()),
+                onExecuteQuery: () =>
+                    SqlEditorCommandBridge.instance.invokeExecute(),
+                onToggleSidebar: () => _splitKey.currentState?.toggleSidebar(),
+                onOpenPreferences: () => showPreferencesDialog(context),
+                onOpenWelcomeTour: () => _dialogs.onOpenWelcomeTour(),
+                onOpenLogsFolder: () => unawaited(openLogsFolder(context)),
+                onCopyDiagnostics: () => unawaited(copyDiagnostics(context)),
+                onGoHome: _nav.onGoHome,
+                child: SqlEditorGlobalActions(
+                  activeConnection: workspace.activeConnection,
+                  onOpenSqlWorkspace: _nav.openSqlWorkspaceForConnection,
+                  child: material.Scaffold(
+                    backgroundColor: wb.canvas,
+                    body: WindowBorder(
+                      color: wb.borderSubtle.withValues(alpha: 0.35),
+                      width: 1,
+                      child: Column(
+                        children: [
+                          ShellTitleBar(
+                            workspace: workspace,
+                            isSidebarVisible: _isSidebarVisible,
+                            connectionsPanelKey: _connectionsPanelKey,
+                            onToggleSidebar: () =>
+                                _splitKey.currentState?.toggleSidebar(),
+                            dialogs: _dialogs,
+                            nav: _nav,
+                          ),
+                          QueryaDivider(
+                              height: 1,
+                              color: wb.borderSubtle.withValues(alpha: 0.22)),
+                          Expanded(
+                            child: MainContentSplit(
+                              key: _splitKey,
+                              connectionsPanelKey: _connectionsPanelKey,
+                              workspace: _workspace,
+                              onSidebarVisibilityChanged: (v) =>
+                                  _isSidebarVisible.value = v,
+                              onConnectionSelected: _nav.onConnectionSelected,
+                              onPostgresObjectSelected:
+                                  _nav.onPostgresObjectSelected,
+                              onMysqlObjectSelected: _nav.onMysqlObjectSelected,
+                              onSqliteObjectSelected:
+                                  _nav.onSqliteObjectSelected,
+                              onExtensionObjectSelected:
+                                  _nav.onExtensionObjectSelected,
+                              onRedisDatabaseSelected:
+                                  _nav.onRedisDatabaseSelected,
+                              onMongoDBDatabaseSelected:
+                                  _nav.onMongoDBDatabaseSelected,
+                              onMongoCollectionSelected:
+                                  _nav.onMongoCollectionSelected,
+                              onPostgresOpenSqlWorkspace:
+                                  _nav.onPostgresOpenSqlWorkspace,
+                              onMysqlOpenSqlWorkspace:
+                                  _nav.onMysqlOpenSqlWorkspace,
+                              onSqliteOpenSqlWorkspace:
+                                  _nav.onSqliteOpenSqlWorkspace,
+                              onRequestNewConnection:
+                                  _dialogs.openNewConnectionFromHero,
+                              onRequestNewConnectionFromUrl:
+                                  _dialogs.onNewDatabaseConnectionFromUrl,
+                              onRequestOpenSqlite: _dialogs.openSqliteFromHero,
+                              onRequestLaunchDemo:
+                                  _dialogs.onLaunchDemoPlayground,
+                              onRequestOpenTour: _dialogs.onOpenWelcomeTour,
+                              onOpenConnection: _nav.onConnectionSelected,
+                              initialMongoCollection:
+                                  _nav.pendingMongoCollection,
+                            ),
+                          ),
+                          ShellStatusBar(
+                            workspace: workspace,
+                            isSidebarVisible: _isSidebarVisible,
+                            onToggleSidebar: () =>
+                                _splitKey.currentState?.toggleSidebar(),
+                          ),
+                        ],
                       ),
                     ),
-                    ShellStatusBar(
-                      workspace: workspace,
-                      isSidebarVisible: _isSidebarVisible,
-                      onToggleSidebar: () =>
-                          _splitKey.currentState?.toggleSidebar(),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-            ),
           ),
-        ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 }
