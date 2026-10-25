@@ -59,6 +59,33 @@ void main() {
     });
   });
 
+  testWidgets('selecting a cell does not move its text', (tester) async {
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: const material.SizedBox(
+          width: 800,
+          height: 400,
+          child: VirtualResultGrid(
+            columns: ['id', 'name'],
+            rows: [
+              ['1', 'Ada'],
+              ['2', 'Bob'],
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final before = tester.getTopLeft(find.text('Ada'));
+
+    await tester.tap(find.text('Ada'));
+    await tester.pumpAndSettle();
+
+    // The selection outline is painted over the cell, not added to its
+    // padding: the text stays where it was (it moved by the border width).
+    expect(tester.getTopLeft(find.text('Ada')), before);
+  });
+
   group('VirtualResultGrid cell hover', () {
     testWidgets('editable cells use the text cursor', (tester) async {
       final staging = DataGridStagingBuffer(
