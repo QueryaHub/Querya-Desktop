@@ -142,7 +142,7 @@ bool sqlResultGridSaveEnabled({
   return primaryKeys.every((pk) => names.contains(pk.toLowerCase()));
 }
 
-final _selectIdent = r'(?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[\p{L}\p{N}_$]+)';
+const _selectIdent = r'(?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[\p{L}\p{N}_$]+)';
 final _plainSelectItem = RegExp(
   '^(?:$_selectIdent\\s*\\.\\s*)*($_selectIdent)(?:\\s+(?:as\\s+)?($_selectIdent))?\$',
   caseSensitive: false,
