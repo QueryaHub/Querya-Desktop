@@ -11,6 +11,10 @@ import 'package:querya_desktop/core/security/ssh_tunnel_manager.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 
 /// Which engine produced an error; only used to tailor the wording.
+/// The hint of the *server requires SSL* error (#1754); the PostgreSQL form
+/// looks for it to offer *Enable SSL and retry*.
+const postgresEnableSslHint = 'Enable SSL in the connection settings and try again';
+
 enum DatabaseDriver { postgres, mysql, sqlite, mongodb, redis, extension }
 
 /// Maps a driver / OS error to a [QueryaDatabaseException].
@@ -93,6 +97,24 @@ QueryaDatabaseException mapDatabaseError(
       'The database is locked by another operation',
       remediationHint:
           'Commit or roll back any open transaction and try again in a moment',
+      originalError: error,
+      stackTrace: stackTrace,
+    );
+  } else if (lower.contains('pg_hba.conf rejects connection') &&
+      lower.contains('no encryption')) {
+    // `hostssl` only in pg_hba.conf: reads like a wrong password or a blocked
+    // IP, but the fix is the SSL switch (#1754). The server's own line stays in
+    // the message.
+    final line = RegExp(r'pg_hba\.conf rejects connection[^\n]*',
+            caseSensitive: false)
+        .firstMatch(raw)
+        ?.group(0)
+        ?.trim();
+    mapped = TlsFailureException(
+      'The server only accepts encrypted connections'
+      '${line == null ? '' : ' ($line)'}',
+      detailedExplanation: raw,
+      remediationHint: postgresEnableSslHint,
       originalError: error,
       stackTrace: stackTrace,
     );

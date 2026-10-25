@@ -751,6 +751,19 @@ class _PostgresConnectionFormContentState
                               ),
                             ).small(),
                           ),
+                          if (!_useSSL &&
+                              _testResult!.contains(postgresEnableSslHint)) ...[
+                            QueryaButton.secondary(
+                              label: 'Enable SSL and retry',
+                              size: QueryaControlSize.sm,
+                              onPressed: () {
+                                _dismissResult();
+                                setState(() => _useSSL = true);
+                                unawaited(_testConnection());
+                              },
+                            ),
+                            const Gap(8),
+                          ],
                           QueryaIconButton(
 icon: const material.Icon(material.Icons.close),
 tooltip: 'Dismiss',
