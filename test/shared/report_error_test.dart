@@ -11,11 +11,13 @@ import '../support/querya_theme_test_shell.dart';
 void main() {
   late Directory logDir;
 
-  setUp(() async {
+  /// For the plain tests only: inside `testWidgets` the log's file writes run
+  /// in the fake-async zone and would never complete.
+  Future<void> startLog() async {
     logDir = await Directory.systemTemp.createTemp('querya_report_error_');
     await QueryaLog.instance.init(logDir);
-  });
-  tearDown(() => logDir.delete(recursive: true));
+    addTearDown(() => logDir.delete(recursive: true));
+  }
 
   Future<material.BuildContext> pumpHost(WidgetTester tester) async {
     late material.BuildContext host;
@@ -48,7 +50,7 @@ void main() {
     expect(text, contains('Cannot reach the database server'));
   });
 
-  testWidgets('reportError shows the toast and writes the log', (tester) async {
+  testWidgets('reportError shows the toast', (tester) async {
     final host = await pumpHost(tester);
 
     reportError(
@@ -64,13 +66,6 @@ void main() {
       find.text('The thing was not saved. Bad state: keychain write failed'),
       findsOneWidget,
     );
-    await tester.runAsync(QueryaLog.instance.flush);
-    final text = await tester.runAsync(
-      () => File('${logDir.path}/${QueryaLog.fileName}').readAsString(),
-    );
-    expect(text, contains('[Somewhere.save] The thing was not saved'));
-    expect(text, contains('keychain write failed'));
-
     await tester.pump(const Duration(seconds: 6));
   });
 }

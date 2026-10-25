@@ -10,6 +10,7 @@ import 'package:querya_desktop/features/mongodb/mongodb_connection_form.dart';
 import 'package:querya_desktop/features/mysql/mysql_connection_form.dart';
 import 'package:querya_desktop/features/postgresql/postgresql_connection_form.dart';
 import 'package:querya_desktop/features/redis/redis_connection_form.dart';
+import 'package:querya_desktop/core/util/querya_log.dart';
 import 'package:querya_desktop/shared/report_error.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
 
@@ -27,13 +28,13 @@ Future<bool> saveNewConnection(
     await LocalDb.instance.addConnection(row);
     return true;
   } catch (e, st) {
-    reportError(
-      context,
-      e,
-      stack: st,
-      where: 'saveNewConnection',
-      action: 'The connection was not saved',
-    );
+    const action = 'The connection was not saved';
+    if (context.mounted) {
+      reportError(context, e,
+          stack: st, where: 'saveNewConnection', action: action);
+    } else {
+      QueryaLog.instance.error('saveNewConnection', action, error: e, stack: st);
+    }
     return false;
   }
 }
