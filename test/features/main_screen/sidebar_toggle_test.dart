@@ -1,5 +1,8 @@
-import 'package:flutter/widgets.dart';
+import 'dart:async';
 import 'dart:io';
+
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
 import 'package:flutter/material.dart' as material;
 import 'package:flutter_test/flutter_test.dart';
@@ -47,8 +50,7 @@ void main() {
   });
 
   group('Fluid Collapsible Sidebar (#557)', () {
-    test('AppSettings preserves sidebarVisible across sets and gets',
-        () async {
+    test('AppSettings preserves sidebarVisible across sets and gets', () async {
       expect(await AppSettings.instance.getSidebarVisible(), isTrue);
 
       await AppSettings.instance.setSidebarVisible(false);
@@ -250,6 +252,53 @@ void main() {
         ),
         findsNothing,
       );
+    });
+
+    testWidgets('Ctrl+B does not reach through an open dialog (#1820)',
+        (tester) async {
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: const material.SizedBox(
+            width: 1200,
+            height: 800,
+            child: MainScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      bool sidebarHidden() => find
+          .ancestor(
+            of: find.byType(ConnectionsPanel, skipOffstage: false),
+            matching: find.byWidgetPredicate(
+              (w) => w is material.Offstage && w.offstage,
+              skipOffstage: false,
+            ),
+          )
+          .evaluate()
+          .isNotEmpty;
+
+      final context = tester.element(find.byType(MainScreen));
+      unawaited(material.showDialog<void>(
+        context: context,
+        builder: (_) => const material.AlertDialog(content: Text('modal')),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyB);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(sidebarHidden(), isFalse);
+
+      material.Navigator.of(context).pop();
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyB);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(sidebarHidden(), isTrue);
     });
 
     testWidgets(

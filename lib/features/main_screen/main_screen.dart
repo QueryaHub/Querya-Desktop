@@ -104,6 +104,9 @@ class _MainScreenState extends State<MainScreen> {
 
   bool _handleGlobalKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
+    // A dialog or sheet is on top: the screen's shortcuts must not reach
+    // through it (Ctrl+N over the welcome tour opened a second dialog, #1820).
+    if (ModalRoute.of(context)?.isCurrent == false) return false;
 
     final keyboard = HardwareKeyboard.instance;
     final shortcut = MainScreenShortcuts.resolve(
