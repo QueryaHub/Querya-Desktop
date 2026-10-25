@@ -454,14 +454,11 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
 
   Widget _buildFilterBar(QueryaUiColors cs) {
     final shadcnCs = context.colors;
-    return material.Container(
-      padding:
-          const material.EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: material.BoxDecoration(
-        color: shadcnCs.muted.withValues(alpha: 0.15),
-      ),
-      child: Row(
-        children: [
+    // The search, the view switcher, three buttons and "Add Document" need
+    // about 1200 px in one row; in a narrower pane the tools go to a second
+    // row that wraps (a single row overflowed by ~200 px at a 1028 px window).
+    const singleRowMinWidth = 1200.0;
+    final searchRow = <material.Widget>[
           material.Expanded(
             child: QueryaSearchField(
               controller: _filterController,
@@ -485,8 +482,9 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
             onPressed: _clearFilter,
             size: QueryaControlSize.sm,
           ),
-          const Gap(12),
-          // View Mode Switcher
+    ];
+    final tools = <material.Widget>[
+      // View Mode Switcher
           material.SizedBox(
             height: 28,
             child: material.SegmentedButton<MongoDocumentsViewMode>(
@@ -565,14 +563,49 @@ class _MongoDocumentsViewState extends material.State<MongoDocumentsView> {
               size: QueryaControlSize.sm,
             ),
           ],
-          const Gap(12),
-          QueryaButton.primary(
-            label: 'Add Document',
-            icon: material.Icons.add_rounded,
-            onPressed: _addDocument,
-            size: QueryaControlSize.sm,
-          ),
-        ],
+    ];
+    final addDocument = QueryaButton.primary(
+      label: 'Add Document',
+      icon: material.Icons.add_rounded,
+      onPressed: _addDocument,
+      size: QueryaControlSize.sm,
+    );
+    return material.Container(
+      padding:
+          const material.EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: material.BoxDecoration(
+        color: shadcnCs.muted.withValues(alpha: 0.15),
+      ),
+      child: material.LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth >= singleRowMinWidth) {
+            return Row(
+              children: [
+                ...searchRow,
+                const Gap(12),
+                ...tools,
+                const Gap(12),
+                addDocument,
+              ],
+            );
+          }
+          return Column(
+            crossAxisAlignment: material.CrossAxisAlignment.stretch,
+            children: [
+              Row(children: searchRow),
+              const Gap(8),
+              material.Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: material.WrapCrossAlignment.center,
+                children: [
+                  ...tools.where((w) => w is! Gap),
+                  addDocument,
+                ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
