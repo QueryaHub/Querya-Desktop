@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:querya_desktop/core/storage/local_db.dart';
 
 /// Thrown when a team profile file cannot be read.
@@ -10,6 +11,14 @@ class TeamProfileFormatException implements Exception {
   @override
   String toString() => message;
 }
+
+/// What [TeamProfileCodec.importInto] did: rows saved, rows that could not be
+/// saved, and the error of the first of those.
+typedef TeamProfileImportResult = ({
+  int added,
+  int failed,
+  Object? firstError,
+});
 
 /// Shareable, secret-free snapshot of a set of connections
 /// (`team-profile.querya`).
@@ -122,8 +131,7 @@ class TeamProfileCodec {
     }
     final v = doc['version'];
     if (v is! int || v > version) {
-      throw TeamProfileFormatException(
-          'Unsupported team profile version: $v.');
+      throw TeamProfileFormatException('Unsupported team profile version: $v.');
     }
     final list = doc['connections'];
     if (list is! List) {
@@ -187,8 +195,12 @@ class TeamProfileCodec {
   }
 
   /// Imports [rows] into [db], skipping ones that already exist
-  /// (same type, name, host, port and database). Returns the added count.
-  static Future<int> importInto(
+  /// (same type, name, host, port and database).
+  ///
+  /// Every row is tried: a row that cannot be saved (typically the system
+  /// keyring refusing a write) is counted in `failed` and does not stop the
+  /// rest. `firstError` is the error of the first such row.
+  static Future<TeamProfileImportResult> importInto(
     LocalDb db,
     List<ConnectionRow> rows,
   ) async {
@@ -197,11 +209,20 @@ class TeamProfileCodec {
         '${r.type}|${r.name}|${r.host}|${r.port}|${r.databaseName}';
     final known = {for (final e in existing) key(e)};
     var added = 0;
+    var failed = 0;
+    Object? firstError;
     for (final r in rows) {
       if (!known.add(key(r))) continue;
-      await db.addConnection(r);
-      added++;
+      try {
+        await db.addConnection(r);
+        added++;
+      } catch (e, st) {
+        debugPrint('TeamProfileCodec.importInto: "${r.name}" failed: '
+            '${e.runtimeType}: $e\n$st');
+        failed++;
+        firstError ??= e;
+      }
     }
-    return added;
+    return (added: added, failed: failed, firstError: firstError);
   }
 }

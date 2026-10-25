@@ -8,7 +8,8 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/team/team_profile.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
 
-const _typeGroup = XTypeGroup(label: 'Querya team profile', extensions: ['querya']);
+const _typeGroup =
+    XTypeGroup(label: 'Querya team profile', extensions: ['querya']);
 
 /// Saves all connections (without passwords) to a `team-profile.querya` file.
 Future<void> exportTeamProfile(BuildContext context) async {
@@ -39,23 +40,34 @@ Future<void> importTeamProfile(BuildContext context) async {
   if (file == null || !context.mounted) return;
   try {
     final read = TeamProfileCodec.read(utf8.decode(await file.readAsBytes()));
-    final added = await TeamProfileCodec.importInto(LocalDb.instance, read.rows);
+    final result =
+        await TeamProfileCodec.importInto(LocalDb.instance, read.rows);
+    final added = result.added;
     if (!context.mounted) return;
     QueryaCommandHost.maybeOf(context)?.onReloadConnections?.call();
     showAppToast(
       context: context,
       message: [
         added == 0
-            ? 'Nothing new to import'
+            ? (result.failed == 0
+                ? 'Nothing new to import'
+                : 'Nothing imported.')
             : 'Imported $added connection(s). Enter passwords when connecting.',
+        if (result.failed > 0)
+          '${result.failed} could not be saved: ${result.firstError}',
         if (read.skipped > 0)
           '${read.skipped} entr${read.skipped == 1 ? 'y was' : 'ies were'} '
               'unreadable and skipped.',
       ].join(' '),
-      variant: read.skipped > 0 ? AppToastVariant.info : AppToastVariant.success,
+      variant: result.failed > 0
+          ? AppToastVariant.error
+          : read.skipped > 0
+              ? AppToastVariant.info
+              : AppToastVariant.success,
     );
   } on TeamProfileFormatException catch (e) {
     if (!context.mounted) return;
-    showAppToast(context: context, message: e.message, variant: AppToastVariant.error);
+    showAppToast(
+        context: context, message: e.message, variant: AppToastVariant.error);
   }
 }
