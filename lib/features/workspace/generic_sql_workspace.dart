@@ -637,6 +637,10 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       }
     }
 
+    // The tab may have been closed while the settings read or the dialog was
+    // pending.
+    if (!mounted) return;
+
     // Only now: cancelling the destructive dialog above must keep the edits.
     if (session.stagingBuffer != null && session.stagingBuffer!.isDirty) {
       session.stagingBuffer?.dispose();

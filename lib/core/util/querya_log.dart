@@ -133,7 +133,17 @@ class QueryaLog {
   Future<void> _append(String line) async {
     final dir = _directory!;
     final bytes = utf8.encode(line);
-    if (_size > 0 && _size + bytes.length > maxBytes) await _rotate(dir);
+    if (_size > 0 && _size + bytes.length > maxBytes) {
+      try {
+        await _rotate(dir);
+      } catch (e) {
+        // A file that cannot be renamed (open in a viewer, wrong permissions)
+        // must not stop the log: keep writing to the current file and try
+        // again after another maxBytes.
+        debugPrint('QueryaLog: could not rotate: $e');
+        _size = 0;
+      }
+    }
     await _file(dir, 0).writeAsBytes(bytes, mode: FileMode.append);
     _size += bytes.length;
   }
