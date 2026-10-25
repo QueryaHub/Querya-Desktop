@@ -183,6 +183,7 @@ class _ConnectionTile extends StatelessWidget {
 
 class _FolderTile extends StatefulWidget {
   const _FolderTile({
+    super.key,
     required this.name,
     required this.initiallyExpanded,
     required this.onExpansionCommitted,

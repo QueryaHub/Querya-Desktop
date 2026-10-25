@@ -902,6 +902,9 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
     if (id == null) return tile;
     final colors = context.colors;
     return material.Draggable<int>(
+      // Keyed by the connection: a row keeps its own expanded branches when
+      // another connection is inserted above it (#1821).
+      key: material.ValueKey('connection-$id'),
       data: id,
       maxSimultaneousDrags: 1,
       onDragStarted: () {
@@ -1309,6 +1312,24 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                             horizontal: 12, vertical: 12),
                         sliver: material.SliverList(
                           delegate: material.SliverChildBuilderDelegate(
+                            findChildIndexCallback: (key) {
+                              if (key is! material.ValueKey<String>) return null;
+                              final v = key.value;
+                              final offset = showEmptyState ? 1 : 0;
+                              if (v.startsWith('folder-')) {
+                                final i = filteredFolders
+                                    .indexOf(v.substring('folder-'.length));
+                                return i < 0 ? null : i + offset;
+                              }
+                              if (v.startsWith('connection-')) {
+                                final i = rootConnections.indexWhere(
+                                    (c) => 'connection-${c.id}' == v);
+                                return i < 0
+                                    ? null
+                                    : i + offset + filteredFolders.length;
+                              }
+                              return null;
+                            },
                             (context, index) {
                               if (showEmptyState && index == 0) {
                                 return material.Padding(
@@ -1325,6 +1346,7 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
                               if (folderIndex < filteredFolders.length) {
                                 final name = filteredFolders[folderIndex];
                                 return _FolderTile(
+                                  key: material.ValueKey('folder-$name'),
                                   name: name,
                                   initiallyExpanded: q.isNotEmpty ||
                                       _expandedFolders.contains(name),
