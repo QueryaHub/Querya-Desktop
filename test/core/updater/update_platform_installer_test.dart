@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
@@ -213,6 +214,72 @@ void main() {
       final zipFile = File(p.join(temp.path, 'evil.zip'));
       final archive = Archive();
       archive.addFile(ArchiveFile('../outside.txt', 4, [1, 2, 3, 4]));
+      await zipFile.writeAsBytes(ZipEncoder().encode(archive));
+
+      expect(
+        () => extractZipSecurely(
+          zipFile: zipFile,
+          destinationDir: Directory(p.join(temp.path, 'out')),
+        ),
+        throwsA(isA<AppUpdaterException>()),
+      );
+    });
+  });
+
+  group('extractZipSecurely symlinks and permissions (#1765)', () {
+    // Like `ditto -c -k`: the target is the content, the mode says "symlink".
+    ArchiveFile symlinkEntry(String name, String target) {
+      final bytes = utf8.encode(target);
+      return ArchiveFile(name, bytes.length, bytes)..mode = 0xa1ff;
+    }
+
+    Future<Directory> tempDir() async {
+      final temp = await Directory.systemTemp.createTemp('querya_zip_test_');
+      addTearDown(() async {
+        if (await temp.exists()) await temp.delete(recursive: true);
+      });
+      return temp;
+    }
+
+    test('keeps a symlink and the executable bit', () async {
+      final temp = await tempDir();
+      final archive = Archive()
+        ..addFile(ArchiveFile('App/bin/tool', 2, [1, 2])..mode = 0x1ed)
+        ..addFile(symlinkEntry('App/bin/current', 'tool'));
+      final zipFile = File(p.join(temp.path, 'ok.zip'));
+      await zipFile.writeAsBytes(ZipEncoder().encode(archive));
+      final out = Directory(p.join(temp.path, 'out'));
+
+      await extractZipSecurely(zipFile: zipFile, destinationDir: out);
+
+      final link = Link(p.join(out.path, 'App', 'bin', 'current'));
+      expect(await link.exists(), isTrue);
+      expect(await link.target(), 'tool');
+      final mode = File(p.join(out.path, 'App', 'bin', 'tool')).statSync().mode;
+      expect(mode & 0x40, isNot(0));
+    }, skip: Platform.isWindows);
+
+    test('rejects a symlink pointing outside the root', () async {
+      final temp = await tempDir();
+      final archive = Archive()
+        ..addFile(symlinkEntry('App/evil', '../../outside'));
+      final zipFile = File(p.join(temp.path, 'evil.zip'));
+      await zipFile.writeAsBytes(ZipEncoder().encode(archive));
+
+      expect(
+        () => extractZipSecurely(
+          zipFile: zipFile,
+          destinationDir: Directory(p.join(temp.path, 'out')),
+        ),
+        throwsA(isA<AppUpdaterException>()),
+      );
+    });
+
+    test('rejects an absolute symlink target', () async {
+      final temp = await tempDir();
+      final archive = Archive()
+        ..addFile(symlinkEntry('App/abs', '/etc/passwd'));
+      final zipFile = File(p.join(temp.path, 'abs.zip'));
       await zipFile.writeAsBytes(ZipEncoder().encode(archive));
 
       expect(

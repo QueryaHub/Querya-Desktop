@@ -41,7 +41,20 @@ Future<void> extractZipSecurely({
       );
     }
 
-    if (entry.isFile) {
+    if (entry.isSymbolicLink) {
+      // The macOS bundle keeps its framework symlinks (`Versions/Current`);
+      // flattened to text files they fail `codesign --verify`.
+      final target = entry.symbolicLink!;
+      final resolved = p.normalize(p.join(p.dirname(targetPath), target));
+      if (p.isAbsolute(target) ||
+          !isArchiveExtractPathWithinRoot(root, resolved)) {
+        throw AppUpdaterException(
+          'Security violation: symlink "$name" points outside the archive',
+        );
+      }
+      await Directory(p.dirname(targetPath)).create(recursive: true);
+      await Link(targetPath).create(target);
+    } else if (entry.isFile) {
       final out = File(targetPath);
       await out.parent.create(recursive: true);
       final Uint8List bytes;
@@ -51,9 +64,25 @@ Future<void> extractZipSecurely({
         throw AppUpdaterException(error.message);
       }
       await out.writeAsBytes(bytes);
+      await _applyUnixPermissions(out, entry.unixPermissions);
     } else {
       await Directory(targetPath).create(recursive: true);
     }
+  }
+}
+
+/// Restores the permission bits of an extracted file (POSIX only), so helper
+/// binaries in an update stay executable.
+Future<void> _applyUnixPermissions(File file, int permissions) async {
+  if (Platform.isWindows || permissions == 0) return;
+  final result = await Process.run('chmod', [
+    permissions.toRadixString(8),
+    file.path,
+  ]);
+  if (result.exitCode != 0) {
+    throw AppUpdaterException(
+      'Could not set permissions on ${p.basename(file.path)}: ${result.stderr}',
+    );
   }
 }
 
