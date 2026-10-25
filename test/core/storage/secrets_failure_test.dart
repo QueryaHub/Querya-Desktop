@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:querya_desktop/core/security/ssh_tunnel_config.dart';
@@ -156,6 +157,44 @@ void main() {
       expect(loaded.password, 'db-password');
       expect(loaded.connectionString, 'postgres://admin@localhost/db');
     });
+  });
+
+  test(
+      'updateConnection: when the restore is refused as well the first error '
+      'is reported and the failed restore is logged (#1778)', () async {
+    final id = await LocalDb.instance.addConnection(row('Before'));
+    testMemorySecrets.resetCounts();
+    final error = StateError('connection string refused');
+    testMemorySecrets.failOnCall(SecretsOp.write, 2, error);
+    // The restore writes the old password first (call 3).
+    testMemorySecrets.failOnCall(
+        SecretsOp.write, 3, StateError('keyring went away'));
+    final printed = <String>[];
+    final original = debugPrint;
+    debugPrint = (message, {wrapWidth}) => printed.add(message ?? '');
+    addTearDown(() => debugPrint = original);
+
+    await expectLater(
+      LocalDb.instance.updateConnection(ConnectionRow(
+        id: id,
+        type: 'postgresql',
+        name: 'After',
+        host: 'other-host',
+        port: 5433,
+        username: 'root',
+        password: 'new-password',
+        connectionString: 'postgres://root@other-host/db',
+        createdAt: '2026-01-01T00:00:00Z',
+      )),
+      throwsA(same(error)),
+    );
+
+    expect(
+      printed.where((l) => l.contains('restore of connection $id')),
+      isNotEmpty,
+    );
+    expect(printed.join('\n'), contains('keyring went away'));
+    expect((await rowsNamed('Before')), hasLength(1));
   });
 
   group('a read that fails', () {
