@@ -1,3 +1,7 @@
+-- The entrypoint pipes this file through the mysql client, which reads it as
+-- latin1 unless told otherwise: non-ASCII text would be stored double-encoded.
+SET NAMES utf8mb4;
+
 -- Demo schema for Querya manual testing (MySQL 8.4+).
 USE querya;
 
