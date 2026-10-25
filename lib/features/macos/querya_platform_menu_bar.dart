@@ -26,6 +26,8 @@ class QueryaPlatformMenuBar extends StatelessWidget {
     this.onToggleSidebar,
     this.onOpenPreferences,
     this.onOpenWelcomeTour,
+    this.onOpenLogsFolder,
+    this.onCopyDiagnostics,
     this.onGoHome,
     this.onFocusFilterBar,
     this.onToggleGroupings,
@@ -41,6 +43,8 @@ class QueryaPlatformMenuBar extends StatelessWidget {
   final VoidCallback? onToggleSidebar;
   final VoidCallback? onOpenPreferences;
   final VoidCallback? onOpenWelcomeTour;
+  final VoidCallback? onOpenLogsFolder;
+  final VoidCallback? onCopyDiagnostics;
   final VoidCallback? onGoHome;
   final VoidCallback? onFocusFilterBar;
   final VoidCallback? onToggleGroupings;
@@ -369,6 +373,18 @@ class QueryaPlatformMenuBar extends StatelessWidget {
             PlatformMenuItem(
               label: 'Report an Issue...',
               onSelected: () => unawaited(launchUrl(Uri.parse(issuesUrl))),
+            ),
+            PlatformMenuItemGroup(
+              members: [
+                PlatformMenuItem(
+                  label: 'Open Logs Folder',
+                  onSelected: onOpenLogsFolder,
+                ),
+                PlatformMenuItem(
+                  label: 'Copy Diagnostics',
+                  onSelected: onCopyDiagnostics,
+                ),
+              ],
             ),
           ],
         ),
