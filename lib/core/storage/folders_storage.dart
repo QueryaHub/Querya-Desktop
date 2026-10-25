@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/storage/app_data_root.dart';
 
+import 'package:querya_desktop/core/util/querya_log.dart';
+
 import 'local_db.dart';
 
 const _legacyFileName = 'folders.json';
@@ -31,6 +33,7 @@ class FoldersStorage {
       // Not marked loaded: the next call reads again instead of caching an
       // empty list for the rest of the session.
       debugPrint('FoldersStorage.load: $e');
+      QueryaLog.instance.error('FoldersStorage', 'load failed', error: e);
       _folders = [];
     }
     return folders;
@@ -62,6 +65,7 @@ class FoldersStorage {
       await file.delete();
     } catch (e) {
       debugPrint('FoldersStorage._migrateFromLegacyIfNeeded: $e');
+      QueryaLog.instance.error('FoldersStorage', 'legacy folders.json migration failed', error: e);
     }
   }
 

@@ -108,6 +108,21 @@ void main() {
     expect(await read(QueryaLog.fileName), contains('kept'));
   });
 
+  test('a rotation that fails does not stop the log', () async {
+    final log = QueryaLog(maxBytes: 100, maxFiles: 2);
+    await log.init(root);
+    // A directory where the rotated file must go makes the rename fail.
+    await Directory(p.join(root.path, 'querya.1.log')).create();
+    await File(p.join(root.path, 'querya.1.log', 'x')).writeAsString('x');
+    for (var i = 0; i < 10; i++) {
+      log.info('t', 'line number $i ${'x' * 20}');
+    }
+    log.info('t', 'the last line');
+    await log.flush();
+
+    expect(await read(QueryaLog.fileName), contains('the last line'));
+  });
+
   test('logIgnored writes to the shared log', () async {
     await QueryaLog.instance.init(root);
     logIgnored('Somewhere.close', StateError('already closed'));

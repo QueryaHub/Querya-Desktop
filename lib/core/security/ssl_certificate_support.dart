@@ -234,8 +234,9 @@ Future<bool> _isProcessAlive(int owner) async {
       return result.exitCode != 0 || '${result.stdout}'.contains('$owner');
     }
     return (await Process.run('kill', ['-0', '$owner'])).exitCode == 0;
-  } catch (_) {
+  } catch (e) {
     // Cannot tell: leave the directory alone.
+    logIgnored('ssl_certificate_support', e);
     return true;
   }
 }
