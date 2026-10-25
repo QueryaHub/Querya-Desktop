@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
-import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 import 'package:querya_desktop/features/connections/remove_saved_password_option.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
@@ -35,8 +34,6 @@ class ConnectionAuthSection extends material.StatefulWidget {
 }
 
 class _ConnectionAuthSectionState extends material.State<ConnectionAuthSection> {
-  bool _showPassword = false;
-
   material.Widget _buildUsernameField() {
     return material.Column(
       crossAxisAlignment: material.CrossAxisAlignment.stretch,
@@ -46,6 +43,7 @@ class _ConnectionAuthSectionState extends material.State<ConnectionAuthSection> 
         const Gap(8),
         QueryaTextField(
           controller: widget.usernameController,
+          semanticLabel: widget.usernameLabel,
           placeholder: widget.usernamePlaceholder,
         ),
       ],
@@ -64,30 +62,13 @@ class _ConnectionAuthSectionState extends material.State<ConnectionAuthSection> 
             onChanged: widget.onRemoveSavedPasswordChanged!,
           ),
         const Gap(8),
-        material.Stack(
-          children: [
-            QueryaTextField(
-              controller: widget.passwordController,
-              enabled: !widget.removeSavedPassword,
-              placeholder: widget.isEditing ? 'Leave blank to keep existing' : 'Password',
-              obscureText: !_showPassword,
-            ),
-            material.Positioned(
-              right: 8,
-              top: 0,
-              bottom: 0,
-              child: material.Center(
-                child: QueryaIconButton(
-icon: material.Icon(_showPassword
-                        ? material.Icons.visibility_off
-                        : material.Icons.visibility),
-tooltip: _showPassword ? 'Hide password' : 'Show password',
-size: QueryaControlSize.sm,
-onPressed: () => setState(() => _showPassword = !_showPassword),
-),
-              ),
-            ),
-          ],
+        QueryaTextField(
+          controller: widget.passwordController,
+          enabled: !widget.removeSavedPassword,
+          placeholder: widget.isEditing ? 'Leave blank to keep existing' : 'Password',
+          semanticLabel: widget.passwordLabel,
+          // The field brings its own show / hide button.
+          obscureText: true,
         ),
       ],
     );

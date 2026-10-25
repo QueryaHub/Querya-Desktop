@@ -188,13 +188,7 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
         onOpenSqlWorkspace != null ||
         onTogglePin != null;
     if (!wantsMenu) {
-      return expanded == null
-          ? row
-          : material.Semantics(
-              button: true,
-              expanded: expanded,
-              child: row,
-            );
+      return expanded == null ? row : _expandSemantics(row);
     }
     final menu = QueryaContextMenu(
       items: [
@@ -311,10 +305,23 @@ class QueryaConnectionTreeRow extends material.StatelessWidget {
       child: row,
     );
     if (expanded == null) return menu;
+    return _expandSemantics(menu);
+  }
+
+  /// One labelled node with the expand / collapse state and a tap action, so
+  /// a screen reader or a switch can open the branch (#1822). The inner
+  /// nodes are excluded: the label is the row's own, not a second one.
+  material.Widget _expandSemantics(material.Widget child) {
     return material.Semantics(
+      container: true,
       button: true,
       expanded: expanded,
-      child: menu,
+      selected: isSelected,
+      label: label,
+      onTap: onTap,
+      // A trailing control keeps its own node.
+      excludeSemantics: trailing == null,
+      child: child,
     );
   }
 

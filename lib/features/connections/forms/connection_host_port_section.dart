@@ -42,6 +42,7 @@ class ConnectionHostPortSection extends StatelessWidget {
               const Gap(8),
               QueryaTextField(
                 controller: hostController,
+                semanticLabel: hostLabel,
                 placeholder: hostPlaceholder,
               ),
             ],
@@ -58,6 +59,7 @@ class ConnectionHostPortSection extends StatelessWidget {
               const Gap(8),
               QueryaTextField(
                 controller: portController,
+                semanticLabel: portLabel,
                 placeholder: portPlaceholder,
               ),
             ],
