@@ -122,7 +122,9 @@ bool _startsWithKeyword(String sql, String keyword) {
 /// Whether SQL-grid Save may run for this result set.
 ///
 /// Requires a simple single-table SELECT, a non-empty primary key, and every
-/// PK column present in [resultColumns] (so WHERE can address the row).
+/// PK column present in [resultColumns] (so WHERE can address the row) *as a
+/// column of the table*: `SELECT number AS id ...` has a column called `id`
+/// that is not the key, and an UPDATE keyed on it would change another row.
 bool sqlResultGridSaveEnabled({
   required String? sql,
   required List<String> resultColumns,
@@ -133,7 +135,76 @@ bool sqlResultGridSaveEnabled({
   }
   if (primaryKeys.isEmpty) return false;
   final cols = resultColumns.toSet();
-  return primaryKeys.every(cols.contains);
+  if (!primaryKeys.every(cols.contains)) return false;
+  final direct = _directSelectColumns(sql);
+  if (direct == null) return true; // `SELECT *`: every column is the table's.
+  final names = {for (final n in direct) n.toLowerCase()};
+  return primaryKeys.every((pk) => names.contains(pk.toLowerCase()));
+}
+
+final _selectIdent = r'(?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[\p{L}\p{N}_$]+)';
+final _plainSelectItem = RegExp(
+  '^(?:$_selectIdent\\s*\\.\\s*)*($_selectIdent)(?:\\s+(?:as\\s+)?($_selectIdent))?\$',
+  caseSensitive: false,
+  unicode: true,
+);
+
+String _unquoteIdent(String s) {
+  if (s.length >= 2 &&
+      ((s.startsWith('"') && s.endsWith('"')) ||
+          (s.startsWith('`') && s.endsWith('`')) ||
+          (s.startsWith('[') && s.endsWith(']')))) {
+    return s.substring(1, s.length - 1);
+  }
+  return s;
+}
+
+/// The output names of the select items of [sql] that are a plain column of
+/// the table, unrenamed (`id`, `t.id`, `"id"`, `id AS id`), or null when the
+/// list holds a `*` (every column of the table, as is). Items that are an
+/// expression or an alias of another column are left out.
+List<String>? _directSelectColumns(String sql) {
+  final text = sql.trim();
+  final selectAt = _skipTrivia(text, 0) + 'select'.length;
+  final fromAt = _indexOfTopLevelKeyword(text, 'from');
+  if (fromAt < 0 || fromAt <= selectAt) return null;
+  var list = text.substring(selectAt, fromAt).trim();
+  final quantifier = RegExp(r'^(?:distinct|all)\s+', caseSensitive: false);
+  list = list.replaceFirst(quantifier, '');
+
+  final items = <String>[];
+  var depth = 0;
+  String? quote;
+  var start = 0;
+  for (var i = 0; i < list.length; i++) {
+    final c = list[i];
+    if (quote != null) {
+      if (c == quote) quote = null;
+    } else if (c == "'" || c == '"' || c == '`') {
+      quote = c;
+    } else if (c == '(') {
+      depth++;
+    } else if (c == ')') {
+      if (depth > 0) depth--;
+    } else if (c == ',' && depth == 0) {
+      items.add(list.substring(start, i).trim());
+      start = i + 1;
+    }
+  }
+  items.add(list.substring(start).trim());
+
+  final direct = <String>[];
+  for (final item in items) {
+    if (item == '*' || item.endsWith('.*')) return null;
+    final m = _plainSelectItem.firstMatch(item);
+    if (m == null) continue;
+    final column = _unquoteIdent(m.group(1)!);
+    final alias = m.group(2);
+    if (alias == null || _unquoteIdent(alias).toLowerCase() == column.toLowerCase()) {
+      direct.add(column);
+    }
+  }
+  return direct;
 }
 
 int _indexOfTopLevelKeyword(String sql, String keyword) {
