@@ -1,4 +1,4 @@
-import 'package:querya_desktop/core/layout/ui_scale.dart';
+import 'package:querya_desktop/core/layout/ui_zoom.dart';
 import 'package:querya_desktop/core/layout/ui_scale_controller.dart';
 import 'package:querya_desktop/core/motion/querya_motion_controller.dart';
 import 'package:querya_desktop/core/motion/querya_motion_scope.dart';
@@ -65,26 +65,22 @@ class QueryaApp extends StatelessWidget {
                   themeAnimationCurve: themeCurve,
                   // Above navigator so dialogs/overlays (SQL editor, Preferences) see tokens.
                   builder: (context, child) {
-                    final mq = MediaQuery.maybeOf(context);
-                    return QueryaUiScaleScope(
+                    // One zoom for the whole interface (text, icons, paddings,
+                    // hit areas), capped by the window size; dialogs and menus
+                    // live in the Navigator below, so they are zoomed with it.
+                    return QueryaUiZoom(
                       scale: scale,
-                      child: MediaQuery(
-                        data: (mq ?? const MediaQueryData()).copyWith(
-                          textScaler: TextScaler.linear(
-                            (mq ?? const MediaQueryData())
-                                    .textScaler
-                                    .scale(1.0) *
-                                scale,
-                          ),
-                        ),
-                        child: AnimatedQueryaTheme(
-                          data: queryaTheme,
-                          duration: themeDuration,
-                          curve: themeCurve,
-                          child: QueryaMotionScope(
-                            level: motionLevel,
-                            child: child ?? const SizedBox.shrink(),
-                          ),
+                      duration: disableAnimations ||
+                              motionLevel == QueryaMotionLevel.off
+                          ? Duration.zero
+                          : const Duration(milliseconds: 180),
+                      child: AnimatedQueryaTheme(
+                        data: queryaTheme,
+                        duration: themeDuration,
+                        curve: themeCurve,
+                        child: QueryaMotionScope(
+                          level: motionLevel,
+                          child: child ?? const SizedBox.shrink(),
                         ),
                       ),
                     );

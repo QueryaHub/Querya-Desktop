@@ -1,3 +1,4 @@
+import 'package:querya_desktop/core/layout/ui_zoom.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async';
 import 'dart:math' as math;
@@ -337,8 +338,10 @@ class _VirtualResultGridState extends material.State<VirtualResultGrid> {
     final screenW = media?.size.width ?? 1920.0;
     final screenH = media?.size.height ?? 1080.0;
 
-    final left = (globalPosition.dx + 10.0).clamp(8.0, screenW - 320.0);
-    final top = (globalPosition.dy + 18.0).clamp(8.0, screenH - 120.0);
+    // The pointer position is in window coordinates; the overlay is zoomed.
+    final at = context.windowToApp(globalPosition);
+    final left = (at.dx + 10.0).clamp(8.0, screenW - 320.0);
+    final top = (at.dy + 18.0).clamp(8.0, screenH - 120.0);
 
     _cellTooltipOverlayEntry = material.OverlayEntry(
       builder: (context) {
