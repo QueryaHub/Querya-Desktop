@@ -263,7 +263,10 @@ class SduiTreeBuilderState extends material.State<SduiTreeBuilder> {
 
     return QueryaTreeIndentGuide(
       depth: depth,
-      leading: 8.0 + (canExpand ? 0 : 4.0),
+      // The connection already indents the tree by underConnection, like the
+      // built-in drivers' trees; an extra 8 here put the first level further
+      // right than a Postgres or MySQL database list.
+      leading: canExpand ? 0 : 4.0,
       child: QueryaConnectionTreeRow(
         label: node.label,
         isSelected: isSelected,

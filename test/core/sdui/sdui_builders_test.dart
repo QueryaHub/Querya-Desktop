@@ -291,6 +291,31 @@ void main() {
       expect(find.text('analytics'), findsOneWidget);
     });
 
+    testWidgets('a root row starts at the tree edge, no extra inset (#1822 run)',
+        (tester) async {
+      final schema = SduiTreeSchema.fromJson(const {
+        'roots': [
+          {'id': 'databases', 'label': 'Databases', 'expandable': true},
+        ],
+      });
+      await tester.pumpWidget(
+        queryaThemeTestShell(
+          child: material.Scaffold(
+            body: SduiTreeBuilder(
+              schema: schema,
+              fetchChildren: (_) async => const [],
+            ),
+          ),
+        ),
+      );
+
+      final tree = tester.getTopLeft(find.byType(SduiTreeBuilder)).dx;
+      final chevron = tester.getTopLeft(find.byIcon(QueryaIcons.expandClosed)).dx;
+      // The row's own padding (4) and nothing else: the connection supplies
+      // the indent under it.
+      expect(chevron - tree, lessThan(8));
+    });
+
     testWidgets('expand chevron uses QueryaMotion tokens (Off = instant)',
         (tester) async {
       final schema = SduiTreeSchema.fromJson(const {
