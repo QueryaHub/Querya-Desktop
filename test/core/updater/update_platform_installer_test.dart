@@ -291,6 +291,24 @@ void main() {
       );
     });
 
+    test('rejects a file written below a chain of symlinks (review of #1765)',
+        () async {
+      final temp = await tempDir();
+      final archive = Archive()
+        ..addFile(symlinkEntry('a', '.'))
+        ..addFile(symlinkEntry('a/b', '..'))
+        ..addFile(ArchiveFile('b/evil', 4, [1, 2, 3, 4]));
+      final zipFile = File(p.join(temp.path, 'chain.zip'));
+      await zipFile.writeAsBytes(asUnixZip(archive));
+      final out = Directory(p.join(temp.path, 'out'));
+
+      await expectLater(
+        extractZipSecurely(zipFile: zipFile, destinationDir: out),
+        throwsA(isA<AppUpdaterException>()),
+      );
+      expect(File(p.join(temp.path, 'evil')).existsSync(), isFalse);
+    });
+
     test('rejects an absolute symlink target', () async {
       final temp = await tempDir();
       final archive = Archive()

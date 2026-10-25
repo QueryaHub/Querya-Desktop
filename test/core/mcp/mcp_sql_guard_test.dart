@@ -117,6 +117,31 @@ void main() {
     refused('SELECT `sleep`(5)', SqlDialect.mysql);
   });
 
+  test('syntax the stripper and the server read differently is refused', () {
+    refused('''SELECT 1 AS "--", pg_sleep(100)''');
+    refused('''SELECT 1 AS "'", pg_read_file('/etc/passwd') AS "'"''');
+    refused(r'SELECT U&"pg_sl\0065ep"(5)');
+    refused('SELECT 1 AS `--`, SLEEP(10)', SqlDialect.mysql);
+    refused('SELECT 1--1, SLEEP(30)', SqlDialect.mysql);
+    refused("SELECT 1 # '\n, SLEEP(10) # '", SqlDialect.mysql);
+  });
+
+  test('ordinary quoting is still allowed', () {
+    allowed('''SELECT "id" FROM users WHERE name = 'x' AND "age" > 3''');
+    allowed('''SELECT "a", "b" FROM t WHERE c = 'it''s' ''');
+    allowed("SELECT '#fff', 'a--b' FROM t", SqlDialect.mysql);
+    allowed('SELECT 1 -- a note', SqlDialect.mysql);
+  });
+
+  test('more server-side functions are refused (review of #1769)', () {
+    refused("SELECT pg_notify('chan', 'x')");
+    refused('SELECT * FROM pg_ls_logdir()');
+    refused('SELECT pg_stat_statements_reset()');
+    refused("SELECT pg_create_logical_replication_slot('s', 'test_decoding')");
+    refused("SELECT pg_logical_slot_get_changes('s', NULL, NULL)");
+    refused("SELECT pg_replication_slot_advance('s', '0/0')");
+  });
+
   test('EXPLAIN of a SELECT that calls REPLACE() is allowed (#1565)', () {
     allowed("EXPLAIN SELECT REPLACE(name, 'a', 'b') FROM users");
     refused("EXPLAIN REPLACE INTO users VALUES (1)", SqlDialect.mysql);
