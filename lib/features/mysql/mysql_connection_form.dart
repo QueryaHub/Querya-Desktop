@@ -1,3 +1,4 @@
+import 'package:querya_desktop/features/connections/connection_save_gate.dart';
 import 'package:querya_desktop/shared/report_error.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
@@ -29,6 +30,7 @@ Future<ConnectionRow?> showMysqlConnectionForm(
   BuildContext context, {
   int? folderId,
   ConnectionRow? initial,
+  ConnectionSaveGate? onSave,
 }) async {
   return showAppDialog<ConnectionRow>(
     context: context,
@@ -38,16 +40,18 @@ Future<ConnectionRow?> showMysqlConnectionForm(
       child: _MysqlConnectionFormContent(
         folderId: folderId,
         initial: initial,
+        onSave: onSave,
       ),
     ),
   );
 }
 
 class _MysqlConnectionFormContent extends material.StatefulWidget {
-  const _MysqlConnectionFormContent({this.folderId, this.initial});
+  const _MysqlConnectionFormContent({this.folderId, this.initial, this.onSave});
 
   final int? folderId;
   final ConnectionRow? initial;
+  final ConnectionSaveGate? onSave;
 
   @override
   material.State<_MysqlConnectionFormContent> createState() =>
@@ -256,7 +260,28 @@ class _MysqlConnectionFormContentState
     }
   }
 
-  void _save() {
+  bool _submitting = false;
+
+  /// Closes the form with [row] once the save gate (creation flows) accepts it;
+  /// when it refuses, the form stays open with everything typed and shows why
+  /// (#1758).
+  Future<void> _finish(ConnectionRow row) async {
+    if (_submitting) return;
+    _submitting = true;
+    try {
+      final error = await widget.onSave?.call(row);
+      if (!mounted) return;
+      if (error != null) {
+        _showTestResult('error: $error');
+        return;
+      }
+      material.Navigator.of(context).pop(row);
+    } finally {
+      _submitting = false;
+    }
+  }
+
+  Future<void> _save() async {
     if (!_formValidNotifier.value) return;
     _syncUriSslParams();
     final name = _nameController.text.trim();
@@ -299,7 +324,7 @@ class _MysqlConnectionFormContentState
     row = row.withSshTunnelConfig(_sshConfig.enabled ? _sshConfig : null);
     row = row.withEnvironment(_environment);
     row = row.copyWith(removeSavedPassword: _removeSavedPassword);
-    material.Navigator.of(context).pop(row);
+    await _finish(row);
   }
 
   @override

@@ -102,5 +102,82 @@ void main() {
       expect(result!.username, 'user');
       expect(result!.password, 'pass');
     });
+
+    group('with a save gate (#1758)', () {
+      Future<void> open(
+        WidgetTester tester,
+        Future<String?> Function(ConnectionRow row) gate,
+        void Function(ConnectionRow?) onResult,
+      ) async {
+        await tester.pumpWidget(
+          queryaThemeTestShell(
+            child: material.Builder(
+              builder: (context) => material.ElevatedButton(
+                onPressed: () async {
+                  onResult(
+                    await showNewConnectionUrlDialog(context, onSave: gate),
+                  );
+                },
+                child: const material.Text('Open'),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byType(QueryaTextField),
+          'postgresql://user:pass@localhost:5432/mydb',
+        );
+      }
+
+      testWidgets('a refused save keeps the dialog and the typed URL',
+          (tester) async {
+        ConnectionRow? result;
+        var closed = false;
+        var calls = 0;
+        await open(tester, (row) async {
+          calls++;
+          return calls == 1 ? 'The connection was not saved: keychain refused' : null;
+        }, (r) {
+          closed = true;
+          result = r;
+        });
+
+        await tester.tap(find.text('Create'));
+        await tester.pumpAndSettle();
+
+        expect(closed, isFalse);
+        expect(find.text('New connection from URL'), findsOneWidget);
+        expect(find.textContaining('keychain refused'), findsOneWidget);
+        expect(find.text('postgresql://user:pass@localhost:5432/mydb'),
+            findsOneWidget);
+
+        // The user presses Create again; this time it is stored.
+        await tester.tap(find.text('Create'));
+        await tester.pumpAndSettle();
+
+        expect(calls, 2);
+        expect(closed, isTrue);
+        expect(result!.databaseName, 'mydb');
+      });
+
+      testWidgets('an accepted save closes the dialog with the row',
+          (tester) async {
+        ConnectionRow? stored;
+        ConnectionRow? result;
+        await open(tester, (row) async {
+          stored = row;
+          return null;
+        }, (r) => result = r);
+
+        await tester.tap(find.text('Create'));
+        await tester.pumpAndSettle();
+
+        expect(stored, isNotNull);
+        expect(result, same(stored));
+        expect(find.text('New connection from URL'), findsNothing);
+      });
+    });
   });
 }

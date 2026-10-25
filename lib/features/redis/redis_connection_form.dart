@@ -1,3 +1,4 @@
+import 'package:querya_desktop/features/connections/connection_save_gate.dart';
 import 'package:querya_desktop/shared/report_error.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
@@ -26,6 +27,7 @@ Future<ConnectionRow?> showRedisConnectionForm(
   BuildContext context, {
   int? folderId,
   ConnectionRow? initial,
+  ConnectionSaveGate? onSave,
 }) async {
   return showAppDialog<ConnectionRow>(
     context: context,
@@ -35,16 +37,18 @@ Future<ConnectionRow?> showRedisConnectionForm(
       child: _RedisConnectionFormContent(
         folderId: folderId,
         initial: initial,
+        onSave: onSave,
       ),
     ),
   );
 }
 
 class _RedisConnectionFormContent extends material.StatefulWidget {
-  const _RedisConnectionFormContent({this.folderId, this.initial});
+  const _RedisConnectionFormContent({this.folderId, this.initial, this.onSave});
 
   final int? folderId;
   final ConnectionRow? initial;
+  final ConnectionSaveGate? onSave;
 
   @override
   material.State<_RedisConnectionFormContent> createState() =>
@@ -267,9 +271,30 @@ class _RedisConnectionFormContentState
         .withEnvironment(_environment);
   }
 
-  void _save() {
+  bool _submitting = false;
+
+  /// Closes the form with [row] once the save gate (creation flows) accepts it;
+  /// when it refuses, the form stays open with everything typed and shows why
+  /// (#1758).
+  Future<void> _finish(ConnectionRow row) async {
+    if (_submitting) return;
+    _submitting = true;
+    try {
+      final error = await widget.onSave?.call(row);
+      if (!mounted) return;
+      if (error != null) {
+        _showTestResult('error: $error');
+        return;
+      }
+      material.Navigator.of(context).pop(row);
+    } finally {
+      _submitting = false;
+    }
+  }
+
+  Future<void> _save() async {
     if (!_formValidNotifier.value) return;
-    material.Navigator.of(context).pop(
+    await _finish(
       _draftRow(id: widget.initial?.id)
           .copyWith(removeSavedPassword: _removeSavedPassword),
     );

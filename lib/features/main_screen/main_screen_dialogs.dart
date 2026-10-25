@@ -80,15 +80,16 @@ class MainScreenDialogs {
     workspace.value = ws.toggleReadOnly();
   }
 
-  Future<void> _saveNewConnection(ConnectionRow row) async {
-    if (!await saveNewConnection(_context(), row)) return;
+  /// The creation forms store the connection themselves (a refused save keeps
+  /// the form open, #1758); what is left is to show it.
+  Future<void> _showNewConnection() async {
     await connectionsPanelKey.currentState?.reloadConnectionsFromDb();
   }
 
   Future<void> openNewConnectionFromHero() async {
     final row = await promptCreateConnection(_context());
     if (!_mounted() || row == null) return;
-    await _saveNewConnection(row);
+    await _showNewConnection();
   }
 
   Future<void> onNewDatabaseConnectionFromMenu() async {
@@ -100,7 +101,7 @@ class MainScreenDialogs {
       if (!_mounted()) return;
       final row = await promptCreateConnection(_context(), folderId: null);
       if (!_mounted() || row == null) return;
-      await _saveNewConnection(row);
+      await _showNewConnection();
     } finally {
       _openingConnectionDialog = false;
     }
@@ -112,18 +113,18 @@ class MainScreenDialogs {
     try {
       await Future.delayed(const Duration(milliseconds: 100));
       if (!_mounted()) return;
-      final row = await showNewConnectionUrlDialog(_context());
+      final row = await showNewConnectionUrlDialog(_context(), onSave: storeNewConnection);
       if (!_mounted() || row == null) return;
-      await _saveNewConnection(row);
+      await _showNewConnection();
     } finally {
       _openingConnectionDialog = false;
     }
   }
 
   Future<void> openSqliteFromHero() async {
-    final row = await showSqliteConnectionForm(_context());
+    final row = await showSqliteConnectionForm(_context(), onSave: storeNewConnection);
     if (!_mounted() || row == null) return;
-    await _saveNewConnection(row);
+    await _showNewConnection();
   }
 
   void onOpenWelcomeTour() {

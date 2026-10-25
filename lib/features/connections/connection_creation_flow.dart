@@ -3,6 +3,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/models/extension_contributions.dart';
 import 'package:querya_desktop/core/storage/local_db.dart';
+import 'package:querya_desktop/features/connections/connection_save_gate.dart';
 import 'package:querya_desktop/features/connections/extension_connection_form.dart';
 import 'package:querya_desktop/features/connections/new_connection_dialog.dart';
 import 'package:querya_desktop/features/connections/sqlite_connection_form.dart';
@@ -15,6 +16,7 @@ import 'package:querya_desktop/shared/report_error.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
 
 export 'package:querya_desktop/features/connections/connection_edit_secrets.dart';
+export 'package:querya_desktop/features/connections/connection_save_gate.dart';
 
 /// Stores a connection a creation flow returned. A failed save (typically the
 /// system keyring refusing the password) rolls the row back; it is reported
@@ -48,7 +50,9 @@ material.BuildContext _dialogAnchorContext(material.BuildContext context) {
   return context;
 }
 
-/// Picks a database type, opens the matching form, returns a saved row or null.
+/// Picks a database type, opens the matching form and returns the row **after
+/// it was stored** (the form keeps itself open, with what the user typed, when
+/// the save is refused, #1758), or null when the user cancelled.
 Future<ConnectionRow?> promptCreateConnection(
   material.BuildContext context, {
   int? folderId,
@@ -63,20 +67,20 @@ Future<ConnectionRow?> promptCreateConnection(
         ConnectionType.postgresql => dialogContext.mounted
             ? await showPostgresConnectionForm(
                 dialogContext,
-                folderId: folderId,
+                folderId: folderId, onSave: storeNewConnection,
               )
             : null,
         ConnectionType.mysql => dialogContext.mounted
-            ? await showMysqlConnectionForm(dialogContext, folderId: folderId)
+            ? await showMysqlConnectionForm(dialogContext, folderId: folderId, onSave: storeNewConnection)
             : null,
         ConnectionType.mongodb => dialogContext.mounted
-            ? await showMongoConnectionForm(dialogContext, folderId: folderId)
+            ? await showMongoConnectionForm(dialogContext, folderId: folderId, onSave: storeNewConnection)
             : null,
         ConnectionType.redis => dialogContext.mounted
-            ? await showRedisConnectionForm(dialogContext, folderId: folderId)
+            ? await showRedisConnectionForm(dialogContext, folderId: folderId, onSave: storeNewConnection)
             : null,
         ConnectionType.sqlite => dialogContext.mounted
-            ? await showSqliteConnectionForm(dialogContext, folderId: folderId)
+            ? await showSqliteConnectionForm(dialogContext, folderId: folderId, onSave: storeNewConnection)
             : null,
       },
     ExtensionDriverChoice(:final manifest, :final driver) =>
@@ -85,7 +89,7 @@ Future<ConnectionRow?> promptCreateConnection(
               dialogContext,
               manifest: manifest,
               driver: driver,
-              folderId: folderId,
+              folderId: folderId, onSave: storeNewConnection,
             )
           : null,
   };

@@ -1,3 +1,4 @@
+import 'package:querya_desktop/features/connections/connection_save_gate.dart';
 import 'package:querya_desktop/core/util/log_ignored.dart';
 import 'package:querya_desktop/shared/report_error.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
@@ -27,6 +28,7 @@ Future<ConnectionRow?> showExtensionConnectionForm(
   required DriverContribution driver,
   int? folderId,
   ConnectionRow? initial,
+  ConnectionSaveGate? onSave,
 }) {
   return showAppDialog<ConnectionRow>(
     context: context,
@@ -38,6 +40,7 @@ Future<ConnectionRow?> showExtensionConnectionForm(
         driver: driver,
         folderId: folderId,
         initial: initial,
+        onSave: onSave,
       ),
     ),
   );
@@ -49,12 +52,14 @@ class _ExtensionConnectionFormContent extends material.StatefulWidget {
     required this.driver,
     this.folderId,
     this.initial,
+    this.onSave,
   });
 
   final ExtensionManifest manifest;
   final DriverContribution driver;
   final int? folderId;
   final ConnectionRow? initial;
+  final ConnectionSaveGate? onSave;
 
   @override
   material.State<_ExtensionConnectionFormContent> createState() =>
@@ -120,7 +125,28 @@ class _ExtensionConnectionFormContentState
     }
   }
 
-  void _save() {
+  bool _submitting = false;
+
+  /// Closes the form with [row] once the save gate (creation flows) accepts it;
+  /// when it refuses, the form stays open with everything typed and shows why
+  /// (#1758).
+  Future<void> _finish(ConnectionRow row) async {
+    if (_submitting) return;
+    _submitting = true;
+    try {
+      final error = await widget.onSave?.call(row);
+      if (!mounted) return;
+      if (error != null) {
+        setState(() => _testMessage = error);
+        return;
+      }
+      material.Navigator.of(context).pop(row);
+    } finally {
+      _submitting = false;
+    }
+  }
+
+  Future<void> _save() async {
     final schema = _schema;
     if (schema == null) return;
     final values = _formKey.currentState?.collectValues();
@@ -137,7 +163,7 @@ class _ExtensionConnectionFormContentState
       folderId: widget.folderId,
       initial: widget.initial,
     ).withEnvironment(_environment);
-    material.Navigator.of(context).pop(row);
+    await _finish(row);
   }
 
   Future<void> _testConnection() async {
