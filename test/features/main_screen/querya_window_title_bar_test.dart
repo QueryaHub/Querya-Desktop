@@ -206,4 +206,28 @@ void main() {
 
     expect(toggled, isTrue);
   });
+
+  testWidgets(
+      'Edit > Preferences… opens the dialog, although the menu has closed by '
+      'the time it opens (#1777)', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: QueryaWindowTitleBar(
+          onNewDatabaseConnection: () async {},
+          onNewDatabaseConnectionFromUrl: () async {},
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Preferences…'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('General'), findsWidgets);
+  });
 }
