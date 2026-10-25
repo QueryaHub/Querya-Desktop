@@ -39,9 +39,13 @@ class _FakePathProvider extends PathProviderPlatform {
 }
 
 /// Lets the real async work of a Run (the settings read in sqflite) finish:
-/// `pumpAndSettle` alone runs on fake time and never waits for it.
-Future<void> _settleRealAsync(WidgetTester tester) async {
-  for (var i = 0; i < 10; i++) {
+/// `pumpAndSettle` alone runs on fake time and never waits for it. Polls until
+/// [done] holds (up to 15 s of real time), so a slow runner does not fail it.
+Future<void> _settleRealAsync(
+  WidgetTester tester, {
+  required bool Function() done,
+}) async {
+  for (var i = 0; i < 300 && !done(); i++) {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 50)),
     );
@@ -156,7 +160,10 @@ void main() {
 
     expect(find.text('Unsaved changes in "Query 1"'), findsOneWidget);
     await tester.tap(find.text('Discard'));
-    await _settleRealAsync(tester);
+    await _settleRealAsync(tester, done: () {
+      final b = activeSession.stagingBuffer as DataGridStagingBuffer?;
+      return b == null || !b.isDirty;
+    });
 
     // Query was allowed to run, previous dirty buffer was discarded
     expect(find.text('Unsaved changes in "Query 1"'), findsNothing);
@@ -208,7 +215,9 @@ void main() {
     await tester.tap(find.widgetWithText(QueryaButton, 'Execute (F5)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Discard'));
-    await _settleRealAsync(tester);
+    await _settleRealAsync(tester,
+        done: () =>
+            find.text('Destructive Operation Detected').evaluate().isNotEmpty);
 
     expect(find.text('Destructive Operation Detected'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
