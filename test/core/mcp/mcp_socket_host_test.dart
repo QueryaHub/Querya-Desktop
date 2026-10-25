@@ -14,13 +14,14 @@ void main() {
     int maxUnauthenticated = 16,
     int maxSessions = 16,
     int maxLineBytes = 4 * 1024 * 1024,
+    int maxHandshakeBytes = 64,
   }) async {
     host = McpSocketHost(
       endpointFile: File(p.join(tempDir.path, 'mcp.json')),
       version: 'test',
       onSession: (_) async {},
       maxUnauthenticated: maxUnauthenticated,
-      maxHandshakeBytes: 64,
+      maxHandshakeBytes: maxHandshakeBytes,
       maxSessions: maxSessions,
       maxLineBytes: maxLineBytes,
     );
@@ -72,7 +73,7 @@ void main() {
   }
 
   test('sessions beyond the cap are turned away (#1776)', () async {
-    await startHost(maxSessions: 1);
+    await startHost(maxSessions: 1, maxHandshakeBytes: 4096);
     final first = await connectAuthed();
     await Future<void>.delayed(const Duration(milliseconds: 200));
     expect(host.sessionCount, 1);
@@ -83,10 +84,11 @@ void main() {
     expect(reply, contains('Too many'));
     expect(host.sessionCount, 1);
     first.destroy();
+    second.destroy();
   });
 
   test('an authenticated line without a newline is cut off (#1776)', () async {
-    await startHost(maxLineBytes: 100);
+    await startHost(maxLineBytes: 100, maxHandshakeBytes: 4096);
     final socket = await connectAuthed();
     await Future<void>.delayed(const Duration(milliseconds: 200));
     expect(host.sessionCount, 1);
@@ -97,5 +99,6 @@ void main() {
     await socket.drain<void>().timeout(const Duration(seconds: 3));
     await Future<void>.delayed(const Duration(milliseconds: 200));
     expect(host.sessionCount, 0);
+    socket.destroy();
   });
 }
