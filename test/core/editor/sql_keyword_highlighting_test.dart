@@ -66,8 +66,8 @@ void main() {
     }
   });
 
-  testWidgets('SQL keywords get the keyword colour, in any case',
-      (tester) async {
+  test('SQL keywords get the keyword colour, in any case', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
     await SyntaxHighlightService.ensureInitialized();
     final editor = QueryaTheme.darkDefault.editor;
     final highlighter = SyntaxHighlightService.createHighlighter(
