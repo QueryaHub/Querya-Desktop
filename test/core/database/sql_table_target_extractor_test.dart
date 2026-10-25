@@ -131,6 +131,66 @@ void main() {
       );
     });
 
+    test('false when the key name is an alias or an expression (#1772)', () {
+      for (final sql in [
+        'SELECT number AS id, name FROM t',
+        'SELECT number id, name FROM t',
+        'SELECT id + 0 AS id, name FROM t',
+        'SELECT CAST(number AS int) AS id, name FROM t',
+      ]) {
+        expect(
+          sqlResultGridSaveEnabled(
+            sql: sql,
+            resultColumns: ['id', 'name'],
+            primaryKeys: ['id'],
+          ),
+          isFalse,
+          reason: sql,
+        );
+      }
+    });
+
+    test('true when the key is selected as its own column (#1772)', () {
+      for (final sql in [
+        'SELECT id, name FROM t',
+        'SELECT t.id, t.name FROM t',
+        'SELECT "id", name FROM t',
+        'SELECT id AS id, name FROM t',
+        'SELECT DISTINCT id, name FROM t',
+        'SELECT t.*, 1 AS extra FROM t',
+        'SELECT ID, name FROM t',
+      ]) {
+        expect(
+          sqlResultGridSaveEnabled(
+            sql: sql,
+            resultColumns: ['id', 'name'],
+            primaryKeys: ['id'],
+          ),
+          isTrue,
+          reason: sql,
+        );
+      }
+    });
+
+    test('a composite key needs every column (#1772)', () {
+      expect(
+        sqlResultGridSaveEnabled(
+          sql: 'SELECT a, name FROM t',
+          resultColumns: ['a', 'name'],
+          primaryKeys: ['a', 'b'],
+        ),
+        isFalse,
+      );
+      expect(
+        sqlResultGridSaveEnabled(
+          sql: 'SELECT a, b, name FROM t',
+          resultColumns: ['a', 'b', 'name'],
+          primaryKeys: ['a', 'b'],
+        ),
+        isTrue,
+      );
+    });
+
     test('false for JOIN and comma FROM', () {
       expect(
         sqlResultGridSaveEnabled(

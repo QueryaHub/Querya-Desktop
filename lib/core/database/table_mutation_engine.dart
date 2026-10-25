@@ -472,7 +472,9 @@ abstract final class TableMutationEngine {
     required List<String> primaryKeys,
   }) {
     if (primaryKeys.isEmpty) return false;
-    return primaryKeys.any((pk) {
+    // Every key column: a composite key with one column missing cannot
+    // address a single row.
+    return primaryKeys.every((pk) {
       if (columns.contains(pk)) return true;
       final normPk = normalizeIdentifier(pk);
       return columns.any((c) => normalizeIdentifier(c) == normPk);
