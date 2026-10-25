@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
 import 'package:querya_desktop/core/theme/querya_theme_scope.dart';
 import 'package:querya_desktop/features/mongodb/mongo_ejson.dart';
+import 'package:querya_desktop/features/mongodb/mongo_value_display.dart';
 import 'package:querya_desktop/features/workspace/result_grid_view.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
 import 'package:gap/gap.dart';
@@ -85,7 +86,7 @@ class MongoTableGridData {
     if (val is bool) return 'Boolean';
     if (val is DateTime) return 'Date';
     if (val is String) return 'String';
-    return val.runtimeType.toString();
+    return mongoValueTypeName(val);
   }
 
   static String _formatCell(Object? val) {
@@ -101,7 +102,7 @@ class MongoTableGridData {
       return '[ $n ${n == 1 ? "item" : "items"} ]';
     }
     if (val is String) return val;
-    return val.toString();
+    return mongoValueText(val);
   }
 }
 
