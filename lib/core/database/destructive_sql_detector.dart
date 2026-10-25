@@ -9,6 +9,8 @@ enum DestructiveSqlType {
   dropTable,
   dropView,
   dropMaterializedView,
+  dropColumn,
+  dropOther,
   truncateTable,
   unconditionalDelete,
   unconditionalUpdate,
@@ -31,6 +33,8 @@ enum DestructiveSqlType {
         DestructiveSqlType.dropTable => 'DROP TABLE',
         DestructiveSqlType.dropView => 'DROP VIEW',
         DestructiveSqlType.dropMaterializedView => 'DROP MATERIALIZED VIEW',
+        DestructiveSqlType.dropColumn => 'DROP COLUMN',
+        DestructiveSqlType.dropOther => 'DROP',
         DestructiveSqlType.truncateTable => 'TRUNCATE TABLE',
         DestructiveSqlType.unconditionalDelete => 'UNCONDITIONAL DELETE',
         DestructiveSqlType.unconditionalUpdate => 'UNCONDITIONAL UPDATE',
@@ -67,6 +71,8 @@ enum DestructiveSqlType {
         DestructiveSqlType.redisFlushDb => 'CRITICAL',
         DestructiveSqlType.redisShutdown => 'CRITICAL',
         DestructiveSqlType.redisKeys => 'HIGH',
+        DestructiveSqlType.dropColumn => 'HIGH',
+        DestructiveSqlType.dropOther => 'MEDIUM',
         DestructiveSqlType.dropMaterializedView => 'MEDIUM',
         DestructiveSqlType.dropView => 'MEDIUM',
       };
@@ -94,6 +100,10 @@ class DestructiveSqlOperation {
         DestructiveSqlType.dropView => 'Drops view "$targetName".',
         DestructiveSqlType.dropMaterializedView =>
           'Drops materialized view "$targetName".',
+        DestructiveSqlType.dropColumn =>
+          'Permanently drops a column of "$targetName" and the data in it.',
+        DestructiveSqlType.dropOther =>
+          'Permanently drops "$targetName". Objects that depend on it may be lost too.',
         DestructiveSqlType.truncateTable =>
           'Quickly deletes all rows from table "$targetName" without transaction rollbacks in some engines.',
         DestructiveSqlType.unconditionalDelete =>
@@ -151,45 +161,111 @@ class DestructiveSqlInspectionResult {
 /// Heuristic analyzer and sanitizer for detecting destructive SQL queries
 /// before executing them in the SQL workspace.
 abstract final class DestructiveSqlDetector {
+  /// One identifier part, optionally quoted: letters and digits of any script
+  /// (`заказы`), `_` and `$`.
+  static const _id = r'["`]?([\p{L}\p{N}_$]+)["`]?';
+
+  static String _withId(String pattern) => pattern.replaceAll('{id}', _id);
+
   static final _dropDatabaseRegex = RegExp(
-    r'^\s*DROP\s+DATABASE\s+(?:IF\s+EXISTS\s+)?(?:["`]?([a-zA-Z0-9_]+)["`]?)',
+    _withId(r'^\s*DROP\s+DATABASE\s+(?:IF\s+EXISTS\s+)?(?:{id})'),
     caseSensitive: false,
+    unicode: true,
   );
 
   static final _dropSchemaRegex = RegExp(
-    r'^\s*DROP\s+SCHEMA\s+(?:IF\s+EXISTS\s+)?(?:["`]?([a-zA-Z0-9_]+)["`]?)',
+    _withId(r'^\s*DROP\s+SCHEMA\s+(?:IF\s+EXISTS\s+)?(?:{id})'),
     caseSensitive: false,
+    unicode: true,
   );
 
   static final _dropTableRegex = RegExp(
-    r'^\s*DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:(?:["`]?([a-zA-Z0-9_]+)["`]?\.)?["`]?([a-zA-Z0-9_]+)["`]?)',
+    _withId(r'^\s*DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:(?:{id}\.)?{id})'),
     caseSensitive: false,
+    unicode: true,
   );
 
   static final _dropMatViewRegex = RegExp(
-    r'^\s*DROP\s+MATERIALIZED\s+VIEW\s+(?:IF\s+EXISTS\s+)?(?:(?:["`]?([a-zA-Z0-9_]+)["`]?\.)?["`]?([a-zA-Z0-9_]+)["`]?)',
+    _withId(r'^\s*DROP\s+MATERIALIZED\s+VIEW\s+(?:IF\s+EXISTS\s+)?(?:(?:{id}\.)?{id})'),
     caseSensitive: false,
+    unicode: true,
   );
 
   static final _dropViewRegex = RegExp(
-    r'^\s*DROP\s+VIEW\s+(?:IF\s+EXISTS\s+)?(?:(?:["`]?([a-zA-Z0-9_]+)["`]?\.)?["`]?([a-zA-Z0-9_]+)["`]?)',
+    _withId(r'^\s*DROP\s+VIEW\s+(?:IF\s+EXISTS\s+)?(?:(?:{id}\.)?{id})'),
     caseSensitive: false,
+    unicode: true,
   );
 
   static final _truncateRegex = RegExp(
-    r'^\s*TRUNCATE\s+(?:TABLE\s+)?(?:(?:["`]?([a-zA-Z0-9_]+)["`]?\.)?["`]?([a-zA-Z0-9_]+)["`]?)',
+    _withId(r'^\s*TRUNCATE\s+(?:TABLE\s+)?(?:(?:{id}\.)?{id})'),
     caseSensitive: false,
+    unicode: true,
   );
 
   static final _deleteRegex = RegExp(
-    r'^\s*DELETE\s+FROM\s+(?:(?:["`]?([a-zA-Z0-9_]+)["`]?\.)?["`]?([a-zA-Z0-9_]+)["`]?)',
+    _withId(r'^\s*DELETE\s+(?:(?:LOW_PRIORITY|QUICK|IGNORE)\s+)*(?:[^;]*?\s)?FROM\s+(?:(?:{id}\.)?{id})'),
     caseSensitive: false,
+    unicode: true,
   );
 
   static final _updateRegex = RegExp(
-    r'^\s*UPDATE\s+(?:(?:LOW_PRIORITY|IGNORE|ONLY)\s+)*(?:(?:["`]?([a-zA-Z0-9_]+)["`]?\.)?["`]?([a-zA-Z0-9_]+)["`]?)',
+    _withId(r'^\s*UPDATE\s+(?:(?:LOW_PRIORITY|IGNORE|ONLY)\s+)*(?:(?:{id}\.)?{id})'),
+    caseSensitive: false,
+    unicode: true,
+  );
+
+  static final _dropOtherRegex = RegExp(
+    _withId(
+      r'^\s*DROP\s+(?:UNIQUE\s+)?(?:INDEX|TYPE|FUNCTION|PROCEDURE|ROLE|USER|TRIGGER|SEQUENCE|DOMAIN|EXTENSION|TABLESPACE|PUBLICATION|SUBSCRIPTION|AGGREGATE|POLICY|RULE)\s+(?:CONCURRENTLY\s+)?(?:IF\s+EXISTS\s+)?(?:(?:{id}\.)?{id})',
+    ),
+    caseSensitive: false,
+    unicode: true,
+  );
+
+  static final _dropColumnRegex = RegExp(
+    _withId(
+      r'^\s*ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?(?:(?:{id}\.)?{id})[^;]*?\bDROP\s+COLUMN\b',
+    ),
+    caseSensitive: false,
+    unicode: true,
+  );
+
+  /// `EXPLAIN ANALYZE` runs the statement it explains.
+  static final _explainAnalyzeRegex = RegExp(
+    r'^\s*EXPLAIN\s+(?:\([^)]*\bANALY[SZ]E\b[^)]*\)|ANALY[SZ]E\b(?:\s+VERBOSE\b)?)\s*',
     caseSensitive: false,
   );
+
+  static final _withRegex =
+      RegExp(r'^\s*WITH\s+(?:RECURSIVE\s+)?', caseSensitive: false);
+
+  static final _dmlStartRegex =
+      RegExp(r'^(?:DELETE|UPDATE)\b', caseSensitive: false);
+
+  /// The statement that actually runs: past an `EXPLAIN ANALYZE` prefix and
+  /// the `WITH name AS (...)` list in front of a `DELETE` / `UPDATE`.
+  static String _effectiveStatement(String sanitized) {
+    var sql = sanitized;
+    final explain = _explainAnalyzeRegex.firstMatch(sql);
+    if (explain != null) sql = sql.substring(explain.end);
+    final withMatch = _withRegex.firstMatch(sql);
+    if (withMatch == null) return sql;
+    var depth = 0;
+    for (var i = withMatch.end; i < sql.length; i++) {
+      final ch = sql[i];
+      if (ch == '(') {
+        depth++;
+      } else if (ch == ')') {
+        if (depth > 0) depth--;
+      } else if (depth == 0 &&
+          (i == 0 || !RegExp(r'[\w$]').hasMatch(sql[i - 1])) &&
+          _dmlStartRegex.hasMatch(sql.substring(i))) {
+        return sql.substring(i);
+      }
+    }
+    return sql;
+  }
 
   static final _whereRegex = RegExp(r'\bWHERE\b', caseSensitive: false);
   static final _setRegex = RegExp(r'\bSET\b', caseSensitive: false);
@@ -388,6 +464,7 @@ abstract final class DestructiveSqlDetector {
         backslashEscapes: backslashEscapes,
       ).trim();
       if (sanitized.isEmpty) continue;
+      final effective = _effectiveStatement(sanitized);
 
       // 1. DROP DATABASE
       final dropDbMatch = _dropDatabaseRegex.firstMatch(sanitized);
@@ -468,6 +545,38 @@ abstract final class DestructiveSqlDetector {
         continue;
       }
 
+      // 5b. DROP INDEX / TYPE / FUNCTION / ROLE / USER ...
+      final dropOtherMatch = _dropOtherRegex.firstMatch(sanitized);
+      if (dropOtherMatch != null) {
+        final schema = dropOtherMatch.group(1);
+        final name = dropOtherMatch.group(2) ?? 'object';
+        operations.add(
+          DestructiveSqlOperation(
+            type: DestructiveSqlType.dropOther,
+            targetName:
+                (schema != null && schema.isNotEmpty) ? '$schema.$name' : name,
+            rawStatement: rawStmt.trim(),
+          ),
+        );
+        continue;
+      }
+
+      // 5c. ALTER TABLE ... DROP COLUMN
+      final dropColumnMatch = _dropColumnRegex.firstMatch(sanitized);
+      if (dropColumnMatch != null) {
+        final schema = dropColumnMatch.group(1);
+        final table = dropColumnMatch.group(2) ?? 'table';
+        operations.add(
+          DestructiveSqlOperation(
+            type: DestructiveSqlType.dropColumn,
+            targetName:
+                (schema != null && schema.isNotEmpty) ? '$schema.$table' : table,
+            rawStatement: rawStmt.trim(),
+          ),
+        );
+        continue;
+      }
+
       // 6. TRUNCATE
       final truncateMatch = _truncateRegex.firstMatch(sanitized);
       if (truncateMatch != null) {
@@ -486,9 +595,9 @@ abstract final class DestructiveSqlDetector {
       }
 
       // 7. DELETE FROM table without WHERE
-      final deleteMatch = _deleteRegex.firstMatch(sanitized);
+      final deleteMatch = _deleteRegex.firstMatch(effective);
       if (deleteMatch != null) {
-        if (!_hasTopLevelWhere(sanitized)) {
+        if (!_hasTopLevelWhere(effective)) {
           final schema = deleteMatch.group(1);
           final table = deleteMatch.group(2) ?? 'table';
           final target =
@@ -505,10 +614,10 @@ abstract final class DestructiveSqlDetector {
       }
 
       // 8. UPDATE table SET ... without WHERE
-      final updateMatch = _updateRegex.firstMatch(sanitized);
+      final updateMatch = _updateRegex.firstMatch(effective);
       if (updateMatch != null &&
-          _setRegex.hasMatch(sanitized) &&
-          !_hasTopLevelWhere(sanitized)) {
+          _setRegex.hasMatch(effective) &&
+          !_hasTopLevelWhere(effective)) {
         final schema = updateMatch.group(1);
         final table = updateMatch.group(2) ?? 'table';
         final target =

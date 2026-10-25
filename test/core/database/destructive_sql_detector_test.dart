@@ -244,4 +244,102 @@ void main() {
       );
     });
   });
+
+  group('DestructiveSqlDetector gaps (#1770)', () {
+    DestructiveSqlOperation only(String sql) {
+      final res = DestructiveSqlDetector.inspect(sql);
+      expect(res.operations, hasLength(1), reason: sql);
+      return res.operations.single;
+    }
+
+    test('non-Latin identifiers are detected and named in full', () {
+      var op = only('DROP TABLE "заказы"');
+      expect(op.type, DestructiveSqlType.dropTable);
+      expect(op.targetName, 'заказы');
+      op = only('DROP DATABASE склад');
+      expect(op.type, DestructiveSqlType.dropDatabase);
+      expect(op.targetName, 'склад');
+      expect(only('TRUNCATE "таблица"').type, DestructiveSqlType.truncateTable);
+      op = only('DROP TABLE public.заказы');
+      expect(op.targetName, 'public.заказы');
+      expect(only('DELETE FROM заказы').type,
+          DestructiveSqlType.unconditionalDelete);
+    });
+
+    test('MySQL DELETE modifiers and the multi-table form', () {
+      for (final sql in [
+        'DELETE IGNORE FROM t',
+        'DELETE LOW_PRIORITY FROM t',
+        'DELETE QUICK IGNORE FROM t',
+        'DELETE t1 FROM t1 JOIN t2 ON t1.id = t2.id',
+      ]) {
+        expect(only(sql).type, DestructiveSqlType.unconditionalDelete,
+            reason: sql);
+      }
+      expect(
+        DestructiveSqlDetector.inspect(
+            'DELETE t1 FROM t1 JOIN t2 ON t1.id = t2.id WHERE t2.x = 1')
+            .isDestructive,
+        isFalse,
+      );
+    });
+
+    test('WITH ... DELETE / UPDATE and EXPLAIN ANALYZE are looked through', () {
+      expect(
+        only('WITH x AS (SELECT id FROM u WHERE a = 1) DELETE FROM t').type,
+        DestructiveSqlType.unconditionalDelete,
+      );
+      expect(
+        only('WITH RECURSIVE x(n) AS (SELECT 1), y AS (SELECT 2) UPDATE t SET a = 1')
+            .type,
+        DestructiveSqlType.unconditionalUpdate,
+      );
+      expect(
+        only('EXPLAIN ANALYZE DELETE FROM t').type,
+        DestructiveSqlType.unconditionalDelete,
+      );
+      expect(
+        only('EXPLAIN (ANALYZE, VERBOSE) DELETE FROM t').type,
+        DestructiveSqlType.unconditionalDelete,
+      );
+    });
+
+    test('a WHERE or a plain EXPLAIN keeps these quiet', () {
+      for (final sql in [
+        'WITH x AS (SELECT 1 WHERE true) DELETE FROM t WHERE id IN (SELECT 1)',
+        'EXPLAIN DELETE FROM t',
+        'EXPLAIN ANALYZE DELETE FROM t WHERE id = 1',
+        'WITH x AS (SELECT 1) SELECT * FROM x',
+      ]) {
+        expect(DestructiveSqlDetector.inspect(sql).isDestructive, isFalse,
+            reason: sql);
+      }
+    });
+
+    test('ALTER TABLE ... DROP COLUMN is a HIGH risk operation', () {
+      final op = only('ALTER TABLE public.users DROP COLUMN email');
+      expect(op.type, DestructiveSqlType.dropColumn);
+      expect(op.targetName, 'public.users');
+      expect(op.type.riskLevel, 'HIGH');
+      expect(
+        DestructiveSqlDetector.inspect(
+                'ALTER TABLE users DROP CONSTRAINT users_pk')
+            .isDestructive,
+        isFalse,
+      );
+    });
+
+    test('DROP INDEX / TYPE / FUNCTION / ROLE / USER are detected', () {
+      for (final sql in [
+        'DROP INDEX CONCURRENTLY IF EXISTS idx_users_email',
+        'DROP TYPE mood',
+        'DROP FUNCTION IF EXISTS public.f',
+        'DROP ROLE app',
+        'DROP USER app',
+      ]) {
+        expect(only(sql).type, DestructiveSqlType.dropOther, reason: sql);
+      }
+      expect(only('DROP FUNCTION IF EXISTS public.f').targetName, 'public.f');
+    });
+  });
 }
