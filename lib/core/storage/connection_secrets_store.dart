@@ -11,8 +11,17 @@ abstract class SecretsStorageBackend {
 }
 
 class _FlutterSecureStorageBackend implements SecretsStorageBackend {
+<<<<<<< Updated upstream
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
     mOptions: ConnectionSecretsStore.macOsOptions,
+=======
+  /// macOS uses the login keychain: the plugin's default data-protection
+  /// keychain needs a `keychain-access-groups` entitlement, which the
+  /// Developer ID build does not carry, so every write failed with -34018 and
+  /// the new connection was rolled back.
+  final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+>>>>>>> Stashed changes
   );
 
   @override
