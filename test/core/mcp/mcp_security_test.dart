@@ -66,9 +66,17 @@ SqlExecutionResult _catalog(String sql) {
 }
 
 /// Client and server over an in-memory channel.
-Future<(ServerConnection, QueryaMcpServer)> _connect(McpQueryService service) async {
+Future<(ServerConnection, QueryaMcpServer)> _connect(
+  McpQueryService service, {
+  void Function(McpCallRecord)? onCall,
+}) async {
   final pair = StreamChannelController<String>();
-  final server = QueryaMcpServer(pair.local, service: service, version: 't');
+  final server = QueryaMcpServer(
+    pair.local,
+    service: service,
+    version: 't',
+    onCall: onCall,
+  );
   final client = MCPClient(Implementation(name: 'attacker', version: '1'));
   final conn = client.connectServer(pair.foreign);
   await conn.initialize(InitializeRequest(
@@ -368,6 +376,55 @@ void main() {
           name: 'run_query', arguments: {'connection_id': 1, 'sql': 'SELECT 1'}));
       expect(r.isError, isTrue);
       expect(_text(r), isNot(contains(_pw)));
+    });
+  });
+
+  group('the schema resource (#1775)', () {
+    test('is logged like a tool call', () async {
+      final calls = <McpCallRecord>[];
+      final (conn, server) = await _connect(
+        McpQueryService(
+          createDelegate: (row, dialect) =>
+              FakeSqlExecutionDelegate()..onExecute = _catalog,
+          access: _Access({1}),
+          loadConnections: () async => [_row(1, 'postgresql')],
+        ),
+        onCall: calls.add,
+      );
+      addTearDown(server.shutdown);
+
+      await conn.readResource(ReadResourceRequest(uri: 'schema://1'));
+
+      expect(calls.single.tool, 'schema');
+      expect(calls.single.connectionId, 1);
+      expect(calls.single.error, isNull);
+    });
+
+    test('masks secrets in a failing driver error and logs it', () async {
+      final calls = <McpCallRecord>[];
+      final (conn, server) = await _connect(
+        McpQueryService(
+          createDelegate: (row, dialect) => throw StateError(
+              'connect postgresql://admin:$_pw@db.internal/shop failed'),
+          access: _Access({1}),
+          loadConnections: () async => [_row(1, 'postgresql')],
+        ),
+        onCall: calls.add,
+      );
+      addTearDown(server.shutdown);
+
+      Object? caught;
+      try {
+        await conn.readResource(ReadResourceRequest(uri: 'schema://1'));
+      } catch (e) {
+        caught = e;
+      }
+
+      expect(caught, isNotNull);
+      expect('$caught', isNot(contains(_pw)));
+      expect(calls.single.tool, 'schema');
+      expect(calls.single.error, isNotNull);
+      expect(calls.single.error, isNot(contains(_pw)));
     });
   });
 

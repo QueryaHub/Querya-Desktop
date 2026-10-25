@@ -113,6 +113,23 @@ void main() {
     opened = 0;
   });
 
+  test('system.* collections are neither listed nor readable (#1774)',
+      () async {
+    final svc = service();
+    expect(await svc.listCollections(1), ['orders', 'users']);
+    await expectLater(
+      svc.find(1, 'system.views'),
+      throwsA(isA<McpToolException>()
+          .having((e) => e.message, 'message', contains('Collection not found'))),
+    );
+    await expectLater(
+      svc.count(1, 'system.views'),
+      throwsA(isA<McpToolException>()
+          .having((e) => e.message, 'message', contains('Collection not found'))),
+    );
+    expect(session.calls, isEmpty);
+  });
+
   group('McpMongoGuard', () {
     test('plain filters pass', () {
       expect(

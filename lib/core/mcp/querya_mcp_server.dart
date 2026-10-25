@@ -344,7 +344,20 @@ base class QueryaMcpServer extends MCPServer with ToolsSupport, ResourcesSupport
     if (!request.uri.startsWith(prefix)) return null;
     final id = int.tryParse(request.uri.substring(prefix.length));
     if (id == null) return null;
-    final tables = await service.schemaOverview(id);
+    final started = DateTime.now();
+    final sw = Stopwatch()..start();
+    final List<McpTableDescription> tables;
+    try {
+      tables = await service.schemaOverview(id);
+    } on McpToolException catch (e) {
+      _report('schema', started, sw.elapsed, id, null, null, e.message, e.rule);
+      rethrow;
+    } catch (e) {
+      final message = McpRedaction.redact('Internal error: $e');
+      _report('schema', started, sw.elapsed, id, null, null, message, null);
+      throw McpToolException(message);
+    }
+    _report('schema', started, sw.elapsed, id, null, tables.length, null, null);
     return ReadResourceResult(contents: [
       TextResourceContents(
         uri: request.uri,
