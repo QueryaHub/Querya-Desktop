@@ -33,14 +33,21 @@ abstract final class McpSqlGuard {
   /// that holds a comment or quote character, a PostgreSQL `U&"..."`
   /// identifier (escapes spell any name), MySQL `#` comments and `--` without
   /// a space after it (which MySQL reads as two minus signs).
-  /// True when a `"..."` or `` `...` `` identifier holds `--`, `'`, `#` or
-  /// `/*`. Reads left to right, skipping string literals, so a closing quote is
-  /// never taken for an opening one.
-  static bool _hasAmbiguousIdentifier(String sql, {required bool backslashEscapes}) {
+  /// Reads [sql] left to right, skipping string literals, and returns whether
+  /// a `"..."` or `` `...` `` identifier holds `--`, `'`, `#` or `/*`, and the
+  /// text with every string literal body removed. Reading in order means a
+  /// closing quote is never taken for an opening one.
+  static ({bool ambiguousIdentifier, String outsideStrings}) _scanQuoting(
+    String sql, {
+    required bool backslashEscapes,
+  }) {
+    final outside = StringBuffer();
+    var ambiguous = false;
     var i = 0;
     while (i < sql.length) {
       final c = sql[i];
       if (c == "'") {
+        outside.write("''");
         i++;
         while (i < sql.length) {
           if (backslashEscapes && sql[i] == r'\') {
@@ -69,20 +76,24 @@ abstract final class McpSqlGuard {
           }
           i++;
         }
-        final body = sql.substring(start, i < sql.length ? i : sql.length);
+        final end = i < sql.length ? i : sql.length;
+        final body = sql.substring(start, end);
         if (body.contains('--') ||
             body.contains("'") ||
             body.contains('#') ||
             body.contains('/*')) {
-          return true;
+          ambiguous = true;
         }
+        outside.write(sql.substring(start - 1, i < sql.length ? i + 1 : end));
         i++;
       } else {
+        outside.write(c);
         i++;
       }
     }
-    return false;
+    return (ambiguousIdentifier: ambiguous, outsideStrings: outside.toString());
   }
+
   static final _unicodeEscapeIdentifier =
       RegExp(r'\bU&\s*"', caseSensitive: false);
   static final _mysqlDashDashNoSpace = RegExp(r'--(?!\s)');
@@ -159,10 +170,11 @@ abstract final class McpSqlGuard {
         RegExp(r'/\*M?!').hasMatch(statement)) {
       return const McpSqlRefusal('mysql_executable_comment', 'MySQL executable comments (/*! ... */) are not allowed.');
     }
-    if (_hasAmbiguousIdentifier(statement, backslashEscapes: escapes) ||
-        _unicodeEscapeIdentifier.hasMatch(statement) ||
+    final quoting = _scanQuoting(statement, backslashEscapes: escapes);
+    if (quoting.ambiguousIdentifier ||
+        _unicodeEscapeIdentifier.hasMatch(quoting.outsideStrings) ||
         (dialect == SqlDialect.mysql &&
-            _mysqlDashDashNoSpace.hasMatch(statement))) {
+            _mysqlDashDashNoSpace.hasMatch(quoting.outsideStrings))) {
       return const McpSqlRefusal('ambiguous_syntax',
           'Quoted identifiers with comment or quote characters, U&"..." identifiers and "--" without a following space are not allowed over MCP.');
     }
