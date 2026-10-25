@@ -135,7 +135,9 @@ extension _GridPointerSelection on _VirtualResultGridState {
     _lastPointerLocalPos = event.localPosition;
 
     if (!_isDragSelecting) {
-      final delta = (event.position - _pointerDownGlobalPos).distance;
+      // Window pixels; the grid is zoomed, so compare in grid pixels.
+      final delta =
+          context.windowToApp(event.position - _pointerDownGlobalPos).distance;
       if (delta > 4.0) {
         _isDragSelecting = true;
         _hasJustDragSelected = false;

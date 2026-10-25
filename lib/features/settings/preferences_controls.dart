@@ -226,6 +226,11 @@ class _InterfaceScaleSliderState extends material.State<InterfaceScaleSlider> {
   bool _fineControl = false;
   double? _dragScale;
 
+  /// Shift decides the slider's range (presets or 1% steps) only between
+  /// drags: letting go of it mid-drag would change the range under the thumb.
+  bool _dragging = false;
+  bool _dragFine = false;
+
   static int get _fineDivisions =>
       ((kMaxUiScale - kMinUiScale) / kUiScaleStep).round();
 
@@ -270,6 +275,7 @@ class _InterfaceScaleSliderState extends material.State<InterfaceScaleSlider> {
   }
 
   bool _onKeyEvent(KeyEvent event) {
+    if (_dragging) return false;
     final fine = _shiftHeld;
     if (fine != _fineControl) {
       setState(() => _fineControl = fine);
@@ -313,18 +319,23 @@ class _InterfaceScaleSliderState extends material.State<InterfaceScaleSlider> {
               min: fine ? kMinUiScale : 0,
               max: fine ? kMaxUiScale : (kUiScalePresets.length - 1).toDouble(),
               divisions: fine ? _fineDivisions : kUiScalePresets.length - 1,
+              onChangeStart: (_) {
+                _dragging = true;
+                _dragFine = _fineControl;
+              },
               onChanged: (value) {
-                final next = _scaleFromSlider(value, fine: _shiftHeld);
+                final next = _scaleFromSlider(value, fine: _dragFine);
                 setState(() => _dragScale = next);
               },
               onChangeEnd: (value) {
-                final next = _scaleFromSlider(value, fine: _shiftHeld);
+                final next = _scaleFromSlider(value, fine: _dragFine);
+                final fine = _dragFine;
+                _dragging = false;
                 setState(() => _dragScale = null);
+                // The app zooms to it at once (the slider itself moves with
+                // the zoom, so there is no live preview while dragging).
                 unawaited(
-                  UiScaleController.instance.commitScale(
-                    next,
-                    fine: _shiftHeld,
-                  ),
+                  UiScaleController.instance.commitScale(next, fine: fine),
                 );
               },
             ),

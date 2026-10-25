@@ -96,7 +96,8 @@ extension _GridCellActions on _VirtualResultGridState {
   void _openCellContextMenu(int row, int col, material.Offset globalPosition) {
     showQueryaContextMenuBuilder(
       context: context,
-      position: globalPosition,
+      // The pointer position is in window coordinates; the menu is zoomed.
+      position: context.windowToApp(globalPosition),
       itemsBuilder: (ctx) => _buildCellContextMenuItems(ctx, row, col),
     );
   }

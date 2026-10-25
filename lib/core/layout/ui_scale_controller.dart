@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/storage/app_settings.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// Loads and broadcasts [AppSettings] UI scale for the widget tree.
 class UiScaleController extends ChangeNotifier {
@@ -14,11 +15,19 @@ class UiScaleController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Persist scale to SQLite (called on slider release).
+  /// Applies [value] at once and then stores it (called on slider release).
+  ///
+  /// The interface changes before the database is touched, so a slow or failing
+  /// write never delays or undoes what the user just chose; a failed write is
+  /// logged and the scale applies until the next start.
   Future<void> commitScale(double value, {bool fine = false}) async {
-    await AppSettings.instance.setUiScale(value, fine: fine);
-    _scale = await AppSettings.instance.getUiScale();
+    _scale = normalize(value, fine: fine);
     notifyListeners();
+    try {
+      await AppSettings.instance.setUiScale(_scale, fine: true);
+    } catch (e, st) {
+      logIgnored('UiScaleController.commitScale', e, st);
+    }
   }
 
   Future<void> setScale(double value, {bool fine = false}) =>
