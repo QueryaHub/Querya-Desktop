@@ -55,6 +55,32 @@ class FolderRepository {
     await db.delete('folders');
   }
 
+  /// Makes the stored folders exactly [names], in one transaction: a failure
+  /// leaves the old list. Folders that stay keep their connections; the ones
+  /// that go release theirs first (see [removeFolder]).
+  Future<void> replaceFolders(List<String> names) async {
+    final wanted = <String>{
+      for (final name in names)
+        if (name.trim().isNotEmpty) name.trim(),
+    };
+    final db = await _open();
+    await db.transaction((txn) async {
+      final rows = await txn.query('folders', columns: ['name']);
+      final existing = {for (final r in rows) r['name'] as String};
+      for (final name in existing.difference(wanted)) {
+        await txn.rawUpdate(
+          'UPDATE connections SET folder_id = NULL WHERE folder_id IN '
+          '(SELECT id FROM folders WHERE name = ?)',
+          [name],
+        );
+        await txn.delete('folders', where: 'name = ?', whereArgs: [name]);
+      }
+      for (final name in wanted.difference(existing)) {
+        await txn.insert('folders', {'name': name});
+      }
+    });
+  }
+
   Future<int?> getFolderIdByName(String name) async {
     final db = await _open();
     final rows = await db.query('folders',

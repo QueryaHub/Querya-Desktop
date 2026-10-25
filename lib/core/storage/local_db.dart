@@ -135,6 +135,9 @@ class LocalDb {
 
   Future<void> clearFolders() => folders.clearFolders();
 
+  Future<void> replaceFolders(List<String> names) =>
+      folders.replaceFolders(names);
+
   Future<int?> getFolderIdByName(String name) =>
       folders.getFolderIdByName(name);
 
