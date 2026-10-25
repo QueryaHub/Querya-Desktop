@@ -367,6 +367,17 @@ class _DbTypeCard extends material.StatelessWidget {
   material.Widget build(material.BuildContext context) {
     final t = theme;
     final highlight = t.muted.withValues(alpha: 0.4);
+    return material.Semantics(
+      button: true,
+      selected: selected,
+      label: choice.label,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: _surface(t, highlight),
+    );
+  }
+
+  material.Widget _surface(QueryaUiColors t, material.Color highlight) {
     return QueryaHoverSurface(
       borderRadius: material.BorderRadius.circular(10),
       padding: const material.EdgeInsets.symmetric(vertical: 10, horizontal: 8),

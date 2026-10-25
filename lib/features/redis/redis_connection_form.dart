@@ -72,7 +72,6 @@ class _RedisConnectionFormContentState
 
   bool _removeSavedPassword = false;
   bool _useSSL = false;
-  bool _showPassword = false;
   bool _isTesting = false;
   String? _testResult;
   Timer? _dismissTimer;
@@ -448,33 +447,15 @@ class _RedisConnectionFormContentState
                             setState(() => _removeSavedPassword = v),
                       ),
                     const Gap(8),
-                    material.Stack(
-                      children: [
-                        QueryaTextField(
-                          controller: _passwordController,
-                          enabled: !_removeSavedPassword,
-                          placeholder: _isEditing
-                                ? 'Leave blank to keep existing'
-                                : 'Password',
-                          obscureText: !_showPassword,
-                        ),
-                        material.Positioned(
-                          right: 8,
-                          top: 0,
-                          bottom: 0,
-                          child: material.Center(
-                            child: QueryaIconButton(
-icon: material.Icon(_showPassword
-                                    ? material.Icons.visibility_off
-                                    : material.Icons.visibility),
-tooltip: _showPassword ? 'Hide password' : 'Show password',
-size: QueryaControlSize.sm,
-onPressed: () => setState(
-                                  () => _showPassword = !_showPassword),
-),
-                          ),
-                        ),
-                      ],
+                    QueryaTextField(
+                      controller: _passwordController,
+                      enabled: !_removeSavedPassword,
+                      placeholder: _isEditing
+                          ? 'Leave blank to keep existing'
+                          : 'Password',
+                      semanticLabel: 'Password',
+                      // The field brings its own show / hide button.
+                      obscureText: true,
                     ),
                     material.Row(
                       children: [

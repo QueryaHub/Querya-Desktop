@@ -43,6 +43,7 @@ class QueryaTextField extends material.StatefulWidget {
     this.textAlign = material.TextAlign.start,
     this.autocorrect = true,
     this.contentPadding,
+    this.semanticLabel,
   });
 
   final material.TextEditingController? controller;
@@ -87,6 +88,10 @@ class QueryaTextField extends material.StatefulWidget {
 
   /// Replaces the padding between the border and the text.
   final material.EdgeInsetsGeometry? contentPadding;
+
+  /// Spoken name of the field, usually its caption (#1822); without it a
+  /// screen reader hears only the placeholder.
+  final String? semanticLabel;
 
   @override
   material.State<QueryaTextField> createState() => _QueryaTextFieldState();
@@ -154,7 +159,7 @@ class _QueryaTextFieldState extends material.State<QueryaTextField> {
         icon: _revealed
             ? material.Icons.visibility_outlined
             : material.Icons.visibility_off_outlined,
-        tooltip: _revealed ? 'Hide' : 'Show',
+        tooltip: _revealed ? 'Hide password' : 'Show password',
         size: QueryaControlSize.sm,
         onPressed: widget.enabled
             ? () => setState(() => _revealed = !_revealed)
@@ -251,6 +256,11 @@ class _QueryaTextFieldState extends material.State<QueryaTextField> {
             ),
           )
         : field;
+
+    final label = widget.semanticLabel;
+    if (label != null) {
+      content = material.Semantics(label: label, child: content);
+    }
 
     if (hasError) {
       content = material.Column(

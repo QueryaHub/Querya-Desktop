@@ -83,12 +83,13 @@ void main() {
       expect(find.text('Username'), findsOneWidget);
       // Label plus the field's own placeholder.
       expect(find.text('Password'), findsNWidgets(2));
-      expect(find.byIcon(material.Icons.visibility), findsOneWidget);
+      expect(find.byIcon(material.Icons.visibility_off_outlined),
+          findsOneWidget);
 
-      await tester.tap(find.byIcon(material.Icons.visibility));
+      await tester.tap(find.byIcon(material.Icons.visibility_off_outlined));
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(material.Icons.visibility_off), findsOneWidget);
+      expect(find.byIcon(material.Icons.visibility_outlined), findsOneWidget);
     });
 
     testWidgets('renders in row layout and shows remove saved password when editing',

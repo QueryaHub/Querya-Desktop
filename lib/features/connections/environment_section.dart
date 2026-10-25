@@ -79,6 +79,9 @@ class _Option extends material.StatelessWidget {
       button: true,
       selected: selected,
       label: label,
+      // The text inside is the same label; one node, not two.
+      excludeSemantics: true,
+      onTap: onTap,
       child: material.InkWell(
         key: material.Key('environment_option_$optionKey'),
         onTap: onTap,
