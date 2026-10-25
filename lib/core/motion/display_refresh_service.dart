@@ -25,7 +25,9 @@ abstract final class DisplayRefreshService {
 
     if (!kDebugMode) return;
 
-    _logRefreshInfo();
+    // 2.x fills `info` asynchronously: read it once it had time to arrive, not
+    // at startup, where it always said 0 Hz.
+    unawaited(Future<void>.delayed(const Duration(seconds: 2), _logRefreshInfo));
     if (displayRefreshOverlayEnabled(
       debugMode: kDebugMode,
       overlayFlag: _overlayFromEnvironment,
@@ -35,8 +37,11 @@ abstract final class DisplayRefreshService {
   }
 
   static void _logRefreshInfo() {
-    // The first reading can still be 0 Hz: 2.x fills `info` asynchronously.
     final info = RefreshRate.info;
+    if (info.currentRate <= 0) {
+      debugPrint('Display refresh: not reported by the platform');
+      return;
+    }
     debugPrint(
       'Display refresh: ${info.currentRate} Hz '
       '(max ${info.maxRate}, variable=${info.isVariableRefreshRate})',

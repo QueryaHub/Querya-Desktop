@@ -9,7 +9,9 @@ import 'color_parser.dart';
 ///
 /// Editor syntax/surface keys are mapped separately by [editorThemeFromQueryaColors].
 /// The generic `background` key is intentionally not mapped to canvas/editorBackground.
-const _knownWorkbenchColorKeys = {
+/// Keys of `editor_colors` that set the workbench (the editor keys of the same
+/// map are read by `editorThemeFromQueryaColors`).
+const knownWorkbenchColorKeys = {
   'canvas',
   'surface',
   'sidebarBackground',
@@ -32,13 +34,8 @@ QueryaWorkbenchTheme workbenchThemeFromQueryaColors({
   required Map<String, String> colors,
   required QueryaWorkbenchTheme fallback,
 }) {
-  if (kDebugMode) {
-    for (final key in colors.keys) {
-      if (!_knownWorkbenchColorKeys.contains(key)) {
-        debugPrint('Querya theme: ignored editor_colors workbench key "$key"');
-      }
-    }
-  }
+  // Unknown keys are reported once, by editorThemeFromQueryaColors: the
+  // same map holds the editor and the workbench keys.
 
   Color pick(String key, Color defaultValue) {
     final raw = colors[key];

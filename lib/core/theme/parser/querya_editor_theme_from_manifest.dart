@@ -4,8 +4,11 @@ import 'package:flutter/foundation.dart';
 
 import '../querya_editor_theme.dart';
 import 'color_parser.dart';
+import 'querya_workbench_theme_from_manifest.dart' show knownWorkbenchColorKeys;
 
-const _knownEditorColorKeys = {
+/// Keys of `editor_colors` that set the editor theme (the workbench keys of
+/// the same map are read by `workbenchThemeFromQueryaColors`).
+const knownEditorColorKeys = {
   'background',
   'foreground',
   'lineHighlight',
@@ -32,8 +35,9 @@ QueryaEditorTheme editorThemeFromQueryaColors({
 }) {
   if (kDebugMode) {
     for (final key in colors.keys) {
-      if (!_knownEditorColorKeys.contains(key)) {
-        debugPrint('Querya theme: ignored editor_colors key "$key"');
+      if (!knownEditorColorKeys.contains(key) &&
+          !knownWorkbenchColorKeys.contains(key)) {
+        debugPrint('Querya theme: unknown editor_colors key "$key"');
       }
     }
   }
