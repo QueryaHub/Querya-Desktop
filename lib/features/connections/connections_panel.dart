@@ -707,10 +707,9 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       context,
       folderId: folderId,
     );
-    if (row != null && mounted) {
-      await LocalDb.instance.addConnection(row);
-      await _loadData();
-    }
+    if (row == null || !mounted) return;
+    if (!await saveNewConnection(context, row)) return;
+    if (mounted) await _loadData();
   }
 
   Future<void> _editConnection(ConnectionRow conn) async {

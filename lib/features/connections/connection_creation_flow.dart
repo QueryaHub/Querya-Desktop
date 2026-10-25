@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/extensions/extension_driver_catalog.dart';
 import 'package:querya_desktop/core/extensions/models/extension_contributions.dart';
@@ -13,6 +13,31 @@ import 'package:querya_desktop/features/redis/redis_connection_form.dart';
 import 'package:querya_desktop/shared/widgets/app_toast.dart';
 
 export 'package:querya_desktop/features/connections/connection_edit_secrets.dart';
+
+/// Stores a connection a creation flow returned. A failed save (typically the
+/// system keyring refusing the password) rolls the row back; it is reported
+/// and logged instead of leaving the user with a closed dialog and no
+/// connection. Returns whether the connection was stored.
+Future<bool> saveNewConnection(
+  material.BuildContext context,
+  ConnectionRow row,
+) async {
+  try {
+    await LocalDb.instance.addConnection(row);
+    return true;
+  } catch (e, st) {
+    debugPrint('saveNewConnection: "${row.name}" failed: '
+        '${e.runtimeType}: $e\n$st');
+    if (context.mounted) {
+      showAppToast(
+        context: context,
+        message: 'The connection was not saved. $e',
+        variant: AppToastVariant.error,
+      );
+    }
+    return false;
+  }
+}
 
 /// Context that stays mounted after menu overlays close (multi-step dialog flow).
 material.BuildContext _dialogAnchorContext(material.BuildContext context) {
