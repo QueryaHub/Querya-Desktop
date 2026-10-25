@@ -1,3 +1,4 @@
+import 'package:querya_desktop/features/postgresql/pg_setting_format.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:math' as math;
 
@@ -510,6 +511,10 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView>
   material.Widget _serverSettingsCard(
       material.BuildContext context, Map<String, dynamic> stats) {
     final settings = stats['settings'] as Map<String, String>? ?? {};
+    final units = stats['setting_units'] as Map<String, String>? ?? {};
+    String setting(String name) => settings[name] == null
+        ? '—'
+        : formatPgSetting(settings[name]!, units[name]);
     return _card(
       context,
       'Server Settings',
@@ -517,10 +522,9 @@ class _PostgresStatsViewState extends material.State<PostgresStatsView>
         mainAxisSize: material.MainAxisSize.min,
         crossAxisAlignment: material.CrossAxisAlignment.stretch,
         children: [
-          _row(context, 'Shared buffers', settings['shared_buffers'] ?? '—'),
-          _row(context, 'Work mem', settings['work_mem'] ?? '—'),
-          _row(context, 'Effective cache',
-              settings['effective_cache_size'] ?? '—'),
+          _row(context, 'Shared buffers', setting('shared_buffers')),
+          _row(context, 'Work mem', setting('work_mem')),
+          _row(context, 'Effective cache', setting('effective_cache_size')),
           _row(context, 'Encoding', settings['server_encoding'] ?? '—'),
           _row(context, 'Timezone', settings['timezone'] ?? '—'),
         ],

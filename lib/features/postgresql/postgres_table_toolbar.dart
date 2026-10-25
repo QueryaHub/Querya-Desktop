@@ -89,18 +89,16 @@ class PostgresTableToolbar extends material.StatelessWidget {
           ),
           material.Expanded(
             flex: 2,
+            // Wraps in a narrow pane: a sideways scroll hid Prev / Next /
+            // Refresh and the mouse wheel does not scroll sideways.
             child: material.LayoutBuilder(
-              builder: (context, constraints) {
-                return material.SingleChildScrollView(
-                  scrollDirection: material.Axis.horizontal,
-                  child: material.ConstrainedBox(
-                    constraints: material.BoxConstraints(
-                      minWidth: constraints.maxWidth,
-                    ),
-                    child: material.Row(
-                      mainAxisAlignment: material.MainAxisAlignment.end,
-                      mainAxisSize: material.MainAxisSize.min,
-                      children: [
+              builder: (context, constraints) => material.Wrap(
+              alignment: material.WrapAlignment.end,
+              runAlignment: material.WrapAlignment.end,
+              crossAxisAlignment: material.WrapCrossAlignment.center,
+              spacing: 6,
+              runSpacing: 6,
+              children: [
                         material.Container(
                           padding: const material.EdgeInsets.symmetric(
                             horizontal: 8,
@@ -118,18 +116,24 @@ class PostgresTableToolbar extends material.StatelessWidget {
                             ),
                           ),
                         ),
-                        const Gap(6),
-                        if (editAction != null) ...[
-                          editAction!,
-                          const Gap(4),
-                        ],
+                        if (editAction != null)
+                          // Never wider than the pane: a long "N pending
+                          // changes" row shrinks instead of overflowing.
+                          material.ConstrainedBox(
+                            constraints: material.BoxConstraints(
+                                maxWidth: constraints.maxWidth),
+                            child: material.FittedBox(
+                              fit: material.BoxFit.scaleDown,
+                              alignment: material.Alignment.centerRight,
+                              child: editAction,
+                            ),
+                          ),
                         QueryaButton.secondary(
                           label: 'SQL',
                           icon: material.Icons.code_rounded,
                           onPressed: onOpenSql,
                           size: QueryaControlSize.sm,
                         ),
-                        const Gap(4),
                         QueryaButton.secondary(
                           label: 'Privileges',
                           icon: material.Icons.admin_panel_settings_rounded,
@@ -137,7 +141,6 @@ class PostgresTableToolbar extends material.StatelessWidget {
                           size: QueryaControlSize.sm,
                         ),
                         if (isMaterializedView && !customSqlActive) ...[
-                          const Gap(4),
                           QueryaButton.secondary(
                             label: 'Refresh MV',
                             icon: material.Icons.sync_rounded,
@@ -146,7 +149,6 @@ class PostgresTableToolbar extends material.StatelessWidget {
                           ),
                         ],
                         if (customSqlActive) ...[
-                          const Gap(4),
                           QueryaButton.secondary(
                             label: 'Table',
                             icon: material.Icons.table_chart_rounded,
@@ -154,32 +156,26 @@ class PostgresTableToolbar extends material.StatelessWidget {
                             size: QueryaControlSize.sm,
                           ),
                         ],
-                        const Gap(4),
                         QueryaButton.secondary(
                           label: 'Prev',
                           icon: material.Icons.chevron_left_rounded,
                           onPressed: canGoPrevious ? onGoPrevious : null,
                           size: QueryaControlSize.sm,
                         ),
-                        const Gap(4),
                         QueryaButton.secondary(
                           label: 'Next',
                           icon: material.Icons.chevron_right_rounded,
                           onPressed: canGoNext ? onGoNext : null,
                           size: QueryaControlSize.sm,
                         ),
-                        const Gap(8),
                         QueryaButton.secondary(
                           label: 'Refresh',
                           icon: material.Icons.refresh_rounded,
                           onPressed: loading ? null : onRefresh,
                           size: QueryaControlSize.sm,
                         ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+              ],
+            ),
             ),
           ),
         ],

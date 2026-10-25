@@ -129,5 +129,30 @@ void main() {
         );
       });
     });
+
+    testWidgets('every action stays on screen in a narrow pane (#1822 run)',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const material.Size(700, 300));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: queryaDarkMaterialTheme,
+          darkTheme: queryaDarkMaterialTheme,
+          themeMode: material.ThemeMode.dark,
+          home: material.Scaffold(
+            body: material.Align(
+              alignment: material.Alignment.topLeft,
+              child: _toolbar(title: 'shop.orders'),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      for (final label in ['SQL', 'Privileges', 'Prev', 'Next', 'Refresh']) {
+        final rect = tester.getRect(find.text(label));
+        expect(rect.right, lessThanOrEqualTo(700), reason: label);
+      }
+    });
   });
 }

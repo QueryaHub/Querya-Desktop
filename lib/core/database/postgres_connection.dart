@@ -743,16 +743,23 @@ class PostgresConnection with SshTunnelHost {
     stats['version'] = ver.first[0] as String;
 
     final settings = await _queued((c) => c.execute(
-      "SELECT name, setting FROM pg_settings "
-      "WHERE name IN ('max_connections','shared_buffers','work_mem',"
+      // lower(name): the setting is called "TimeZone", which a plain list of
+      // lower-case names never matched (the Timezone row stayed empty).
+      "SELECT lower(name), setting, unit FROM pg_settings "
+      "WHERE lower(name) IN ('max_connections','shared_buffers','work_mem',"
       "'effective_cache_size','server_version','data_directory',"
       "'listen_addresses','port','server_encoding','timezone')",
     ));
     final settingsMap = <String, String>{};
+    final settingUnits = <String, String>{};
     for (final row in settings) {
-      settingsMap[row[0] as String] = row[1] as String;
+      final name = row[0] as String;
+      settingsMap[name] = row[1] as String;
+      final unit = row[2];
+      if (unit is String && unit.isNotEmpty) settingUnits[name] = unit;
     }
     stats['settings'] = settingsMap;
+    stats['setting_units'] = settingUnits;
 
     final activity = await _queued((c) => c.execute(
       "SELECT count(*) AS total, "
