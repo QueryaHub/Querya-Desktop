@@ -1,3 +1,4 @@
+import 'package:querya_desktop/features/connections/connection_save_gate.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/layout/window_layout.dart';
@@ -9,19 +10,23 @@ import 'package:querya_desktop/core/ui/querya_control_tokens.dart';
 /// Shows a dialog to create a new database connection from a URI.
 /// Returns the ConnectionRow or null if cancelled.
 Future<ConnectionRow?> showNewConnectionUrlDialog(
-    material.BuildContext context) {
+  material.BuildContext context, {
+  ConnectionSaveGate? onSave,
+}) {
   return showAppDialog<ConnectionRow>(
     context: context,
     builder: (context) => material.Dialog(
       backgroundColor: material.Colors.transparent,
       insetPadding: WindowLayout.dialogSymmetricInsets(context),
-      child: const _NewConnectionUrlDialogContent(),
+      child: _NewConnectionUrlDialogContent(onSave: onSave),
     ),
   );
 }
 
 class _NewConnectionUrlDialogContent extends material.StatefulWidget {
-  const _NewConnectionUrlDialogContent();
+  const _NewConnectionUrlDialogContent({this.onSave});
+
+  final ConnectionSaveGate? onSave;
 
   @override
   material.State<_NewConnectionUrlDialogContent> createState() =>
@@ -65,7 +70,9 @@ class _NewConnectionUrlDialogContentState
     });
   }
 
-  void _validateAndSubmit() {
+  bool _submitting = false;
+
+  Future<void> _validateAndSubmit() async {
     _touched = true;
     final result = parseConnectionUrlInput(_urlController.text);
     if (result.error != null) {
@@ -75,7 +82,22 @@ class _NewConnectionUrlDialogContentState
       });
       return;
     }
-    material.Navigator.of(context).pop(result.row);
+    final row = result.row;
+    if (row == null || _submitting) return;
+    _submitting = true;
+    try {
+      // The creation flow stores the connection here, so a refused save keeps
+      // the typed URL (#1758).
+      final error = await widget.onSave?.call(row);
+      if (!mounted) return;
+      if (error != null) {
+        setState(() => _validationError = error);
+        return;
+      }
+      material.Navigator.of(context).pop(row);
+    } finally {
+      _submitting = false;
+    }
   }
 
   @override

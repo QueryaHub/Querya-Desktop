@@ -710,8 +710,8 @@ class ConnectionsPanelState extends State<ConnectionsPanel> {
       folderId: folderId,
     );
     if (row == null || !mounted) return;
-    if (!await saveNewConnection(context, row)) return;
-    if (mounted) await _loadData();
+    // Stored by the form already (#1758).
+    await _loadData();
   }
 
   Future<void> _editConnection(ConnectionRow conn) async {

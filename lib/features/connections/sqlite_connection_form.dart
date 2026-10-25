@@ -1,3 +1,4 @@
+import 'package:querya_desktop/features/connections/connection_save_gate.dart';
 import 'package:querya_desktop/shared/report_error.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
@@ -21,6 +22,7 @@ Future<ConnectionRow?> showSqliteConnectionForm(
   material.BuildContext context, {
   int? folderId,
   ConnectionRow? initial,
+  ConnectionSaveGate? onSave,
 }) async {
   return showAppDialog<ConnectionRow>(
     context: context,
@@ -30,16 +32,18 @@ Future<ConnectionRow?> showSqliteConnectionForm(
       child: _SqliteConnectionFormContent(
         folderId: folderId,
         initial: initial,
+        onSave: onSave,
       ),
     ),
   );
 }
 
 class _SqliteConnectionFormContent extends material.StatefulWidget {
-  const _SqliteConnectionFormContent({this.folderId, this.initial});
+  const _SqliteConnectionFormContent({this.folderId, this.initial, this.onSave});
 
   final int? folderId;
   final ConnectionRow? initial;
+  final ConnectionSaveGate? onSave;
 
   @override
   material.State<_SqliteConnectionFormContent> createState() =>
@@ -182,6 +186,27 @@ class _SqliteConnectionFormContentState
     }
   }
 
+  bool _submitting = false;
+
+  /// Closes the form with [row] once the save gate (creation flows) accepts it;
+  /// when it refuses, the form stays open with everything typed and shows why
+  /// (#1758).
+  Future<void> _finish(ConnectionRow row) async {
+    if (_submitting) return;
+    _submitting = true;
+    try {
+      final error = await widget.onSave?.call(row);
+      if (!mounted) return;
+      if (error != null) {
+        _showTestResult('error: $error');
+        return;
+      }
+      material.Navigator.of(context).pop(row);
+    } finally {
+      _submitting = false;
+    }
+  }
+
   Future<void> _save() async {
     if (!_formValidNotifier.value) return;
     final path = _pathController.text.trim();
@@ -208,7 +233,7 @@ class _SqliteConnectionFormContentState
       folderId: initial?.folderId ?? widget.folderId,
       sortOrder: initial?.sortOrder ?? 0,
     );
-    material.Navigator.of(context).pop(row.withEnvironment(_environment));
+    await _finish(row.withEnvironment(_environment));
   }
 
   @override

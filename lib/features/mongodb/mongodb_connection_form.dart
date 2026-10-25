@@ -60,6 +60,7 @@ Future<ConnectionRow?> showMongoConnectionForm(
   BuildContext context, {
   int? folderId,
   ConnectionRow? initial,
+  ConnectionSaveGate? onSave,
 }) async {
   return showAppDialog<ConnectionRow>(
     context: context,
@@ -69,16 +70,18 @@ Future<ConnectionRow?> showMongoConnectionForm(
       child: _MongoConnectionFormContent(
         folderId: folderId,
         initial: initial,
+        onSave: onSave,
       ),
     ),
   );
 }
 
 class _MongoConnectionFormContent extends material.StatefulWidget {
-  const _MongoConnectionFormContent({this.folderId, this.initial});
+  const _MongoConnectionFormContent({this.folderId, this.initial, this.onSave});
 
   final int? folderId;
   final ConnectionRow? initial;
+  final ConnectionSaveGate? onSave;
 
   @override
   material.State<_MongoConnectionFormContent> createState() =>
@@ -328,7 +331,28 @@ class _MongoConnectionFormContentState
     }
   }
 
-  void _save() {
+  bool _submitting = false;
+
+  /// Closes the form with [row] once the save gate (creation flows) accepts it;
+  /// when it refuses, the form stays open with everything typed and shows why
+  /// (#1758).
+  Future<void> _finish(ConnectionRow row) async {
+    if (_submitting) return;
+    _submitting = true;
+    try {
+      final error = await widget.onSave?.call(row);
+      if (!mounted) return;
+      if (error != null) {
+        _showTestResult('error: $error');
+        return;
+      }
+      material.Navigator.of(context).pop(row);
+    } finally {
+      _submitting = false;
+    }
+  }
+
+  Future<void> _save() async {
     _syncUriSslParams();
     final data = _formData;
     if (!data.isValid) return;
@@ -366,7 +390,7 @@ class _MongoConnectionFormContentState
     row = row.withEnvironment(_environment);
     row = row.copyWith(removeSavedPassword: _removeSavedPassword);
 
-    material.Navigator.of(context).pop(row);
+    await _finish(row);
   }
 
   @override
