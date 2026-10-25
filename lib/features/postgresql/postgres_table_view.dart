@@ -1,3 +1,5 @@
+import 'package:querya_desktop/shared/report_error.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart' as material;
@@ -345,11 +347,11 @@ class _PostgresTableViewState extends material.State<PostgresTableView> {
     try {
       await _delegate.refreshMaterializedView();
       await state.refresh();
-    } catch (e) {
+    } catch (e, st) {
       if (!context.mounted) return;
       showAppToast(
         context: context,
-        message: 'Refresh materialized view failed: $e',
+        message: failureMessage('Refresh materialized view failed', e, where: 'PostgresTableView', stack: st, driver: DatabaseDriver.postgres),
         variant: AppToastVariant.error,
       );
     }

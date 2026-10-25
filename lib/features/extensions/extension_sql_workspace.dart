@@ -1,3 +1,5 @@
+import 'package:querya_desktop/shared/report_error.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart' as material;
@@ -153,18 +155,25 @@ class _ExtensionSqlWorkspaceState extends material.State<ExtensionSqlWorkspace> 
       if (ws != null) {
         await ws.execute(ws.activeSession);
       }
-    } catch (e) {
+    } catch (e, st) {
+      final message = failureMessage(
+        'Driver restart failed',
+        e,
+        where: 'ExtensionSqlWorkspace',
+        stack: st,
+        driver: DatabaseDriver.extension,
+      );
       if (!mounted) return;
       setState(() {
         final ws = _workspaceKey.currentState;
         if (ws != null) {
-          ws.activeSession.error = 'Driver restart failed: $e';
+          ws.activeSession.error = message;
         }
         _restartingDriver = false;
       });
       showAppToast(
         context: context,
-        message: 'Driver restart failed: $e',
+        message: message,
         variant: AppToastVariant.error,
       );
     }

@@ -1,3 +1,5 @@
+import 'package:querya_desktop/shared/report_error.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async' show unawaited;
 
@@ -355,12 +357,12 @@ class _SqliteTableViewState extends material.State<SqliteTableView> {
           ),
         ),
       );
-    } catch (e) {
+    } catch (e, st) {
       if (navigator.canPop()) navigator.pop();
       if (!mounted) return;
       showAppToast(
         context: context,
-        message: 'Failed to fetch DDL: $e',
+        message: failureMessage('Failed to fetch DDL', e, where: 'SqliteTableView', stack: st, driver: DatabaseDriver.sqlite),
         variant: AppToastVariant.error,
       );
     }

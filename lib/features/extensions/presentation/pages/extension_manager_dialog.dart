@@ -1,3 +1,4 @@
+import 'package:querya_desktop/shared/report_error.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async';
 
@@ -201,9 +202,9 @@ class _ExtensionManagerContentState
       });
     } on MarketplaceException catch (e) {
       if (mounted) setState(() => _sideloadError = e.message);
-    } catch (e) {
+    } catch (e, st) {
       if (mounted) {
-        setState(() => _sideloadError = 'Failed to install extension: $e');
+        setState(() => _sideloadError = failureMessage('Failed to install extension', e, where: 'ExtensionManagerDialog', stack: st));
       }
     } finally {
       if (mounted) setState(() => _sideloading = false);

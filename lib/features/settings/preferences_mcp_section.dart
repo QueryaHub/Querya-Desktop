@@ -1,3 +1,4 @@
+import 'package:querya_desktop/shared/report_error.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async' show StreamSubscription, unawaited;
 
@@ -121,12 +122,12 @@ class PreferencesMcpSectionState extends material.State<PreferencesMcpSection> {
     });
     try {
       await _controller.setEnabled(v);
-    } catch (e) {
+    } catch (e, st) {
       if (mounted) {
         setState(() => _enabled = false);
         showAppToast(
           context: context,
-          message: 'MCP server did not start: $e',
+          message: failureMessage('MCP server did not start', e, where: 'PreferencesMcpSection', stack: st),
           variant: AppToastVariant.error,
         );
       }

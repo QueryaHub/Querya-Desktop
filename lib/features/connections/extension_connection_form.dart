@@ -1,3 +1,5 @@
+import 'package:querya_desktop/shared/report_error.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -108,11 +110,11 @@ class _ExtensionConnectionFormContentState
             ? 'Connection form schema not found for this driver.'
             : null;
       });
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _loadError = 'Failed to load connection form: $e';
+        _loadError = failureMessage('Failed to load connection form', e, where: 'ExtensionConnectionForm', stack: st, driver: DatabaseDriver.extension);
       });
     }
   }
@@ -183,12 +185,12 @@ class _ExtensionConnectionFormContentState
             ? 'Connection successful.'
             : 'Connection successful — server version $version.';
       });
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
       setState(() {
         _testing = false;
         _testSucceeded = false;
-        _testMessage = 'Connection failed: $e';
+        _testMessage = failureMessage('Connection failed', e, where: 'ExtensionConnectionForm', stack: st, driver: DatabaseDriver.extension);
       });
     }
   }
