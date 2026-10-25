@@ -17,7 +17,9 @@ import 'core/motion/querya_motion_controller.dart';
 import 'core/platform/file_launch_service.dart';
 import 'core/platform/macos_file_open_channel.dart';
 import 'core/security/ssl_certificate_support.dart';
+import 'core/extensions/sandbox/sandbox_log_paths.dart';
 import 'core/storage/local_db.dart';
+import 'core/util/querya_log.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/recovery/querya_startup_recovery_app.dart';
 import 'features/updater/update_controller.dart';
@@ -29,9 +31,19 @@ void main([List<String> args = const []]) async {
     FileLaunchService.instance.processLaunchArguments(args);
     await MacOsFileOpenChannel.install();
 
+    unawaited(SandboxLogPaths.logsDirectory()
+        .then(QueryaLog.instance.init)
+        .catchError((Object e) => debugPrint('QueryaLog: no log dir: $e')));
+    QueryaLog.instance.info('app', 'start');
+
     FlutterError.onError = (details) {
       FlutterError.presentError(details);
       debugPrint('FlutterError: ${details.exceptionAsString()}');
+      QueryaLog.instance.error(
+        'flutter',
+        details.exceptionAsString(),
+        stack: details.stack,
+      );
     };
 
     DisplayRefreshService.initialize();
@@ -52,6 +64,12 @@ void main([List<String> args = const []]) async {
       runApp(const QueryaApp());
     } catch (error, stack) {
       debugPrint('Startup database initialization failed: $error\n$stack');
+      QueryaLog.instance.error(
+        'startup',
+        'database initialization failed',
+        error: error,
+        stack: stack,
+      );
       runApp(
         QueryaStartupRecoveryApp(
           error: error,
@@ -70,5 +88,7 @@ void main([List<String> args = const []]) async {
     });
   }, (error, stack) {
     debugPrint('Unhandled async error: $error\n$stack');
+    QueryaLog.instance.error('zone', 'unhandled async error',
+        error: error, stack: stack);
   }));
 }
