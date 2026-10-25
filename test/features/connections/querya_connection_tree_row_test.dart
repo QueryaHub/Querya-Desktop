@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart' as material;
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:querya_desktop/core/theme/querya_theme.dart';
@@ -33,7 +35,7 @@ void main() {
         node.getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
-      expect(node.getSemanticsData().flagsCollection.isExpanded, isFalse);
+      expect(node.getSemanticsData().flagsCollection.isExpanded, Tristate.isFalse);
       tester.binding.pipelineOwner.semanticsOwner!
           .performAction(node.id, SemanticsAction.tap);
       expect(taps, 1);
