@@ -156,4 +156,56 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pumpAndSettle();
   });
+
+  testWidgets(
+      'cancelling the destructive-query dialog keeps the staged edits (#1771)',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const material.Size(1200, 800));
+
+    final conn = ConnectionRow(
+      id: 501,
+      type: 'sqlite',
+      name: 'Test SQLite',
+      host: dbPath,
+      createdAt: '2026-09-24T00:00:00Z',
+    );
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox.expand(
+          child: SqliteSqlWorkspace(connectionRow: conn),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final dynamic dynamicState = tester.state(find.byType(SqliteSqlWorkspace));
+    final dynamic activeSession = dynamicState.activeSession;
+    activeSession.controller.text = 'DELETE FROM users;';
+    activeSession.columns = ['id', 'name'];
+    activeSession.rows = [['1', 'Alice']];
+    final buffer = DataGridStagingBuffer(
+      columns: ['id', 'name'],
+      rows: [['1', 'Alice']],
+    );
+    activeSession.stagingBuffer = buffer;
+    buffer.setCell(0, 1, 'Bob');
+
+    await tester.tap(find.widgetWithText(QueryaButton, 'Execute (F5)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Destructive Operation Detected'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Destructive Operation Detected'), findsNothing);
+    expect(buffer.isDirty, isTrue);
+    expect(activeSession.stagingBuffer, same(buffer));
+
+    material.FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+  });
 }

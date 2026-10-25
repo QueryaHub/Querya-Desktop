@@ -617,11 +617,6 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
       tableTitle: session.title,
     );
     if (!safeToProceed) return;
-    if (session.stagingBuffer != null && session.stagingBuffer!.isDirty) {
-      session.stagingBuffer?.dispose();
-      session.stagingBuffer = null;
-    }
-
     // Checked once, over the text that will run.
     final confirmDestructive =
         await AppSettings.instance.getConfirmDestructiveOperations();
@@ -640,6 +635,12 @@ class GenericSqlWorkspaceState extends material.State<GenericSqlWorkspace> {
         );
         if (confirmed != true) return;
       }
+    }
+
+    // Only now: cancelling the destructive dialog above must keep the edits.
+    if (session.stagingBuffer != null && session.stagingBuffer!.isDirty) {
+      session.stagingBuffer?.dispose();
+      session.stagingBuffer = null;
     }
 
     invalidatePane(session);
