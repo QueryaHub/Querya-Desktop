@@ -66,6 +66,7 @@ class WorkspacePanel extends StatefulWidget {
     this.lastSelectedRedisKey,
     this.onNavigateHome,
     this.onRestoreLastSelectedObject,
+    this.onOpenSqliteTable,
     this.isReadOnly = false,
     this.onRequestNewConnection,
     this.onRequestNewConnectionFromUrl,
@@ -188,6 +189,9 @@ class WorkspacePanel extends StatefulWidget {
 
   /// Callback to restore the last selected table / object view.
   final VoidCallback? onRestoreLastSelectedObject;
+
+  /// Opens a SQLite table chosen on the Overview page (#1816).
+  final void Function(String name)? onOpenSqliteTable;
 
   /// Empty-state hero: primary CTA to add a connection.
   final void Function()? onRequestNewConnection;
@@ -378,6 +382,7 @@ class _WorkspacePanelState extends State<WorkspacePanel> {
             sqlTabRequestToken: widget.sqliteSqlTabRequestToken,
             lastSelectedSqliteObject: widget.lastSelectedSqliteObject,
             onRestoreLastSelectedObject: widget.onRestoreLastSelectedObject,
+            onOpenTable: widget.onOpenSqliteTable,
             isReadOnly: widget.isReadOnly,
           ),
           object: sq == null
