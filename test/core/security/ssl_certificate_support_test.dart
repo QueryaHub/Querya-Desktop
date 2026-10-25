@@ -110,6 +110,42 @@ void main() {
       expect(await orphanDir.exists(), isFalse);
     });
 
+    test('cleanup keeps the directory of a process that is still running (#1768)',
+        () async {
+      final live = await Directory.systemTemp
+          .createTemp('${kMongoTlsTempPrefix}4242_');
+      final dead = await Directory.systemTemp
+          .createTemp('${kMongoTlsTempPrefix}4243_');
+      addTearDown(() async {
+        if (await live.exists()) await live.delete(recursive: true);
+        if (await dead.exists()) await dead.delete(recursive: true);
+      });
+
+      await cleanupStaleMongoTlsTempFiles(
+        isProcessAlive: (pid) async => pid == 4242,
+      );
+
+      expect(await live.exists(), isTrue);
+      expect(await dead.exists(), isFalse);
+    });
+
+    test('the merged key is created in a directory named for this process (#1768)',
+        () async {
+      final input = await Directory.systemTemp.createTemp('querya_test_input_');
+      addTearDown(() => input.delete(recursive: true));
+      await File('${input.path}/c.pem').writeAsString('CERT');
+      await File('${input.path}/k.pem').writeAsString('KEY');
+
+      final path = await resolveMongoTlsCertificateKeyFile(
+        clientCert: '${input.path}/c.pem',
+        clientKey: '${input.path}/k.pem',
+      );
+      addTearDown(() => cleanupMongoTlsTempFile(path));
+
+      expect(File(path!).parent.path, contains('$kMongoTlsTempPrefix$pid'));
+      expect(await File(path).readAsString(), contains('KEY'));
+    });
+
     test('buildSecurityContext returns null when paths.hasAny is false', () {
       const paths = SslCertificatePaths();
       final ctx = buildSecurityContext(paths);

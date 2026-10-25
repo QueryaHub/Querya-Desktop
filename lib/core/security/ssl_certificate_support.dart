@@ -167,34 +167,37 @@ Future<String?> resolveMongoTlsCertificateKeyFile({
 
   final certBytes = await File(certPath).readAsString();
   final keyBytes = await File(keyPath).readAsString();
-  final dir = await Directory.systemTemp.createTemp(kMongoTlsTempPrefix);
-  if (!Platform.isWindows) {
-    try {
-      await Process.run('chmod', ['700', dir.path]);
-    } catch (e) {
-      logIgnored('ssl_certificate_support', e);
-    }
-  }
+  // The pid in the name lets another instance's start-up cleanup see that this
+  // directory is in use.
+  final dir = await Directory.systemTemp
+      .createTemp('$kMongoTlsTempPrefix${pid}_');
   final merged = File('${dir.path}/client.pem');
-  await merged.writeAsString('$certBytes\n$keyBytes\n', flush: true);
-  if (!Platform.isWindows) {
-    // `Process.run` does not throw on a non-zero exit, so check it: a key
-    // file that stayed at the default mode must not be handed out silently.
-    try {
-      final result = await Process.run('chmod', ['600', merged.path]);
-      if (result.exitCode != 0) {
-        throw FileSystemException(
-          'Could not restrict permissions of the TLS client key file: '
-          '${result.stderr}'.trim(),
-          merged.path,
-        );
-      }
-    } catch (_) {
-      await cleanupMongoTlsTempFile(merged.path);
-      rethrow;
+  try {
+    if (!Platform.isWindows) {
+      await _chmod('700', dir.path, 'TLS temp directory');
+      // Empty and 0600 before the key goes in, so it is never readable with
+      // the default mode.
+      await merged.create();
+      await _chmod('600', merged.path, 'TLS client key file');
     }
+    await merged.writeAsString('$certBytes\n$keyBytes\n', flush: true);
+  } catch (_) {
+    await cleanupMongoTlsTempFile(merged.path);
+    rethrow;
   }
   return merged.path;
+}
+
+/// `Process.run` does not throw on a non-zero exit, so check it: a key file
+/// that stayed at the default mode must not be handed out silently.
+Future<void> _chmod(String mode, String path, String what) async {
+  final result = await Process.run('chmod', [mode, path]);
+  if (result.exitCode != 0) {
+    throw FileSystemException(
+      'Could not restrict permissions of the $what: ${result.stderr}'.trim(),
+      path,
+    );
+  }
 }
 
 /// Reliably deletes a temporary MongoDB TLS certificate file and its parent temp directory.
@@ -220,8 +223,30 @@ Future<void> cleanupMongoTlsTempFile(String? filePath) async {
   }
 }
 
-/// Cleans up any stale temporary MongoDB TLS directories left from previous sessions.
-Future<void> cleanupStaleMongoTlsTempFiles() async {
+final _tlsTempOwnerPid = RegExp('^$kMongoTlsTempPrefix(\\d+)_');
+
+Future<bool> _isProcessAlive(int owner) async {
+  if (owner == pid) return true;
+  try {
+    if (Platform.isWindows) {
+      final result =
+          await Process.run('tasklist', ['/FI', 'PID eq $owner', '/NH']);
+      return result.exitCode != 0 || '${result.stdout}'.contains('$owner');
+    }
+    return (await Process.run('kill', ['-0', '$owner'])).exitCode == 0;
+  } catch (_) {
+    // Cannot tell: leave the directory alone.
+    return true;
+  }
+}
+
+/// Cleans up stale temporary MongoDB TLS directories left from previous
+/// sessions. A directory named for a process that is still running belongs to
+/// another Querya instance and is kept; [isProcessAlive] is for tests.
+Future<void> cleanupStaleMongoTlsTempFiles({
+  Future<bool> Function(int pid)? isProcessAlive,
+}) async {
+  final alive = isProcessAlive ?? _isProcessAlive;
   try {
     final tempDir = Directory.systemTemp;
     if (!await tempDir.exists()) return;
@@ -230,6 +255,8 @@ Future<void> cleanupStaleMongoTlsTempFiles() async {
         final name =
             entity.uri.pathSegments.where((s) => s.isNotEmpty).lastOrNull ?? '';
         if (name.startsWith(kMongoTlsTempPrefix)) {
+          final owner = _tlsTempOwnerPid.firstMatch(name)?.group(1);
+          if (owner != null && await alive(int.parse(owner))) continue;
           try {
             await entity.delete(recursive: true);
           } catch (e) {

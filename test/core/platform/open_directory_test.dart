@@ -31,6 +31,23 @@ void main() {
       expect(await Directory(target).exists(), isTrue);
     });
 
+    test('returns false when the directory cannot be created (#1768)',
+        () async {
+      final root = await Directory.systemTemp
+          .createTemp('querya_open_directory_blocked_test_');
+      addTearDown(() => root.delete(recursive: true));
+      final file = File(p.join(root.path, 'a_file'))..writeAsStringSync('x');
+      var called = false;
+
+      final opened = await openDirectoryInFileManager(
+        p.join(file.path, 'child'),
+        opener: (_) async => called = true,
+      );
+
+      expect(opened, isFalse);
+      expect(called, isFalse);
+    });
+
     test('returns false when opener reports failure', () async {
       final root = await Directory.systemTemp
           .createTemp('querya_open_directory_fail_test_');
