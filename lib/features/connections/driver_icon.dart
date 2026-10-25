@@ -5,6 +5,14 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
 
+/// Brightens every channel (x1.9 and a small lift), alpha untouched.
+const _liftDarkIcon = material.ColorFilter.matrix(<double>[
+  1.9, 0, 0, 0, 40, //
+  0, 1.9, 0, 0, 40,
+  0, 0, 1.9, 0, 40,
+  0, 0, 0, 1, 0,
+]);
+
 /// Renders a bundled or extension-provided database icon with one fallback.
 class DriverIcon extends StatelessWidget {
   const DriverIcon({
@@ -37,7 +45,7 @@ class DriverIcon extends StatelessWidget {
     }
     if (assetPath != null) {
       final cacheSize = (size * MediaQuery.devicePixelRatioOf(context)).toInt();
-      return material.Image.asset(
+      final image = material.Image.asset(
         assetPath!,
         width: size,
         height: size,
@@ -47,6 +55,16 @@ class DriverIcon extends StatelessWidget {
         filterQuality: material.FilterQuality.medium,
         errorBuilder: (_, __, ___) => fallback,
       );
+      // The MySQL dolphin is dark blue and nearly vanishes on a dark surface
+      // (#1824): lift it there, leave the light theme alone.
+      if (assetPath!.endsWith('mysql_icon.png') &&
+          material.Theme.of(context).brightness == material.Brightness.dark) {
+        return material.ColorFiltered(
+          colorFilter: _liftDarkIcon,
+          child: image,
+        );
+      }
+      return image;
     }
     return fallback;
   }
