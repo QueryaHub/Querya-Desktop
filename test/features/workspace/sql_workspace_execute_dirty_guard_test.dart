@@ -47,7 +47,8 @@ Future<void> _settleRealAsync(WidgetTester tester) async {
     );
     await tester.pump();
   }
-  await tester.pump(const Duration(milliseconds: 100));
+  // Long enough for the closing dialog to finish its exit transition.
+  await tester.pump(const Duration(seconds: 1));
 }
 
 void main() {
