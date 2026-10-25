@@ -159,5 +159,60 @@ void main() {
       );
       expect(again, isFalse);
     });
+
+    test('a copy that fails midway leaves no querya.db and is retried (#1766)',
+        () async {
+      final legacy = Directory(p.join(tempDir.path, 'legacy_support'));
+      final next = Directory(p.join(tempDir.path, 'new_support'));
+      await Directory(p.join(legacy.path, 'querya_desktop'))
+          .create(recursive: true);
+      await File(p.join(legacy.path, 'querya_desktop', 'querya.db'))
+          .writeAsString('legacy-db');
+      await File(p.join(legacy.path, 'querya_desktop', 'querya.db-wal'))
+          .writeAsString('legacy-wal');
+      await Directory(p.join(legacy.path, 'themes')).create(recursive: true);
+      await File(p.join(legacy.path, 'themes', 'a.json')).writeAsString('{}');
+      // A directory where a file has to go makes that copy fail.
+      await Directory(p.join(next.path, 'themes', 'a.json'))
+          .create(recursive: true);
+
+      await expectLater(
+        AppDataRoot.migrateLegacySupportIfNeeded(
+          newSupport: next,
+          legacyCandidates: [legacy],
+        ),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(
+        await File(p.join(next.path, 'querya_desktop', 'querya.db')).exists(),
+        isFalse,
+      );
+
+      await Directory(p.join(next.path, 'themes', 'a.json')).delete();
+      final retried = await AppDataRoot.migrateLegacySupportIfNeeded(
+        newSupport: next,
+        legacyCandidates: [legacy],
+      );
+      expect(retried, isTrue);
+      expect(
+        await File(p.join(next.path, 'querya_desktop', 'querya.db'))
+            .readAsString(),
+        'legacy-db',
+      );
+      expect(
+        await File(p.join(next.path, 'querya_desktop', 'querya.db-wal'))
+            .readAsString(),
+        'legacy-wal',
+      );
+      expect(
+        await File(p.join(next.path, 'querya_desktop', 'querya.db.migrating'))
+            .exists(),
+        isFalse,
+      );
+      expect(
+        await File(p.join(legacy.path, 'querya_desktop', 'querya.db')).exists(),
+        isTrue,
+      );
+    });
   });
 }

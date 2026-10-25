@@ -194,19 +194,36 @@ abstract final class AppDataRoot {
     return const [];
   }
 
+  /// Copies [from] into [to] so that `querya_desktop/querya.db` appears last
+  /// and whole: the migration is skipped once that file exists, so an
+  /// interrupted copy must never leave it behind. Its `-wal` / `-shm` files
+  /// are copied before it, and the database goes in under a temporary name
+  /// and is renamed into place. [from] is not touched.
   static Future<void> _copyDirectory(Directory from, Directory to) async {
     if (!await to.exists()) {
       await to.create(recursive: true);
     }
+    final dbRelative = p.join('querya_desktop', 'querya.db');
+    File? legacyDb;
     await for (final entity in from.list(recursive: true, followLinks: false)) {
       final relative = p.relative(entity.path, from: from.path);
       final destPath = p.join(to.path, relative);
       if (entity is Directory) {
         await Directory(destPath).create(recursive: true);
       } else if (entity is File) {
+        if (relative == dbRelative) {
+          legacyDb = entity;
+          continue;
+        }
         await File(destPath).parent.create(recursive: true);
         await entity.copy(destPath);
       }
     }
+    if (legacyDb == null) return;
+    final destDb = p.join(to.path, dbRelative);
+    await Directory(p.dirname(destDb)).create(recursive: true);
+    final staged = '$destDb.migrating';
+    await legacyDb.copy(staged);
+    await File(staged).rename(destDb);
   }
 }
