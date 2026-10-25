@@ -9,8 +9,12 @@ Future<bool> openDirectoryInFileManager(
   Future<bool> Function(String path)? opener,
 }) async {
   final dir = Directory(directoryPath);
-  if (!await dir.exists()) {
-    await dir.create(recursive: true);
+  try {
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+  } on FileSystemException {
+    return false;
   }
 
   final open = opener ?? _defaultOpener;
