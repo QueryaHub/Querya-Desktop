@@ -388,4 +388,39 @@ void main() {
       );
     });
   });
+
+  group('a server that wants SSL (#1754)', () {
+    const raw = '28000: pg_hba.conf rejects connection for host "10.10.0.129", '
+        'user "app", database "demo", no encryption';
+
+    test('is told as an SSL problem, with the server line kept', () {
+      final mapped =
+          mapDatabaseError(Exception(raw), driver: DatabaseDriver.postgres);
+
+      expect(mapped, isA<TlsFailureException>());
+      expect(mapped.message, contains('only accepts encrypted connections'));
+      expect(mapped.message, contains('pg_hba.conf rejects connection'));
+      expect(mapped.message, contains('no encryption'));
+      expect(mapped.remediationHint, postgresEnableSslHint);
+      expect(describeDatabaseError(Exception(raw)), contains('Enable SSL'));
+    });
+
+    test('is found inside the wrapped connect error too', () {
+      final wrapped = PostgresConnectionException(
+        'Failed to connect to PostgreSQL (demo): ${describeDatabaseError(Exception(raw))}',
+        cause: Exception(raw),
+      );
+      expect(wrapped.message, contains(postgresEnableSslHint));
+    });
+
+    test('a rejection that is not about missing encryption gets no SSL hint', () {
+      final mapped = mapDatabaseError(
+        Exception('28000: pg_hba.conf rejects connection for host "10.0.0.1", '
+            'user "app", database "demo", SSL encryption'),
+        driver: DatabaseDriver.postgres,
+      );
+      expect(mapped, isNot(isA<TlsFailureException>()));
+      expect(mapped.remediationHint, isNot(postgresEnableSslHint));
+    });
+  });
 }
