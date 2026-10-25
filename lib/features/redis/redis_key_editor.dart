@@ -1,3 +1,5 @@
+import 'package:querya_desktop/shared/report_error.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
@@ -315,11 +317,11 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       }
       if (!mounted) return;
       setState(() => _loadingMore = false);
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
       setState(() {
         _loadingMore = false;
-        _error = 'Load failed: $e';
+        _error = failureMessage('Load failed', e, where: 'RedisKeyEditor', stack: st, driver: DatabaseDriver.redis);
       });
     }
   }
@@ -336,9 +338,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       if (!mounted) return;
       setState(() => _success = 'Value saved');
       _clearSuccessAfterDelay();
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      setState(() => _error = 'Save failed: $e');
+      setState(() => _error = failureMessage('Save failed', e, where: 'RedisKeyEditor', stack: st, driver: DatabaseDriver.redis));
     }
   }
 
@@ -377,9 +379,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       });
       _clearSuccessAfterDelay();
       widget.onKeyRenamed?.call(newBulk);
-    } catch (e) {
+    } catch (e, st) {
       if (mounted) {
-        setState(() => _error = 'Rename failed: $e');
+        setState(() => _error = failureMessage('Rename failed', e, where: 'RedisKeyEditor', stack: st, driver: DatabaseDriver.redis));
       }
     }
   }
@@ -397,9 +399,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     try {
       await widget.connection.del(_cmdKey);
       widget.onKeyDeleted?.call();
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      setState(() => _error = 'Delete failed: $e');
+      setState(() => _error = failureMessage('Delete failed', e, where: 'RedisKeyEditor', stack: st, driver: DatabaseDriver.redis));
     }
   }
 
@@ -417,9 +419,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
         _success = seconds > 0 ? 'TTL set to $seconds seconds' : 'TTL removed';
       });
       _clearSuccessAfterDelay();
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      setState(() => _error = 'TTL failed: $e');
+      setState(() => _error = failureMessage('TTL failed', e, where: 'RedisKeyEditor', stack: st, driver: DatabaseDriver.redis));
     }
   }
 
@@ -429,9 +431,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     try {
       await widget.connection.hset(_cmdKey, field, value);
       await _load();
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      setState(() => _error = 'HSET failed: $e');
+      setState(() => _error = failureMessage('HSET failed', e, where: 'RedisKeyEditor', stack: st, driver: DatabaseDriver.redis));
     }
   }
 
@@ -448,9 +450,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     try {
       await widget.connection.hdel(_cmdKey, field);
       await _load();
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      setState(() => _error = 'HDEL failed: $e');
+      setState(() => _error = failureMessage('HDEL failed', e, where: 'RedisKeyEditor', stack: st, driver: DatabaseDriver.redis));
     }
   }
 
@@ -460,9 +462,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     try {
       await widget.connection.rpush(_cmdKey, value);
       await _load();
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      setState(() => _error = 'RPUSH failed: $e');
+      setState(() => _error = failureMessage('RPUSH failed', e, where: 'RedisKeyEditor', stack: st, driver: DatabaseDriver.redis));
     }
   }
 
@@ -485,9 +487,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
       }
       await widget.connection.lset(_cmdKey, index, newValue);
       await _load();
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      setState(() => _error = 'LSET failed: $e');
+      setState(() => _error = failureMessage('LSET failed', e, where: 'RedisKeyEditor', stack: st, driver: DatabaseDriver.redis));
     }
   }
 
@@ -522,9 +524,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
         rethrow;
       }
       await _load();
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      setState(() => _error = 'LREM failed: $e');
+      setState(() => _error = failureMessage('LREM failed', e, where: 'RedisKeyEditor', stack: st, driver: DatabaseDriver.redis));
     }
   }
 
@@ -541,9 +543,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     try {
       await widget.connection.sadd(_cmdKey, member);
       await _load();
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      setState(() => _error = 'SADD failed: $e');
+      setState(() => _error = failureMessage('SADD failed', e, where: 'RedisKeyEditor', stack: st, driver: DatabaseDriver.redis));
     }
   }
 
@@ -560,9 +562,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     try {
       await widget.connection.srem(_cmdKey, member);
       await _load();
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      setState(() => _error = 'SREM failed: $e');
+      setState(() => _error = failureMessage('SREM failed', e, where: 'RedisKeyEditor', stack: st, driver: DatabaseDriver.redis));
     }
   }
 
@@ -572,9 +574,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     try {
       await widget.connection.zadd(_cmdKey, score, member);
       await _load();
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      setState(() => _error = 'ZADD failed: $e');
+      setState(() => _error = failureMessage('ZADD failed', e, where: 'RedisKeyEditor', stack: st, driver: DatabaseDriver.redis));
     }
   }
 
@@ -591,9 +593,9 @@ class _RedisKeyEditorState extends material.State<RedisKeyEditor> {
     try {
       await widget.connection.zrem(_cmdKey, member);
       await _load();
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      setState(() => _error = 'ZREM failed: $e');
+      setState(() => _error = failureMessage('ZREM failed', e, where: 'RedisKeyEditor', stack: st, driver: DatabaseDriver.redis));
     }
   }
 

@@ -48,6 +48,21 @@ void main() {
     expect(text, contains('Cannot reach the database server'));
   });
 
+  test('failureMessage logs and returns the inline error line', () async {
+    final text = failureMessage(
+      'Delete failed',
+      StateError('connection reset'),
+      where: 'RedisKeysView',
+      driver: DatabaseDriver.redis,
+    );
+    await QueryaLog.instance.flush();
+
+    expect(text, startsWith('Delete failed: '));
+    final log =
+        await File('${logDir.path}/${QueryaLog.fileName}').readAsString();
+    expect(log, contains('[RedisKeysView] Delete failed'));
+  });
+
   testWidgets('reportError shows the toast and writes the log', (tester) async {
     final host = await pumpHost(tester);
 
