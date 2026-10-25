@@ -610,10 +610,12 @@ class _MongoStatsViewState extends material.State<MongoStatsView>
   material.Widget _memoryCard(
       material.BuildContext context, Map<String, dynamic> status) {
     final mem = status['mem'] as Map<String, dynamic>?;
-    final resident = _getInt(mem, 'resident') ?? 0;
-    final virtual = _getInt(mem, 'virtual') ?? 0;
-    final mapped = _getInt(mem, 'mapped') ?? 0;
-    final mappedWithJournal = _getInt(mem, 'mappedWithJournal') ?? 0;
+    // serverStatus reports `mem` in MiB, not bytes.
+    const mib = 1024 * 1024;
+    final resident = (_getInt(mem, 'resident') ?? 0) * mib;
+    final virtual = (_getInt(mem, 'virtual') ?? 0) * mib;
+    final mapped = (_getInt(mem, 'mapped') ?? 0) * mib;
+    final mappedWithJournal = (_getInt(mem, 'mappedWithJournal') ?? 0) * mib;
     return _card(
       context,
       'Memory',
@@ -799,12 +801,7 @@ class _MongoStatsViewState extends material.State<MongoStatsView>
     return v?.toString();
   }
 
-  int? _getInt(Map<String, dynamic>? map, String key) {
-    final v = map?[key];
-    if (v is int) return v;
-    if (v is num) return v.toInt();
-    return null;
-  }
+  int? _getInt(Map<String, dynamic>? map, String key) => mongoStatInt(map?[key]);
 
   int? _getNestedInt(Map<String, dynamic>? map, String key1, String key2,
       [String? key3]) {
@@ -813,15 +810,9 @@ class _MongoStatsViewState extends material.State<MongoStatsView>
     if (key3 != null) {
       final m2 = m1[key2] as Map<String, dynamic>?;
       if (m2 == null) return null;
-      final v = m2[key3];
-      if (v is int) return v;
-      if (v is num) return v.toInt();
-      return null;
+      return mongoStatInt(m2[key3]);
     }
-    final v = m1[key2];
-    if (v is int) return v;
-    if (v is num) return v.toInt();
-    return null;
+    return mongoStatInt(m1[key2]);
   }
 
   Map<String, String> _extractServerInfo(Map<String, dynamic> status) {
@@ -891,4 +882,15 @@ class _MongoStatsViewState extends material.State<MongoStatsView>
     }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
+}
+
+/// A `serverStatus` number as an [int]: [int], [num], or bson `Int64`, which is
+/// not a Dart [num] (counters such as `opcounters` and `network.bytesIn` come
+/// as Int64 and used to read as 0).
+@visibleForTesting
+int? mongoStatInt(Object? v) {
+  if (v == null) return null;
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  return int.tryParse(v.toString());
 }
