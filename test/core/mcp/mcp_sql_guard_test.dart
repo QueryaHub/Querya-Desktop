@@ -99,6 +99,24 @@ void main() {
     refused("SELECT setval('s', 10)");
   });
 
+  test('a denylisted function is refused quoted, qualified and spaced (#1769)',
+      () {
+    refused('SELECT pg_catalog."pg_terminate_backend"(123)');
+    refused('''SELECT "nextval"('s')''');
+    refused('SELECT "pg_sleep" (60)');
+    refused('SELECT pg_catalog.pg_sleep (60)');
+    refused('SELECT pg_sleep /* c */ (60)');
+    refused('SELECT pg_stat_reset()');
+    refused("SELECT pg_create_restore_point('x')");
+    refused('SELECT pg_promote()');
+    refused('SELECT SLEEP(5)', SqlDialect.mysql);
+    refused("SELECT BENCHMARK(1000000, MD5('a'))", SqlDialect.mysql);
+    refused("SELECT GET_LOCK('l', 10)", SqlDialect.mysql);
+    refused("SELECT RELEASE_LOCK('l')", SqlDialect.mysql);
+    refused("SELECT IS_FREE_LOCK('l')", SqlDialect.mysql);
+    refused('SELECT `sleep`(5)', SqlDialect.mysql);
+  });
+
   test('EXPLAIN of a SELECT that calls REPLACE() is allowed (#1565)', () {
     allowed("EXPLAIN SELECT REPLACE(name, 'a', 'b') FROM users");
     refused("EXPLAIN REPLACE INTO users VALUES (1)", SqlDialect.mysql);

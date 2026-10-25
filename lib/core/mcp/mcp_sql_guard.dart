@@ -47,7 +47,9 @@ abstract final class McpSqlGuard {
     r'PG_READ_FILE|PG_READ_BINARY_FILE|PG_LS_DIR|PG_STAT_FILE|LO_\w*|'
     r'QUERY_TO_XML\w*|CURSOR_TO_XML|TABLE_TO_XML\w*|PG_(?:TRY_)?ADVISORY_\w*|PG_SLEEP\w*|'
     r'NEXTVAL|SETVAL|DBLINK\w*|SET_CONFIG|LOAD_FILE|LOAD_EXTENSION|WRITEFILE|'
-    r'READFILE|FSDIR)\s*\(',
+    r'READFILE|FSDIR|SLEEP|BENCHMARK|GET_LOCK|RELEASE_LOCK|RELEASE_ALL_LOCKS|IS_FREE_LOCK|'
+    r'PG_STAT_RESET\w*|PG_SWITCH_WAL|PG_CREATE_RESTORE_POINT|PG_LOGICAL_EMIT_MESSAGE|'
+    r'PG_PROMOTE|PG_DROP_REPLICATION_SLOT)\s*\(',
   );
 
   /// SQLite pragmas that only read the schema.
@@ -114,7 +116,9 @@ abstract final class McpSqlGuard {
     if (first == null || !_readStarts.contains(first)) {
       return const McpSqlRefusal('read_only_only', 'Only read-only queries are allowed (SELECT, WITH, EXPLAIN, SHOW, DESCRIBE).');
     }
-    if (_forbiddenFunctions.hasMatch(upper)) {
+    // `"nextval"('s')` is the same call in PostgreSQL; the stripper keeps
+    // quoted identifiers, so drop the quotes before looking for the name.
+    if (_forbiddenFunctions.hasMatch(upper.replaceAll(RegExp(r'["`]'), ''))) {
       return const McpSqlRefusal('function_not_allowed', 'This query calls a server function that is not allowed over MCP.');
     }
     if (first == 'EXPLAIN') {
