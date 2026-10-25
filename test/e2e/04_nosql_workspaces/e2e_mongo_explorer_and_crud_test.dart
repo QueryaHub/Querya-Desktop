@@ -42,6 +42,7 @@ class _FakeMongo extends MongoService {
     Map<String, dynamic>? sort,
     int? limit,
     int? skip,
+    int? maxTimeMs,
   }) async =>
       [for (final d in docs) Map<String, dynamic>.of(d)];
 
@@ -51,6 +52,7 @@ class _FakeMongo extends MongoService {
     String database,
     String collection, {
     Map<String, dynamic>? filter,
+    int? maxTimeMs,
   }) async =>
       docs.length;
 
