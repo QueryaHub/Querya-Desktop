@@ -38,6 +38,19 @@ class _FakePathProvider extends PathProviderPlatform {
   Future<String?> getDownloadsPath() async => _root;
 }
 
+/// Lets the real async work of a Run (the settings read in sqflite) finish:
+/// `pumpAndSettle` alone runs on fake time and never waits for it.
+Future<void> _settleRealAsync(WidgetTester tester) async {
+  for (var i = 0; i < 10; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
+  }
+  // Long enough for the closing dialog to finish its exit transition.
+  await tester.pump(const Duration(seconds: 1));
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -143,8 +156,7 @@ void main() {
 
     expect(find.text('Unsaved changes in "Query 1"'), findsOneWidget);
     await tester.tap(find.text('Discard'));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 150)));
-    await tester.pumpAndSettle();
+    await _settleRealAsync(tester);
 
     // Query was allowed to run, previous dirty buffer was discarded
     expect(find.text('Unsaved changes in "Query 1"'), findsNothing);
@@ -154,6 +166,60 @@ void main() {
 
     material.FocusManager.instance.primaryFocus?.unfocus();
     await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets(
+      'cancelling the destructive-query dialog keeps the staged edits (#1771)',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const material.Size(1200, 800));
+
+    final conn = ConnectionRow(
+      id: 501,
+      type: 'sqlite',
+      name: 'Test SQLite',
+      host: dbPath,
+      createdAt: '2026-09-24T00:00:00Z',
+    );
+
+    await tester.pumpWidget(
+      queryaThemeTestShell(
+        child: material.SizedBox.expand(
+          child: SqliteSqlWorkspace(connectionRow: conn),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final dynamic dynamicState = tester.state(find.byType(SqliteSqlWorkspace));
+    final dynamic activeSession = dynamicState.activeSession;
+    activeSession.controller.text = 'DELETE FROM users;';
+    activeSession.columns = ['id', 'name'];
+    activeSession.rows = [['1', 'Alice']];
+    final buffer = DataGridStagingBuffer(
+      columns: ['id', 'name'],
+      rows: [['1', 'Alice']],
+    );
+    activeSession.stagingBuffer = buffer;
+    buffer.setCell(0, 1, 'Bob');
+
+    await tester.tap(find.widgetWithText(QueryaButton, 'Execute (F5)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard'));
+    await _settleRealAsync(tester);
+
+    expect(find.text('Destructive Operation Detected'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Destructive Operation Detected'), findsNothing);
+    expect(buffer.isDirty, isTrue);
+    expect(activeSession.stagingBuffer, same(buffer));
+
+    material.FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpWidget(const SizedBox());
+    // The connection pool arms a release timer when the workspace goes away.
+    await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
   });
 }
