@@ -16,6 +16,7 @@ import 'package:querya_desktop/core/storage/local_db.dart';
 import 'package:querya_desktop/core/extensions/sandbox/unsandboxed_launch_consent_gate.dart';
 import 'package:querya_desktop/features/extensions/presentation/widgets/unsandboxed_driver_consent_dialog.dart';
 import 'package:querya_desktop/features/connections/connections_panel.dart';
+import 'package:querya_desktop/features/help/log_actions.dart';
 import 'package:querya_desktop/features/macos/querya_platform_menu_bar.dart';
 import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/shared/widgets/widgets.dart';
@@ -319,6 +320,8 @@ class _MainScreenState extends State<MainScreen> {
               onToggleSidebar: () => _splitKey.currentState?.toggleSidebar(),
               onOpenPreferences: () => showPreferencesDialog(context),
               onOpenWelcomeTour: () => _dialogs.onOpenWelcomeTour(),
+              onOpenLogsFolder: () => unawaited(openLogsFolder(context)),
+              onCopyDiagnostics: () => unawaited(copyDiagnostics(context)),
               onGoHome: _nav.onGoHome,
               child: SqlEditorGlobalActions(
                 activeConnection: workspace.activeConnection,

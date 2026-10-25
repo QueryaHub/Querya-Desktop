@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:bitsdojo_window/bitsdojo_window.dart';
@@ -14,6 +15,7 @@ import 'package:querya_desktop/features/settings/preferences_dialog.dart';
 import 'package:querya_desktop/shared/widgets/connection_environment_badge.dart';
 import 'package:querya_desktop/features/extensions/presentation/pages/extension_manager_dialog.dart';
 import 'package:querya_desktop/features/help/about_dialog.dart';
+import 'package:querya_desktop/features/help/log_actions.dart';
 import 'package:querya_desktop/features/updater/update_available_badge.dart';
 import 'package:querya_desktop/features/updater/update_controller.dart';
 import 'package:querya_desktop/features/updater/update_dialog.dart';
@@ -413,6 +415,17 @@ class QueryaWindowTitleBar extends StatelessWidget {
                             QueryaMenuItem(
                                 onPressed: (_) => openQueryaDocumentation(),
                                 child: const Text('Documentation')),
+                            const QueryaMenuDivider(),
+                            QueryaMenuItem(
+                              onPressed: (_) =>
+                                  unawaited(openLogsFolder(titleBarContext)),
+                              child: const Text('Open Logs Folder'),
+                            ),
+                            QueryaMenuItem(
+                              onPressed: (_) =>
+                                  unawaited(copyDiagnostics(titleBarContext)),
+                              child: const Text('Copy Diagnostics'),
+                            ),
                           ],
                           child: const Text('Help'),
                         ),
