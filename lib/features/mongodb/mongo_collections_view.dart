@@ -86,7 +86,11 @@ class _MongoCollectionsViewState extends material.State<MongoCollectionsView> {
       _statsTotal = 0;
     });
     try {
-      final names = await widget.connection.listCollections(widget.database);
+      // The sidebar tree lists them sorted by name; the same order here
+      // (#1824) instead of the server's.
+      final names = [
+        ...await widget.connection.listCollections(widget.database),
+      ]..sort();
       if (!mounted || gen != _loadGeneration) return;
 
       setState(() {
