@@ -134,7 +134,18 @@ class McpServerController {
       },
     );
     host.changes.listen((_) => _publish(host));
-    await host.start();
+    try {
+      await host.start();
+    } catch (_) {
+      // It may have bound the socket before it failed; do not leave it
+      // listening with a token nobody holds.
+      try {
+        await host.stop();
+      } catch (e, st) {
+        logIgnored('McpServerController.start cleanup', e, st);
+      }
+      rethrow;
+    }
     _host = host;
     _publish(host);
   }
@@ -154,7 +165,11 @@ class McpServerController {
   }
 
   void _onCall(McpCallRecord r) {
-    if (_logActivity) unawaited(_persist(r));
+    if (_logActivity) {
+      unawaited(_persist(r).catchError((Object e, StackTrace st) {
+        logIgnored('McpServerController.persist activity', e, st);
+      }));
+    }
     _calls.add(r);
   }
 

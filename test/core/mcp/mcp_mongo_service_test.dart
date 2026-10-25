@@ -181,6 +181,18 @@ void main() {
           'mongo_too_large');
     });
 
+    test('a huge list in a filter is refused (#1776)', () {
+      final filter = {
+        'id': {r'$in': List<int>.generate(McpMongoGuard.maxKeys + 1, (i) => i)},
+      };
+      expect(McpMongoGuard.refusal(filter, what: 'filter')?.rule,
+          'mongo_too_large');
+      final small = {
+        'id': {r'$in': List<int>.generate(20, (i) => i)},
+      };
+      expect(McpMongoGuard.refusal(small, what: 'filter'), isNull);
+    });
+
     test('a value that is not a document is refused', () {
       expect(McpMongoGuard.refusal('abc', what: 'filter')?.rule,
           'mongo_not_a_document');
