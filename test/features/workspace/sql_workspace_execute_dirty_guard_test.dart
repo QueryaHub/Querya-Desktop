@@ -47,7 +47,7 @@ Future<void> _settleRealAsync(WidgetTester tester) async {
     );
     await tester.pump();
   }
-  await tester.pumpAndSettle();
+  await tester.pump(const Duration(milliseconds: 100));
 }
 
 void main() {
@@ -217,6 +217,8 @@ void main() {
 
     material.FocusManager.instance.primaryFocus?.unfocus();
     await tester.pumpWidget(const SizedBox());
+    // The connection pool arms a release timer when the workspace goes away.
+    await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
   });
 }
