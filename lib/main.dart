@@ -2,9 +2,7 @@ import 'dart:async';
 
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
-import 'package:mcp_toolkit/mcp_toolkit.dart';
 
 import 'app/app.dart';
 import 'app/app_wiring.dart';
@@ -27,11 +25,6 @@ import 'features/updater/update_controller.dart';
 void main([List<String> args = const []]) async {
   unawaited(runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
-    if (kDebugMode) {
-      MCPToolkitBinding.instance
-        ..initialize()
-        ..initializeFlutterToolkit();
-    }
     installAppWiring();
     FileLaunchService.instance.processLaunchArguments(args);
     await MacOsFileOpenChannel.install();
