@@ -112,4 +112,37 @@ void main() {
     await tester.pump(const Duration(seconds: 6));
     await tester.pumpAndSettle();
   });
+
+  testWidgets(
+      'a save that fails on the second secret leaves nothing behind, and the '
+      'same row saves once the keyring answers', (tester) async {
+    final host = await pumpHost(tester);
+    testMemorySecrets.failOnCall(
+      SecretsOp.write,
+      2,
+      StateError('connection string refused'),
+    );
+    final withString = _row.copyWith(connectionString: 'postgres://x@y/z');
+
+    final first =
+        await tester.runAsync(() => saveNewConnection(host, withString));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(first, isFalse);
+    expect(await savedRows(tester), isEmpty);
+    expect(testMemorySecrets.keys, isEmpty);
+    expect(find.textContaining('was not saved'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pumpAndSettle();
+
+    final second =
+        await tester.runAsync(() => saveNewConnection(host, withString));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(second, isTrue);
+    expect(await savedRows(tester), hasLength(1));
+    expect(find.textContaining('was not saved'), findsNothing);
+  });
 }
