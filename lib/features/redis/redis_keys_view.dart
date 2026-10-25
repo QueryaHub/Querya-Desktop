@@ -1,3 +1,5 @@
+import 'package:querya_desktop/shared/report_error.dart';
+import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' as material;
 import 'package:querya_desktop/core/theme/querya_ui_colors.dart';
@@ -130,13 +132,13 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
               ttl: metas[i].ttl,
             ),
         ];
-      } catch (e) {
+      } catch (e, st) {
         // Still show keys with unknown type/TTL; surface the failure non-blocking.
         infos = [
           for (final name in accumulatedKeys)
             RedisKeyInfo(name: name, type: 'unknown', ttl: -1),
         ];
-        typeTtlError = 'Failed to load key types/TTLs: $e';
+        typeTtlError = failureMessage('Failed to load key types/TTLs', e, where: 'RedisKeysView', stack: st, driver: DatabaseDriver.redis);
       }
     } else {
       infos = [];
@@ -193,8 +195,8 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
         _keys.removeWhere((k) => k.name == keyInfo.name);
         _dbSize = (_dbSize - 1).clamp(0, _dbSize);
       });
-    } catch (e) {
-      if (mounted) setState(() => _error = 'Delete failed: $e');
+    } catch (e, st) {
+      if (mounted) setState(() => _error = failureMessage('Delete failed', e, where: 'RedisKeysView', stack: st, driver: DatabaseDriver.redis));
     }
   }
 
@@ -222,11 +224,11 @@ class _RedisKeysViewState extends material.State<RedisKeysView> {
         _keys.removeWhere((k) => toRemove.contains(k.name));
         _dbSize = (_dbSize - count).clamp(0, _dbSize);
       });
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
       // Some chunks may have been removed: show what is really left.
       await _load();
-      if (mounted) setState(() => _error = 'Delete folder failed: $e');
+      if (mounted) setState(() => _error = failureMessage('Delete folder failed', e, where: 'RedisKeysView', stack: st, driver: DatabaseDriver.redis));
     }
   }
 
