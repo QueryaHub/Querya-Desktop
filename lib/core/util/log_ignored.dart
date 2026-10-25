@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:querya_desktop/core/util/querya_log.dart';
 
 /// Records an error that the caller deliberately goes on from: a best-effort
 /// close or delete, a cache that can be rebuilt. [where] names the place
@@ -6,5 +7,6 @@ import 'package:flutter/foundation.dart';
 /// trace in the debug log instead of none.
 void logIgnored(String where, Object error, [StackTrace? stack]) {
   debugPrint('[$where] ignored: $error');
+  QueryaLog.instance.warn(where, 'ignored', error: error);
   if (stack != null && kDebugMode) debugPrint('$stack');
 }

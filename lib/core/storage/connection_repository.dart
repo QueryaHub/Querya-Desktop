@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:querya_desktop/core/storage/connection_secrets_store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:querya_desktop/core/storage/local_db_models.dart';
+import 'package:querya_desktop/core/util/log_ignored.dart';
 
 /// Saved connections: rows, secrets and SSH configuration kept in step.
 /// Part of [LocalDb], which keeps the same methods and delegates here.
@@ -154,12 +155,21 @@ class ConnectionRepository {
         await ConnectionSecretsStore.writeSshSecretsForConnection(row.id!);
       }
     } catch (e) {
-      await db.update(
-        'connections',
-        previousRow.toPersistenceMap(),
-        where: 'id = ?',
-        whereArgs: [row.id],
-      );
+      // Best effort, but never silent: when the restore fails as well, the row
+      // and the keyring can disagree (old row, new password), and this line is
+      // what explains it. The original error is the one reported.
+      final where = 'ConnectionRepository.updateConnection restore of '
+          'connection ${row.id}';
+      try {
+        await db.update(
+          'connections',
+          previousRow.toPersistenceMap(),
+          where: 'id = ?',
+          whereArgs: [row.id],
+        );
+      } catch (restoreError, stack) {
+        logIgnored('$where (row)', restoreError, stack);
+      }
       try {
         await ConnectionSecretsStore.writeForConnection(
           row.id!,
@@ -174,8 +184,8 @@ class ConnectionRepository {
           passphrase: previousSsh.passphrase,
           jumpPassword: previousSsh.jumpPassword,
         );
-      } catch (_) {
-        // Best-effort restore of previous secrets; surface the original error.
+      } catch (restoreError, stack) {
+        logIgnored('$where (secrets)', restoreError, stack);
       }
       rethrow;
     }
