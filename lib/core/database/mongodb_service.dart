@@ -157,6 +157,7 @@ class MongoService {
     Map<String, dynamic>? sort,
     int? limit,
     int? skip,
+    int? maxTimeMs,
   }) async {
     if (!connection.isConnected) {
       throw StateError('Not connected to MongoDB');
@@ -183,7 +184,17 @@ class MongoService {
       // Never unbounded: `stream.toList()` below holds every document.
       selector.limit(effectiveMongoFindLimit(limit));
 
-      final stream = coll.find(selector);
+      // `maxTimeMS` makes the server stop a runaway query (`$regex`, `$expr`)
+      // itself; dropping the client future would leave it running. It needs
+      // the find command (MongoDB 3.6+); older servers get the plain find.
+      final stream = maxTimeMs != null &&
+              maxTimeMs > 0 &&
+              db.masterConnection.serverCapabilities.supportsOpMsg
+          ? coll.modernFind(
+              selector: selector,
+              findOptions: FindOptions(maxTimeMS: maxTimeMs),
+            )
+          : coll.find(selector);
       return await stream.toList();
     });
   }
@@ -243,11 +254,13 @@ class MongoService {
     String database,
     String collection, {
     Map<String, dynamic>? filter,
+    int? maxTimeMs,
   }) async {
     return _withDb(connection, database, (db) async {
       final result = await db.runCommand(<String, Object>{
         'count': collection,
         if (filter != null && filter.isNotEmpty) 'query': filter,
+        if (maxTimeMs != null && maxTimeMs > 0) 'maxTimeMS': maxTimeMs,
       });
       final n = result['n'];
       if (n is int) return n;

@@ -33,6 +33,7 @@ class _FakeSession implements McpMongoSession {
   Map<String, dynamic>? lastFilter;
   Map<String, dynamic>? lastSort;
   int? lastLimit;
+  int? lastMaxTimeMs;
   var closed = false;
 
   @override
@@ -47,8 +48,10 @@ class _FakeSession implements McpMongoSession {
     Map<String, dynamic>? filter,
     Map<String, dynamic>? sort,
     required int limit,
+    int? maxTimeMs,
   }) async {
     calls.add('find $collection');
+    lastMaxTimeMs = maxTimeMs;
     lastFilter = filter;
     lastSort = sort;
     lastLimit = limit;
@@ -58,8 +61,10 @@ class _FakeSession implements McpMongoSession {
   }
 
   @override
-  Future<int> count(String collection, {Map<String, dynamic>? filter}) async {
+  Future<int> count(String collection,
+      {Map<String, dynamic>? filter, int? maxTimeMs}) async {
     calls.add('count $collection');
+    lastMaxTimeMs = maxTimeMs;
     lastFilter = filter;
     return docs.length;
   }
@@ -88,6 +93,7 @@ void main() {
     Set<int> shared = const {1},
     Duration timeout = const Duration(seconds: 5),
     int maxField = 4096,
+    int maxTotal = 200000,
   }) =>
       McpMongoService(
         access: _Access(shared),
@@ -102,6 +108,7 @@ void main() {
         },
         timeout: timeout,
         maxFieldChars: maxField,
+        maxTotalChars: maxTotal,
       );
 
   setUp(() {
@@ -128,6 +135,38 @@ void main() {
           .having((e) => e.message, 'message', contains('Collection not found'))),
     );
     expect(session.calls, isEmpty);
+  });
+
+  test('the server is told to stop a query after the timeout (#1776)', () async {
+    final svc = service(timeout: const Duration(seconds: 7));
+
+    await svc.find(1, 'users');
+    expect(session.lastMaxTimeMs, 7000);
+
+    session.lastMaxTimeMs = null;
+    await svc.count(1, 'users');
+    expect(session.lastMaxTimeMs, 7000);
+  });
+
+  test('the documents together are capped, not only each field (#1776)',
+      () async {
+    session = _FakeSession(docs: [
+      for (var i = 0; i < 10; i++) {'_id': 'id$i', 'text': 'x' * 100},
+    ]);
+    final svc = service(maxTotal: 350);
+
+    final result = await svc.find(1, 'users', limit: 10);
+
+    expect(result.documents.length, lessThan(10));
+    expect(result.documents, isNotEmpty);
+    expect(result.truncated, isTrue);
+  });
+
+  test('a result under the total cap is returned whole (#1776)', () async {
+    final result = await service().find(1, 'users');
+
+    expect(result.documents.length, 3);
+    expect(result.truncated, isFalse);
   });
 
   group('McpMongoGuard', () {
