@@ -111,9 +111,9 @@ void main() {
     expect(
       QueryaWindowTitleBar.titleBarLeadingInset(
         isMacOS: true,
-        scale: (v) => v,
+        scale: (v) => v * 0.8,
       ),
-      72,
+      80,
     );
     expect(
       QueryaWindowTitleBar.titleBarLeadingInset(

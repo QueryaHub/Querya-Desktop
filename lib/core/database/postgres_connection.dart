@@ -261,6 +261,11 @@ class PostgresConnection {
       effectiveConnectionString = secrets.connectionString;
     }
 
+    final viaUri = _usesConnectionString(effectiveConnectionString);
+    debugPrint(
+      'PostgresConnection.connect: host=$host port=$port db=$database '
+      'user=$username viaUri=$viaUri useSSL=$useSSL ssh=${sshConfig != null}',
+    );
     try {
       if (sshConfig != null && sshConfig!.enabled) {
         var sec = sshSecrets;
@@ -340,6 +345,10 @@ class PostgresConnection {
       _inTransaction = false;
       scrubCredentials();
     } catch (e, st) {
+      debugPrint(
+        'PostgresConnection.connect failed: host=$host port=$port '
+        'viaUri=$viaUri error=${e.runtimeType}: $e\n$st',
+      );
       _isConnected = false;
       _conn = null;
       try {
