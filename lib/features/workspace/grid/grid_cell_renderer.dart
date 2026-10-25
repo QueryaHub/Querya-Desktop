@@ -127,6 +127,9 @@ class _GridCell extends material.StatelessWidget {
                       : (striped
                           ? _CellBackground.striped
                           : _CellBackground.none)))),
+    );
+    final selectionEdge = _CellLook.selectionEdge(
+      colors,
       right: isSelectionRight,
       left: isSelectionLeft,
       top: isSelectionTop,
@@ -144,6 +147,9 @@ class _GridCell extends material.StatelessWidget {
       padding: const material.EdgeInsets.symmetric(horizontal: 10),
       alignment: material.Alignment.centerLeft,
       decoration: decoration,
+      // On top, not in [decoration]: a border there is added to the padding,
+      // so the text of a selected cell moved by the border's width.
+      foregroundDecoration: selectionEdge,
       child: material.Stack(
         clipBehavior: material.Clip.none,
         alignment: material.Alignment.centerLeft,
@@ -215,18 +221,11 @@ abstract final class _CellLook {
   static material.BoxDecoration decoration(
     QueryaUiColors scheme, {
     required _CellBackground background,
-    required bool right,
-    required bool left,
-    required bool top,
-    required bool bottom,
   }) {
     _forget(scheme);
-    final key = background.index |
-        (right ? 1 << 3 : 0) |
-        (left ? 1 << 4 : 0) |
-        (top ? 1 << 5 : 0) |
-        (bottom ? 1 << 6 : 0);
-    return _decorations[key] ??= material.BoxDecoration(
+    // The grid lines are the same in every cell, so the content of every cell
+    // sits at the same place; the selection outline is [selectionEdge].
+    return _decorations[background.index] ??= material.BoxDecoration(
       color: switch (background) {
         _CellBackground.selected => scheme.primary.withValues(alpha: 0.18),
         _CellBackground.deleted => scheme.destructive.withValues(alpha: 0.08),
@@ -237,22 +236,38 @@ abstract final class _CellLook {
       },
       border: material.Border(
         right: material.BorderSide(
-          color: right
-              ? scheme.primary
-              : scheme.border.withValues(alpha: 0.3),
-          width: right ? 1.5 : 1.0,
+          color: scheme.border.withValues(alpha: 0.3),
         ),
-        left: left
-            ? material.BorderSide(color: scheme.primary, width: 1.5)
-            : material.BorderSide.none,
-        top: top
-            ? material.BorderSide(color: scheme.primary, width: 1.5)
-            : material.BorderSide.none,
-        bottom: bottom
-            ? material.BorderSide(color: scheme.primary, width: 1.5)
-            : material.BorderSide(
-                color: scheme.border.withValues(alpha: 0.15),
-              ),
+        bottom: material.BorderSide(
+          color: scheme.border.withValues(alpha: 0.15),
+        ),
+      ),
+    );
+  }
+
+  /// The outline of the selected range on the sides of this cell that are an
+  /// edge of it, painted over the cell; null when the cell has none.
+  static material.BoxDecoration? selectionEdge(
+    QueryaUiColors scheme, {
+    required bool right,
+    required bool left,
+    required bool top,
+    required bool bottom,
+  }) {
+    if (!(right || left || top || bottom)) return null;
+    _forget(scheme);
+    final key = 1 << 8 |
+        (right ? 1 : 0) |
+        (left ? 2 : 0) |
+        (top ? 4 : 0) |
+        (bottom ? 8 : 0);
+    final edge = material.BorderSide(color: scheme.primary, width: 1.5);
+    return _decorations[key] ??= material.BoxDecoration(
+      border: material.Border(
+        right: right ? edge : material.BorderSide.none,
+        left: left ? edge : material.BorderSide.none,
+        top: top ? edge : material.BorderSide.none,
+        bottom: bottom ? edge : material.BorderSide.none,
       ),
     );
   }

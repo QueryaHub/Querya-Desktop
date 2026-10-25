@@ -278,7 +278,7 @@ class _QuickStartSection extends StatelessWidget {
               icon: material.Icons.auto_awesome_rounded,
               title: 'Interactive Quick Tour',
               description:
-                  'Learn connections, shortcuts & grid navigation in 4 visual steps',
+                  'Learn connections, shortcuts & grid navigation in 6 visual steps',
               color: primary,
               actionLabel: 'Start Tour',
               onTap: openTour,

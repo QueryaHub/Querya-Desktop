@@ -309,8 +309,13 @@ onPressed: _finish,
                     final incoming =
                         child.key == material.ValueKey(_currentStep);
                     final side = (_forward ? 1.0 : -1.0) * (incoming ? 1 : -1);
+                    // Fade through: the old step is gone before the new one
+                    // shows, so their texts never overlap.
                     return material.FadeTransition(
-                      opacity: animation,
+                      opacity: material.CurvedAnimation(
+                        parent: animation,
+                        curve: const material.Interval(0.5, 1.0),
+                      ),
                       child: material.SlideTransition(
                         position: material.Tween<material.Offset>(
                           begin: material.Offset(0.04 * side, 0),
@@ -440,7 +445,18 @@ onPressed: _finish,
               'Execute scripts with $cmdCtrl+Enter or F5. Open multiple query tabs, format SQL with $cmdCtrl+Shift+F, and access persistent query history.',
           tipText:
               'Use $cmdCtrl+T or $cmdCtrl+Shift+N to spawn a fresh SQL editor tab.',
-          shortcutBadge: KbdBadge(['F5', 'or', '$cmdCtrl+Enter']),
+          // Two shortcuts, not one chord: KbdBadge joins its keys with "+".
+          shortcutBadge: material.Row(
+            mainAxisSize: material.MainAxisSize.min,
+            children: [
+              const KbdBadge(['F5']),
+              const material.Padding(
+                padding: material.EdgeInsets.symmetric(horizontal: 6),
+                child: Text('or'),
+              ),
+              KbdBadge([cmdCtrl, 'Enter']),
+            ],
+          ),
           wb: wb,
         );
       case 3:

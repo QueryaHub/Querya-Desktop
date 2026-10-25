@@ -391,8 +391,21 @@ class MainContentSplitState extends State<MainContentSplit>
         final isAnimating = _widthSpring.isAnimating;
         final remainingWidth =
             math.max(0.0, constraints.maxWidth - currentW - currentHandleW);
+        // While the sidebar slides, the workspace is laid out once at the width
+        // it ends with and pinned to the right edge: it stands still and the
+        // sidebar covers or uncovers its left side. Laid out at the full window
+        // width and pinned left, its right side ran past the window and it
+        // snapped to the narrower width when the sidebar finished opening.
+        final settledWidth = _sidebarVisible
+            ? math.max(
+                0.0,
+                constraints.maxWidth -
+                    _clampLeftWidth(_lastExpandedWidth, constraints.maxWidth) -
+                    _resizeHandleWidth,
+              )
+            : constraints.maxWidth;
         final workspaceLaidOutWidth =
-            isAnimating ? constraints.maxWidth : remainingWidth;
+            isAnimating ? settledWidth : remainingWidth;
 
         return Row(
           children: [
@@ -423,7 +436,8 @@ class MainContentSplitState extends State<MainContentSplit>
               key: const ValueKey('main_content_workspace_expanded'),
               child: ClipRect(
                 child: OverflowBox(
-                  alignment: Alignment.topLeft,
+                  alignment:
+                      isAnimating ? Alignment.topRight : Alignment.topLeft,
                   minWidth: workspaceLaidOutWidth,
                   maxWidth: workspaceLaidOutWidth,
                   child: material.RepaintBoundary(
