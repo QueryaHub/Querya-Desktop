@@ -1,3 +1,4 @@
+import 'package:querya_desktop/shared/report_error.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async';
 
@@ -566,7 +567,7 @@ class PreferencesDialogContentState
           subtitle: const Text(
             'Silently checks GitHub Releases when Querya starts to notify you of new features.',
           ).muted().xSmall(),
-          onChanged: (v) => unawaited(_setCheckUpdatesOnStartup(v)),
+          onChanged: (v) => runReported(context, () => _setCheckUpdatesOnStartup(v), where: 'PreferencesDialog', failedAction: 'The setting was not saved'),
         ),
         const material.SizedBox(height: 16),
         PreferencesFieldRow(
@@ -584,7 +585,7 @@ class PreferencesDialogContentState
                 ? UpdateChannel.stable
                 : _updateChannel,
             onSelected: (v) {
-              if (v != null) unawaited(_setUpdateChannel(v));
+              if (v != null) runReported(context, () => _setUpdateChannel(v), where: 'PreferencesDialog', failedAction: 'The setting was not saved');
             },
             entries: const [
               material.DropdownMenuEntry(
@@ -617,7 +618,7 @@ class PreferencesDialogContentState
           control: PreferencesDropdownMenu<double>(
             value: _fontSize,
             onSelected: (v) {
-              if (v != null) unawaited(_setFont(v));
+              if (v != null) runReported(context, () => _setFont(v), where: 'PreferencesDialog', failedAction: 'The setting was not saved');
             },
             entries: const [
               material.DropdownMenuEntry(value: 11.0, label: '11 pt'),
@@ -637,7 +638,7 @@ class PreferencesDialogContentState
           control: SqlStatementTimeoutDropdown(
             value: _pgTimeout,
             expandToParent: true,
-            onChanged: (v) => unawaited(_setPg(v)),
+            onChanged: (v) => runReported(context, () => _setPg(v), where: 'PreferencesDialog', failedAction: 'The setting was not saved'),
           ),
         ),
         const material.SizedBox(height: 16),
@@ -648,7 +649,7 @@ class PreferencesDialogContentState
           control: SqlStatementTimeoutDropdown(
             value: _mysqlTimeout,
             expandToParent: true,
-            onChanged: (v) => unawaited(_setMysql(v)),
+            onChanged: (v) => runReported(context, () => _setMysql(v), where: 'PreferencesDialog', failedAction: 'The setting was not saved'),
           ),
         ),
         const material.SizedBox(height: 16),
@@ -659,7 +660,7 @@ class PreferencesDialogContentState
           control: SqlStatementTimeoutDropdown(
             value: _sqliteTimeout,
             expandToParent: true,
-            onChanged: (v) => unawaited(_setSqlite(v)),
+            onChanged: (v) => runReported(context, () => _setSqlite(v), where: 'PreferencesDialog', failedAction: 'The setting was not saved'),
           ),
         ),
         const material.SizedBox(height: 16),
@@ -670,7 +671,7 @@ class PreferencesDialogContentState
           control: PreferencesDropdownMenu<int>(
             value: _historyMax,
             onSelected: (v) {
-              if (v != null) unawaited(_setHistoryMax(v));
+              if (v != null) runReported(context, () => _setHistoryMax(v), where: 'PreferencesDialog', failedAction: 'The setting was not saved');
             },
             entries: [
               for (final n in kSqlHistoryMaxEntriesPresets)
@@ -688,7 +689,7 @@ class PreferencesDialogContentState
           subtitle: const Text(
             'Displays confirmation modal before running DROP, TRUNCATE, or unconditional DELETE queries.',
           ).muted().xSmall(),
-          onChanged: (v) => unawaited(_setConfirmDestructive(v)),
+          onChanged: (v) => runReported(context, () => _setConfirmDestructive(v), where: 'PreferencesDialog', failedAction: 'The setting was not saved'),
         ),
       ],
     );
@@ -711,7 +712,7 @@ class PreferencesDialogContentState
           control: PreferencesDropdownMenu<int>(
             value: _maxRows,
             onSelected: (v) {
-              if (v != null) unawaited(_setMaxRows(v));
+              if (v != null) runReported(context, () => _setMaxRows(v), where: 'PreferencesDialog', failedAction: 'The setting was not saved');
             },
             entries: [
               for (final n in kSqlResultMaxRowsPresets)

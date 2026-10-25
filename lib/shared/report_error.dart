@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:querya_desktop/core/database/database_error_mapper.dart';
 import 'package:querya_desktop/core/mcp/mcp_redaction.dart';
@@ -49,4 +51,30 @@ String failureMessage(
 }) {
   QueryaLog.instance.error(where, action, error: error, stack: stack);
   return '$action: ${describeError(error, driver: driver)}';
+}
+
+/// Starts [action] without waiting for it and reports its failure like
+/// [reportError]. For a user action that is fired from a callback
+/// (`onChanged: (v) => unawaited(_save(v))`), where a bare `unawaited` would
+/// leave a failed write to the zone handler: the log only, with the control on
+/// screen showing a value that was not saved.
+void runReported(
+  BuildContext context,
+  Future<void> Function() action, {
+  required String where,
+  required String failedAction,
+  DatabaseDriver? driver,
+}) {
+  unawaited(() async {
+    try {
+      await action();
+    } catch (error, stack) {
+      if (context.mounted) {
+        reportError(context, error,
+            where: where, action: failedAction, stack: stack, driver: driver);
+      } else {
+        QueryaLog.instance.error(where, failedAction, error: error, stack: stack);
+      }
+    }
+  }());
 }
