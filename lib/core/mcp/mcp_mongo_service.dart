@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:async';
 
 import 'package:querya_desktop/core/database/mongodb_connection.dart';
@@ -81,14 +82,20 @@ abstract interface class McpMongoSession {
 
   Future<List<String>> listCollections();
 
+  /// [maxTimeMs]: the server gives up on the query after this long.
   Future<List<Map<String, dynamic>>> find(
     String collection, {
     Map<String, dynamic>? filter,
     Map<String, dynamic>? sort,
     required int limit,
+    int? maxTimeMs,
   });
 
-  Future<int> count(String collection, {Map<String, dynamic>? filter});
+  Future<int> count(
+    String collection, {
+    Map<String, dynamic>? filter,
+    int? maxTimeMs,
+  });
 
   Future<void> close();
 }
@@ -129,14 +136,19 @@ class _LiveMongoSession implements McpMongoSession {
     Map<String, dynamic>? filter,
     Map<String, dynamic>? sort,
     required int limit,
+    int? maxTimeMs,
   }) =>
       _service.find(_connection, database, collection,
-          filter: filter, sort: sort, limit: limit);
+          filter: filter, sort: sort, limit: limit, maxTimeMs: maxTimeMs);
 
   @override
-  Future<int> count(String collection, {Map<String, dynamic>? filter}) =>
+  Future<int> count(
+    String collection, {
+    Map<String, dynamic>? filter,
+    int? maxTimeMs,
+  }) =>
       _service.countDocuments(_connection, database, collection,
-          filter: filter);
+          filter: filter, maxTimeMs: maxTimeMs);
 
   @override
   Future<void> close() => _connection.disconnect();
@@ -155,6 +167,7 @@ class McpMongoService {
     this.maxDocuments = 100,
     this.timeout = const Duration(seconds: 15),
     this.maxFieldChars = 4096,
+    this.maxTotalChars = 200000,
   })  : _access = access ?? McpAccessStore.instance,
         _loadConnections =
             loadConnections ?? (() => LocalDb.instance.getConnections()),
@@ -167,6 +180,10 @@ class McpMongoService {
   final int maxDocuments;
   final Duration timeout;
   final int maxFieldChars;
+
+  /// Characters of all returned documents together (as JSON); more are cut
+  /// off and the result is marked truncated.
+  final int maxTotalChars;
 
   /// Shared MongoDB connections, without credentials.
   Future<List<McpConnectionInfo>> listConnections() async {
@@ -212,15 +229,28 @@ class McpMongoService {
         filter: filter,
         sort: sort,
         limit: n + 1,
+        maxTimeMs: timeout.inMilliseconds,
       );
       final cut = docs.length > n;
+      // Each field is capped, but 100 documents of many capped fields are
+      // still a lot: stop at a total size too.
+      final documents = <Map<String, Object?>>[];
+      var total = 0;
+      var cutBySize = false;
+      for (final d in (cut ? docs.sublist(0, n) : docs)) {
+        final shortened = _shorten(d) as Map<String, Object?>;
+        final size = jsonEncode(shortened, toEncodable: (o) => '$o').length;
+        if (documents.isNotEmpty && total + size > maxTotalChars) {
+          cutBySize = true;
+          break;
+        }
+        total += size;
+        documents.add(shortened);
+      }
       return McpMongoDocuments(
         collection: name,
-        documents: [
-          for (final d in (cut ? docs.sublist(0, n) : docs))
-            _shorten(d) as Map<String, Object?>,
-        ],
-        truncated: cut,
+        documents: documents,
+        truncated: cut || cutBySize,
       );
     });
   }
@@ -233,7 +263,8 @@ class McpMongoService {
     _guard(filter, 'filter');
     return _withSession(connectionId, (session) async {
       final name = await _knownCollection(session, collection);
-      return session.count(name, filter: filter);
+      return session.count(name,
+          filter: filter, maxTimeMs: timeout.inMilliseconds);
     });
   }
 
