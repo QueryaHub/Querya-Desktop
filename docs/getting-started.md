@@ -21,7 +21,7 @@ How to build and run Querya Desktop from source.
   sudo dnf install clang cmake ninja-build pkgconf-pkg-config gtk3-devel libsecret-devel
   ```
 
-- **Flutter version.** CI builds with Flutter **3.47.1** (stable channel, see
+- **Flutter version.** CI builds with Flutter **3.47.7** (stable channel, see
   `.github/workflows/ci.yml`); using the same one locally avoids "works on my
   machine" drift (see [Contributing](../CONTRIBUTING.md)).
 

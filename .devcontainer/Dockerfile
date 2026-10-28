@@ -4,7 +4,7 @@ FROM ubuntu:24.04
 
 # Keep in step with `flutter-version` in .github/workflows/ci.yml
 # (test/guards/devcontainer_flutter_version_test.dart fails when they differ).
-ARG FLUTTER_VERSION=3.47.1
+ARG FLUTTER_VERSION=3.47.7
 
 ENV DEBIAN_FRONTEND=noninteractive \
     FLUTTER_HOME=/opt/flutter \
