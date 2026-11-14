@@ -1,0 +1,84 @@
+name: Tauri CI
+
+# Path-filtered checks for apps/tauri only. Flutter jobs in ci.yml stay untouched
+# and do not run on PRs whose base is epic/tauri-migration.
+on:
+  pull_request:
+    branches: [epic/tauri-migration, dev, main]
+    paths:
+      - apps/tauri/**
+      - .github/workflows/tauri-ci.yml
+  push:
+    branches: [epic/tauri-migration]
+    paths:
+      - apps/tauri/**
+      - .github/workflows/tauri-ci.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tauri-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: apps/tauri
+
+jobs:
+  frontend:
+    name: Frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: apps/tauri/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Production build
+        run: pnpm build
+
+  rust:
+    name: Rust (check + test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux WebKit / Tauri deps
+        timeout-minutes: 8
+        run: |
+          APT="-o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20"
+          sudo apt-get $APT update
+          sudo apt-get $APT install -y \
+            build-essential curl wget file libxdo-dev libssl-dev \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/tauri/src-tauri -> target
+
+      - name: cargo check
+        working-directory: apps/tauri/src-tauri
+        run: cargo check --locked
+
+      - name: cargo test
+        working-directory: apps/tauri/src-tauri
+        run: cargo test --locked
