@@ -13,8 +13,9 @@ pub use connection::{
 pub use profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 pub use secrets::{KeyringSecretStore, MemorySecretStore, SecretError, SecretStore, SharedSecretStore};
 pub use staging::{
-    apply_plan_sqlite, apply_staging_sqlite, generate_plan, ApplyError, ApplyResult, MutationType,
-    SqlDialect, StagedCellStatus, StagedRowStatus, StagingBuffer, StagingColumnMeta,
+    apply_plan_mysql, apply_plan_postgres, apply_plan_sqlite, apply_staging_mysql,
+    apply_staging_postgres, apply_staging_sqlite, generate_plan, ApplyError, ApplyResult,
+    MutationType, SqlDialect, StagedCellStatus, StagedRowStatus, StagingBuffer, StagingColumnMeta,
     TableMutationPlan, TableMutationStatement, NULL_SENTINEL,
 };
 
