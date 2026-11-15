@@ -13,7 +13,7 @@ const SCHEMA_VERSION: i32 = 1;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConnectionProfile {
     pub id: String,
-    /// Driver family: `sqlite` | `postgres` | `mysql` (… later).
+    /// Driver family: `sqlite` | `postgres` | `mysql` | `redis` (… later).
     pub driver: String,
     pub name: String,
     /// SQLite file path (absolute).
@@ -95,6 +95,31 @@ impl ConnectionProfile {
             port: Some(i64::from(port)),
             username: Some(user.into()),
             database_name: Some(database.into()),
+            folder_id: None,
+            sort_order: 0,
+            created_at: now.clone(),
+            updated_at: now,
+        }
+    }
+
+    /// Redis profile — `database_name` stores the logical DB index as a string.
+    pub fn new_redis(
+        name: impl Into<String>,
+        host: impl Into<String>,
+        port: u16,
+        db: u8,
+        username: Option<String>,
+    ) -> Self {
+        let now = now_rfc3339();
+        Self {
+            id: Uuid::new_v4().to_string(),
+            driver: "redis".into(),
+            name: name.into(),
+            path: None,
+            host: Some(host.into()),
+            port: Some(i64::from(port)),
+            username,
+            database_name: Some(db.to_string()),
             folder_id: None,
             sort_order: 0,
             created_at: now.clone(),

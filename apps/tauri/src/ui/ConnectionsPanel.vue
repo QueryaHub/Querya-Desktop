@@ -364,7 +364,21 @@ onUnmounted(() => {
                 </div>
 
                 <div
-                  v-if="nav.isExpanded(c.id)"
+                  v-if="nav.isExpanded(c.id) && c.driver === 'redis'"
+                  class="tree"
+                  data-testid="redis-db-tree"
+                >
+                  <div class="tree-header">
+                    <span class="tree-label">DATABASE</span>
+                  </div>
+                  <ul class="nodes">
+                    <li class="redis-db">
+                      db{{ c.database ?? "0" }}
+                    </li>
+                  </ul>
+                </div>
+                <div
+                  v-else-if="nav.isExpanded(c.id)"
                   class="tree"
                   data-testid="sqlite-object-tree"
                 >
@@ -463,7 +477,21 @@ onUnmounted(() => {
             </div>
 
             <div
-              v-if="nav.isExpanded(c.id)"
+              v-if="nav.isExpanded(c.id) && c.driver === 'redis'"
+              class="tree"
+              data-testid="redis-db-tree"
+            >
+              <div class="tree-header">
+                <span class="tree-label">DATABASE</span>
+              </div>
+              <ul class="nodes">
+                <li class="redis-db">
+                  db{{ c.database ?? "0" }}
+                </li>
+              </ul>
+            </div>
+            <div
+              v-else-if="nav.isExpanded(c.id)"
               class="tree"
               data-testid="sqlite-object-tree"
             >
@@ -757,5 +785,13 @@ onUnmounted(() => {
 
 .nodes {
   margin: 4px 0 0;
+}
+
+.redis-db {
+  list-style: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: var(--q-font-mono);
+  color: var(--q-muted-foreground);
 }
 </style>

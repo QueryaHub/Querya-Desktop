@@ -11,6 +11,7 @@ import {
   profilesUpsert,
   type ConnectionProfile,
 } from "../api/connection";
+import { profilesConnectRedis } from "../api/redis";
 import { DEMO_CONNECTION } from "../mock/demoCatalog";
 import { useFoldersStore } from "./folders";
 import { useShellNavStore } from "./shellNav";
@@ -18,7 +19,7 @@ import { useShellStatusStore } from "./shellStatus";
 
 export type LiveConnection = {
   id: string;
-  driver: "sqlite" | "postgres" | "mysql";
+  driver: "sqlite" | "postgres" | "mysql" | "redis";
   name: string;
   /** SQLite file path. */
   path?: string;
@@ -47,8 +48,9 @@ function endpointLabel(conn: LiveConnection): string {
   if (conn.driver === "sqlite") return conn.path ?? "";
   const host = conn.host ?? "localhost";
   const port =
-    conn.port ?? (conn.driver === "mysql" ? 3306 : 5432);
-  const db = conn.database ?? "";
+    conn.port ??
+    (conn.driver === "mysql" ? 3306 : conn.driver === "redis" ? 6379 : 5432);
+  const db = conn.database ?? (conn.driver === "redis" ? "0" : "");
   return `${host}:${port}/${db}`;
 }
 
@@ -83,6 +85,21 @@ function fromProfile(p: ConnectionProfile, connected = false): LiveConnection | 
       connected,
     };
   }
+  if (p.driver === "redis") {
+    const host = p.host?.trim();
+    if (!host) return null;
+    return {
+      id: p.id,
+      driver: "redis",
+      name: p.name,
+      host,
+      port: p.port != null ? Number(p.port) : 6379,
+      database: p.database_name?.trim() || "0",
+      user: p.username?.trim() || undefined,
+      folderId: p.folder_id ?? null,
+      connected,
+    };
+  }
   return null;
 }
 
@@ -97,6 +114,21 @@ function toProfile(conn: LiveConnection): ConnectionProfile {
       port: conn.port ?? (conn.driver === "mysql" ? 3306 : 5432),
       username: conn.user ?? null,
       database_name: conn.database ?? null,
+      folder_id: conn.folderId ?? null,
+      sort_order: 0,
+      created_at: now,
+      updated_at: now,
+    };
+  }
+  if (conn.driver === "redis") {
+    return {
+      id: conn.id,
+      driver: "redis",
+      name: conn.name,
+      host: conn.host ?? null,
+      port: conn.port ?? 6379,
+      username: conn.user ?? null,
+      database_name: conn.database ?? "0",
       folder_id: conn.folderId ?? null,
       sort_order: 0,
       created_at: now,
@@ -255,6 +287,63 @@ export const useConnectionsStore = defineStore("connections", () => {
     return connectServerDriver("mysql", opts);
   }
 
+  async function connectRedis(opts: {
+    name: string;
+    host: string;
+    port: number;
+    database?: string | null;
+    username?: string | null;
+    password?: string | null;
+    folderId?: string | null;
+    id?: string | null;
+  }) {
+    const status = useShellStatusStore();
+    const nav = useShellNavStore();
+    const name =
+      opts.name.trim() || `${opts.host}:${opts.port}/${opts.database ?? "0"}`;
+    status.setQueryMetrics({
+      busy: true,
+      message: `Connecting Redis ${opts.host}:${opts.port}…`,
+    });
+    try {
+      const profile = await profilesConnectRedis({
+        name,
+        host: opts.host,
+        port: opts.port,
+        database: opts.database ?? "0",
+        username: opts.username ?? null,
+        password: opts.password ?? null,
+        folderId: opts.folderId ?? null,
+        id: opts.id ?? null,
+      });
+      if (opts.password) sessionPasswords.set(profile.id, opts.password);
+      const conn: LiveConnection = {
+        id: profile.id,
+        driver: "redis",
+        name: profile.name,
+        host: profile.host ?? opts.host,
+        port: profile.port != null ? Number(profile.port) : opts.port,
+        database: profile.database_name ?? opts.database ?? "0",
+        user: profile.username ?? opts.username ?? undefined,
+        folderId: profile.folder_id ?? opts.folderId ?? null,
+        connected: true,
+      };
+      upsert(conn);
+      nav.setExpanded(conn.id, true);
+      nav.selectConnection(conn.id);
+      status.setConnection(conn.name, endpointLabel(conn));
+      status.setQueryMetrics({
+        busy: false,
+        message: `Connected · ${conn.name}`,
+      });
+      return conn;
+    } catch (err) {
+      const msg = formatConnectionError(err);
+      status.setQueryMetrics({ busy: false, message: msg });
+      throw err;
+    }
+  }
+
   async function connectServerDriver(
     driver: "postgres" | "mysql",
     opts: {
@@ -341,6 +430,18 @@ export const useConnectionsStore = defineStore("connections", () => {
     }
     // Prefer in-memory cache; otherwise Rust loads from OS keyring (#1878).
     const password = sessionPasswords.get(id) ?? null;
+    if (conn.driver === "redis") {
+      return connectRedis({
+        name: conn.name,
+        host: conn.host ?? "localhost",
+        port: conn.port ?? 6379,
+        database: conn.database ?? "0",
+        username: conn.user ?? null,
+        password,
+        folderId: conn.folderId,
+        id: conn.id,
+      });
+    }
     const opts = {
       name: conn.name,
       host: conn.host ?? "localhost",
@@ -472,6 +573,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     connectSqlite,
     connectPostgres,
     connectMysql,
+    connectRedis,
     ensureConnected,
     disconnect,
     removeConnection,
