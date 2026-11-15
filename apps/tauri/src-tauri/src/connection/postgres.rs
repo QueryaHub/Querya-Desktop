@@ -154,7 +154,7 @@ pub fn open_postgres(params: PostgresConnectParams) -> ConnectionResult<Postgres
     let id = params
         .id
         .filter(|i| !i.as_str().trim().is_empty())
-        .unwrap_or_else(ConnectionId::new);
+        .unwrap_or_default();
 
     let pool = runtime::block_on(async {
         PgPoolOptions::new()

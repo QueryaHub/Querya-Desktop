@@ -4,8 +4,23 @@ use crate::connection::{
 };
 use crate::profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 use crate::secrets::SharedSecretStore;
+use serde::Deserialize;
 use tauri::ipc::Channel;
 use tauri::State;
+
+/// Bundled IPC args for Postgres save+connect (keeps clippy under the limit).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectPostgresRequest {
+    pub name: String,
+    pub host: String,
+    pub port: u16,
+    pub database: String,
+    pub user: String,
+    pub password: Option<String>,
+    pub folder_id: Option<String>,
+    pub id: Option<String>,
+}
 
 #[tauri::command]
 pub fn db_connect_sqlite(
@@ -130,18 +145,22 @@ pub fn profiles_connect_sqlite(
 /// Save Postgres profile metadata (no password) and open a live session.
 #[tauri::command]
 pub fn profiles_connect_postgres(
-    name: String,
-    host: String,
-    port: u16,
-    database: String,
-    user: String,
-    password: Option<String>,
-    folder_id: Option<String>,
-    id: Option<String>,
+    request: ConnectPostgresRequest,
     store: State<'_, ProfileStore>,
     secrets: State<'_, SharedSecretStore>,
     registry: State<'_, ConnectionRegistry>,
 ) -> Result<ConnectionProfile, ConnectionError> {
+    let ConnectPostgresRequest {
+        name,
+        host,
+        port,
+        database,
+        user,
+        password,
+        folder_id,
+        id,
+    } = request;
+
     let display_name = {
         let t = name.trim();
         if t.is_empty() {
@@ -179,8 +198,13 @@ pub fn profiles_connect_postgres(
                 p
             }),
         None => {
-            let mut p =
-                ConnectionProfile::new_postgres(display_name, host.clone(), port, database.clone(), user.clone());
+            let mut p = ConnectionProfile::new_postgres(
+                display_name,
+                host.clone(),
+                port,
+                database.clone(),
+                user.clone(),
+            );
             p.folder_id = folder_id;
             p
         }

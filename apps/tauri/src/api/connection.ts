@@ -126,14 +126,16 @@ export async function profilesConnectPostgres(opts: {
   id?: string | null;
 }): Promise<ConnectionProfile> {
   return invoke<ConnectionProfile>("profiles_connect_postgres", {
-    name: opts.name,
-    host: opts.host,
-    port: opts.port,
-    database: opts.database,
-    user: opts.user,
-    password: opts.password ?? null,
-    folderId: opts.folderId ?? null,
-    id: opts.id ?? null,
+    request: {
+      name: opts.name,
+      host: opts.host,
+      port: opts.port,
+      database: opts.database,
+      user: opts.user,
+      password: opts.password ?? null,
+      folderId: opts.folderId ?? null,
+      id: opts.id ?? null,
+    },
   });
 }
 
