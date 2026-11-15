@@ -1,3 +1,10 @@
+mod connection;
+
+pub use connection::{
+    ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager, ConnectionRegistry,
+    DriverKind,
+};
+
 #[tauri::command]
 fn app_info() -> serde_json::Value {
     serde_json::json!({
@@ -23,6 +30,7 @@ fn host_platform() -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .manage(ConnectionRegistry::new())
         .invoke_handler(tauri::generate_handler![app_info, host_platform])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
