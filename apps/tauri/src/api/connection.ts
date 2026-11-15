@@ -35,6 +35,12 @@ export type SqlObjectNode = {
 /** Mirrors Rust `ConnectionError` (serde tag = kind). */
 export type SqlGuardRule = "empty_query" | "single_statement" | "parse_error";
 
+export type DangerousSqlKind =
+  | "drop"
+  | "truncate"
+  | "unconditional_delete"
+  | "unconditional_update";
+
 export type ConnectionError =
   | { kind: "not_found"; id: string }
   | { kind: "already_connected"; id: string }
@@ -43,7 +49,12 @@ export type ConnectionError =
   | { kind: "unsupported_driver"; driver: string }
   | { kind: "io"; message: string }
   | { kind: "driver"; driver: string; message: string }
-  | { kind: "sql_guard"; rule: SqlGuardRule; message: string };
+  | { kind: "sql_guard"; rule: SqlGuardRule; message: string }
+  | {
+      kind: "needs_confirmation";
+      danger: DangerousSqlKind;
+      message: string;
+    };
 
 export type ColumnMeta = {
   name: string;
@@ -396,6 +407,8 @@ export function formatConnectionError(err: unknown): string {
     switch (err.kind) {
       case "sql_guard":
         return `sql_guard: ${err.rule}: ${err.message}`;
+      case "needs_confirmation":
+        return err.message;
       case "driver":
         return `${err.driver}: ${err.message}`;
       case "not_found":
@@ -414,4 +427,21 @@ export function formatConnectionError(err: unknown): string {
     if (typeof e.message === "string") return e.message;
   }
   return String(err);
+}
+
+/** Unwrap Tauri invoke payload when the error is nested under `error` / data. */
+export function asConnectionError(err: unknown): ConnectionError | null {
+  if (isConnectionError(err)) return err;
+  if (err && typeof err === "object") {
+    const e = err as Record<string, unknown>;
+    if (isConnectionError(e.error)) return e.error;
+    if (isConnectionError(e.data)) return e.data;
+  }
+  return null;
+}
+
+export function isNeedsConfirmation(
+  err: unknown,
+): err is Extract<ConnectionError, { kind: "needs_confirmation" }> {
+  return asConnectionError(err)?.kind === "needs_confirmation";
 }

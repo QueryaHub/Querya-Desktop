@@ -5,8 +5,12 @@ import {
   applyQueryEvent,
   emptyAccumulatedQuery,
 } from "../api/queryAccumulate";
-import { formatConnectionError } from "../api/connection";
+import {
+  asConnectionError,
+  formatConnectionError,
+} from "../api/connection";
 import { useConnectionsStore } from "./connections";
+import { usePreferencesStore } from "./preferences";
 import { useShellNavStore } from "./shellNav";
 import { useShellStatusStore } from "./shellStatus";
 
@@ -118,7 +122,26 @@ export const useQueryResultStore = defineStore("queryResult", () => {
     running.value = true;
     status.setQueryMetrics({ message: "Running…", busy: true });
     try {
-      await dbExecuteQuery(id, trimmed, feedEvent);
+      const prefs = usePreferencesStore();
+      // Pref off → skip dialog and send confirmed on the first attempt.
+      let confirmed = !prefs.state.confirmDestructive;
+      try {
+        await dbExecuteQuery(id, trimmed, feedEvent, { confirmed });
+      } catch (err) {
+        const needs = asConnectionError(err);
+        if (needs?.kind !== "needs_confirmation" || confirmed) throw err;
+        const ok = window.confirm(
+          `${needs.message}\n\nRun this statement anyway?`,
+        );
+        if (!ok) {
+          error.value = "Cancelled";
+          status.setQueryMetrics({ message: error.value, busy: false });
+          return;
+        }
+        confirmed = true;
+        reset();
+        await dbExecuteQuery(id, trimmed, feedEvent, { confirmed });
+      }
       if (error.value) {
         status.setQueryMetrics({ message: error.value, busy: false });
       } else if (affectedRows.value != null && columns.value.length === 0) {

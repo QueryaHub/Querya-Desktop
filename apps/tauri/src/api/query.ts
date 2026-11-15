@@ -19,14 +19,15 @@ export async function dbExecuteQuery(
   id: string,
   sql: string,
   onEvent: QueryEventHandler,
-  limit?: number,
+  opts?: { limit?: number; confirmed?: boolean },
 ): Promise<void> {
   const channel = new Channel<QueryEvent>();
   channel.onmessage = onEvent;
   await invoke("db_execute_query", {
     id,
     sql,
-    limit: limit ?? null,
+    limit: opts?.limit ?? null,
+    confirmed: opts?.confirmed ?? false,
     onEvent: channel,
   });
 }

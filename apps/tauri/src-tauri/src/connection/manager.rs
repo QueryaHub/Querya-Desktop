@@ -226,17 +226,22 @@ impl ConnectionRegistry {
     }
 
     /// Driver-aware query stream (SQLite + Postgres + MySQL).
+    ///
+    /// `confirmed` must be true for DROP / TRUNCATE / unconditional DELETE|UPDATE
+    /// (see `sql_guard::assert_query_allowed`); otherwise returns
+    /// [`ConnectionError::NeedsConfirmation`].
     pub fn execute_query(
         &self,
         id: &ConnectionId,
         sql: &str,
         limit: Option<usize>,
+        confirmed: bool,
         emit: impl FnMut(QueryEvent) -> ConnectionResult<()>,
     ) -> ConnectionResult<()> {
         let driver = self
             .driver_of(id)
             .ok_or_else(|| ConnectionError::NotFound { id: id.clone() })?;
-        super::sql_guard::assert_single_statement(sql, driver)?;
+        super::sql_guard::assert_query_allowed(sql, driver, confirmed)?;
         match driver {
             DriverKind::Sqlite => self.execute_sqlite_query(id, sql, limit, emit),
             DriverKind::Postgres => {
@@ -500,7 +505,7 @@ mod tests {
             })
             .unwrap();
         let err = reg
-            .execute_query(&id, "SELECT 1; SELECT 2", None, |_| Ok(()))
+            .execute_query(&id, "SELECT 1; SELECT 2", None, false, |_| Ok(()))
             .unwrap_err();
         match err {
             ConnectionError::SqlGuard { rule, .. } => {
