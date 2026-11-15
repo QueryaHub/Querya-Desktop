@@ -25,6 +25,9 @@ import QuickSwitcher from "./ui/QuickSwitcher.vue";
 import WelcomeTourDialog from "./ui/WelcomeTourDialog.vue";
 import AboutDialog from "./ui/AboutDialog.vue";
 import NewFolderDialog from "./ui/NewFolderDialog.vue";
+import NewConnectionDialog, {
+  type SqliteConnectPayload,
+} from "./ui/NewConnectionDialog.vue";
 
 const shell = useShellStore();
 const status = useShellStatusStore();
@@ -40,6 +43,7 @@ const switcherOpen = ref(false);
 const tourOpen = ref(false);
 const aboutOpen = ref(false);
 const newFolderOpen = ref(false);
+const newConnectionOpen = ref(false);
 
 provideQueryaMotion();
 
@@ -66,10 +70,15 @@ async function onOpenSqlite() {
 }
 
 function onNewConnection() {
-  status.setQueryMetrics({
-    message: "Connection form UI next — use Demo or Open SQLite for now",
-    busy: false,
-  });
+  newConnectionOpen.value = true;
+}
+
+async function onConnectSqliteFromDialog(payload: SqliteConnectPayload) {
+  try {
+    await connections.connectSqlite(payload.path, { name: payload.name });
+  } catch {
+    // status already set in store
+  }
 }
 
 function onNewFolder() {
@@ -246,6 +255,11 @@ onUnmounted(() => {
       :open="newFolderOpen"
       @close="newFolderOpen = false"
       @create="onCreateFolder"
+    />
+    <NewConnectionDialog
+      :open="newConnectionOpen"
+      @close="newConnectionOpen = false"
+      @connect-sqlite="onConnectSqliteFromDialog"
     />
   </div>
 </template>

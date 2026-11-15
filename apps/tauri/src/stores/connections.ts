@@ -67,7 +67,10 @@ export const useConnectionsStore = defineStore("connections", () => {
     return conn;
   }
 
-  async function connectSqlite(path: string, folderId?: string | null) {
+  async function connectSqlite(
+    path: string,
+    opts?: { folderId?: string | null; name?: string },
+  ) {
     const status = useShellStatusStore();
     const nav = useShellNavStore();
     status.setQueryMetrics({
@@ -79,9 +82,9 @@ export const useConnectionsStore = defineStore("connections", () => {
       const conn: LiveConnection = {
         id,
         driver: "sqlite",
-        name: fileName(path),
+        name: opts?.name?.trim() || fileName(path),
         path,
-        folderId: folderId ?? null,
+        folderId: opts?.folderId ?? null,
       };
       upsert(conn);
       nav.setExpanded(id, true);
