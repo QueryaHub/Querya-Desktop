@@ -4,6 +4,7 @@ import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 // template and make `v-if="open"` always truthy (Save connected, dialog stuck).
 import { open as pickSqliteFile } from "@tauri-apps/plugin-dialog";
 import QueryaButton from "./QueryaButton.vue";
+import { QueryaIcon } from "./icons";
 
 export type BuiltInDriverId =
   | "postgresql"
@@ -328,7 +329,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
           below.
         </p>
         <label class="search">
-          <span class="search-ico" aria-hidden="true">⌕</span>
+          <QueryaIcon class="search-ico" name="search" :size="14" />
           <input
             ref="searchEl"
             v-model="search"

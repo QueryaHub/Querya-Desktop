@@ -11,6 +11,7 @@ import {
 import { useQueryaMotion } from "../motion";
 import { useShellStore } from "../stores/shell";
 import TitleBarMenus from "./TitleBarMenus.vue";
+import { QueryaIcon } from "./icons";
 
 const props = withDefaults(
   defineProps<{
@@ -132,7 +133,7 @@ onUnmounted(() => {
         :aria-label="shell.sidebarOpen ? 'Hide sidebar' : 'Show sidebar'"
         @click="shell.toggleSidebar()"
       >
-        ▤
+        <QueryaIcon name="sidebar" :size="16" />
       </button>
       <div class="brand" data-tauri-drag-region>
         <span class="mark" aria-hidden="true" />

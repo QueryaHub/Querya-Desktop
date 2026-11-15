@@ -15,6 +15,7 @@ import {
 } from "../preferences/shortcutsCatalog";
 import InterfaceScaleSlider from "./InterfaceScaleSlider.vue";
 import QueryaButton from "./QueryaButton.vue";
+import { QueryaIcon, type QueryaIconName } from "./icons";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ close: [] }>();
@@ -33,8 +34,8 @@ type Category = {
   id: CategoryId;
   label: string;
   description: string;
-  /** Display glyph (Flutter rail icon stand-in). */
-  icon: string;
+  /** Flutter prefs rail — Material Symbols via QueryaIcon. */
+  icon: QueryaIconName;
   keywords: string;
 };
 
@@ -45,21 +46,21 @@ const categories: Category[] = [
     id: "general",
     label: "General",
     description: "Startup, updates, release channel",
-    icon: "⚙",
+    icon: "settings",
     keywords: "updates startup automatic release channel stable beta",
   },
   {
     id: "appearance",
     label: "Appearance",
     description: "Themes, dark mode, scaling, animations",
-    icon: "◇",
+    icon: "sparkles",
     keywords: "theme dark light system scaling motion animation interface color",
   },
   {
     id: "sql",
     label: "SQL & Editor",
     description: "Editor font, statement timeouts, query history",
-    icon: "›_",
+    icon: "code",
     keywords:
       "font size postgresql mysql sqlite statement timeout history destructive drop truncate delete",
   },
@@ -67,35 +68,35 @@ const categories: Category[] = [
     id: "dataGrid",
     label: "Data Grid",
     description: "Result rows limit, column sizing, safety",
-    icon: "▦",
+    icon: "grid",
     keywords: "max rows results grid column size formatting safety limits",
   },
   {
     id: "extensions",
     label: "Extensions",
     description: "Sideloading .qext/.zip packages, extension folder",
-    icon: "⧉",
+    icon: "puzzle",
     keywords: "extensions qext zip package install sideload folder directory",
   },
   {
     id: "mcp",
     label: "MCP Server",
     description: "Let AI clients read shared connections",
-    icon: "◉",
+    icon: "network",
     keywords: "mcp ai model claude cursor vscode copilot llm server share token",
   },
   {
     id: "shortcuts",
     label: "Shortcuts",
     description: "Keyboard shortcuts reference and keymap",
-    icon: "⌘",
+    icon: "keyboard",
     keywords: "shortcut keyboard keymap hotkey",
   },
   {
     id: "about",
     label: "About & Storage",
     description: "App version, local SQLite storage, paths",
-    icon: "ℹ",
+    icon: "info",
     keywords: "about version storage directory cache logs sqlite",
   },
 ];
@@ -266,10 +267,10 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
     <div class="dialog" role="dialog" aria-modal="true" aria-label="Preferences">
       <!-- Header: title + search + close (Flutter) -->
       <header class="header">
-        <span class="hdr-icon" aria-hidden="true">⚙</span>
+        <QueryaIcon class="hdr-icon" name="settings" :size="18" />
         <h1 class="hdr-title">Preferences</h1>
         <div class="search-wrap" :class="{ active: hasSearch }">
-          <span class="search-ico" aria-hidden="true">⌕</span>
+          <QueryaIcon class="search-ico" name="search" :size="14" />
           <input
             ref="searchEl"
             v-model="search"
@@ -310,7 +311,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
             :class="{ on: category === c.id }"
             @click="category = c.id"
           >
-            <span class="rail-ico" aria-hidden="true">{{ c.icon }}</span>
+            <QueryaIcon class="rail-ico" :name="c.icon" :size="16" />
             <span class="rail-label">{{ c.label }}</span>
             <span
               v-if="hasSearch && matchCounts[c.id] > 0"

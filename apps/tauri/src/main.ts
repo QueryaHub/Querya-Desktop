@@ -1,6 +1,7 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
+import "material-symbols/rounded.css";
 import "./styles/base.css";
 import { initTheme } from "./theme/queryaTheme";
 import {
