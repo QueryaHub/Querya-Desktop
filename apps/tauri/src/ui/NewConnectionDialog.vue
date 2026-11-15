@@ -28,6 +28,16 @@ export type PostgresConnectPayload = {
   password: string;
 };
 
+export type MysqlConnectPayload = {
+  driver: "mysql";
+  name: string;
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password: string;
+};
+
 type Category = "all" | "sql" | "nosql";
 
 type DriverChoice = {
@@ -82,13 +92,14 @@ const open = defineModel<boolean>("open", { required: true });
 const emit = defineEmits<{
   connectSqlite: [payload: SqliteConnectPayload];
   connectPostgres: [payload: PostgresConnectPayload];
+  connectMysql: [payload: MysqlConnectPayload];
 }>();
 
 function dismiss() {
   open.value = false;
 }
 
-type Step = "pick" | "sqlite" | "postgres" | "stub";
+type Step = "pick" | "sqlite" | "postgres" | "mysql" | "stub";
 
 const step = ref<Step>("pick");
 const category = ref<Category>("all");
@@ -143,6 +154,8 @@ const canSavePostgres = computed(() => {
     p <= 65535
   );
 });
+
+const canSaveMysql = canSavePostgres;
 
 function reset() {
   step.value = "pick";
@@ -201,6 +214,17 @@ function goNext() {
   if (choice.id === "postgresql") {
     step.value = "postgres";
     if (!name.value.trim()) name.value = "querya";
+    port.value = "5432";
+    void nextTick(() => nameEl.value?.focus());
+    return;
+  }
+  if (choice.id === "mysql") {
+    step.value = "mysql";
+    if (!name.value.trim()) name.value = "mysql";
+    port.value = "3306";
+    database.value = "mysql";
+    user.value = "root";
+    password.value = "";
     void nextTick(() => nameEl.value?.focus());
     return;
   }
@@ -281,6 +305,34 @@ function submitPostgres() {
   });
 }
 
+function submitMysql() {
+  error.value = null;
+  const n = name.value.trim();
+  const h = host.value.trim();
+  const db = database.value.trim();
+  const u = user.value.trim();
+  const p = Number(port.value);
+  if (!n) {
+    error.value = "Connection name is required.";
+    return;
+  }
+  if (!h || !db || !u || !Number.isFinite(p) || p <= 0 || p > 65535) {
+    error.value = "Host, port, database and user are required.";
+    return;
+  }
+  dismiss();
+  emit("connectMysql", {
+    driver: "mysql",
+    name: n,
+    host: h,
+    port: p,
+    database: db,
+    user: u,
+    password: password.value,
+  });
+}
+
+
 function onKey(e: KeyboardEvent) {
   if (!open.value) return;
   if (e.key === "Escape") {
@@ -293,6 +345,7 @@ function onKey(e: KeyboardEvent) {
     else if (step.value === "sqlite" && canSaveSqlite.value) submitSqlite();
     else if (step.value === "postgres" && canSavePostgres.value)
       submitPostgres();
+    else if (step.value === "mysql" && canSaveMysql.value) submitMysql();
   }
 }
 
@@ -569,9 +622,84 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
       </footer>
     </div>
 
-    <!-- Step 2c: stub for drivers without Tauri adapter yet -->
+    <!-- Step 2c: MySQL form -->
     <div
-      v-else
+      v-else-if="step === 'mysql'"
+      class="dialog form"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ncd-mysql-title"
+      data-testid="mysql-connect-form"
+    >
+      <header class="hdr form-hdr">
+        <h2 id="ncd-mysql-title">New MySQL Connection</h2>
+        <p class="sub">Connect to a MySQL / MariaDB server.</p>
+      </header>
+
+      <div class="body">
+        <label class="field">
+          <span>Connection name</span>
+          <input
+            ref="nameEl"
+            v-model="name"
+            type="text"
+            placeholder="e.g. Local MySQL"
+            maxlength="120"
+          />
+        </label>
+        <div class="row2">
+          <label class="field grow">
+            <span>Host</span>
+            <input v-model="host" type="text" spellcheck="false" />
+          </label>
+          <label class="field port">
+            <span>Port</span>
+            <input v-model="port" type="number" min="1" max="65535" />
+          </label>
+        </div>
+        <label class="field">
+          <span>Database</span>
+          <input v-model="database" type="text" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span>User</span>
+          <input v-model="user" type="text" spellcheck="false" autocomplete="username" />
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input
+            v-model="password"
+            type="password"
+            autocomplete="current-password"
+          />
+        </label>
+        <p class="hint-inline">
+          Password is stored in the OS keyring (not in the profile database).
+        </p>
+        <p v-if="error" class="err">{{ error }}</p>
+      </div>
+
+      <footer>
+        <QueryaButton variant="ghost" size="lg" @click="goBack">
+          Back
+        </QueryaButton>
+        <QueryaButton variant="ghost" size="lg" @click="dismiss">
+          Cancel
+        </QueryaButton>
+        <QueryaButton
+          variant="primary"
+          size="lg"
+          :disabled="!canSaveMysql"
+          @click="submitMysql"
+        >
+          Save
+        </QueryaButton>
+      </footer>
+    </div>
+
+    <!-- Step 2d: stub for drivers without Tauri adapter yet -->
+    <div
+      v-else-if="step === 'stub'"
       class="dialog form"
       role="dialog"
       aria-modal="true"

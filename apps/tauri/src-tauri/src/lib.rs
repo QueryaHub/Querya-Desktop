@@ -12,10 +12,11 @@ pub use profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 pub use secrets::{KeyringSecretStore, MemorySecretStore, SecretError, SecretStore, SharedSecretStore};
 
 use commands::{
-    db_connect_postgres, db_connect_sqlite, db_describe_object, db_disconnect, db_execute_query,
-    db_is_connected, db_list_children, db_list_columns, db_list_schemas, db_list_tables,
-    db_postgres_object_detail, db_sqlite_overview, profiles_connect_postgres,
-    profiles_connect_sqlite, profiles_delete, profiles_list, profiles_upsert,
+    db_connect_mysql, db_connect_postgres, db_connect_sqlite, db_describe_object, db_disconnect,
+    db_execute_query, db_is_connected, db_list_children, db_list_columns, db_list_schemas,
+    db_list_tables, db_postgres_object_detail, db_sqlite_overview, profiles_connect_mysql,
+    profiles_connect_postgres, profiles_connect_sqlite, profiles_delete, profiles_list,
+    profiles_upsert,
 };
 
 #[tauri::command]
@@ -59,6 +60,7 @@ pub fn run() {
             host_platform,
             db_connect_sqlite,
             db_connect_postgres,
+            db_connect_mysql,
             db_disconnect,
             db_is_connected,
             db_list_schemas,
@@ -74,6 +76,7 @@ pub fn run() {
             profiles_delete,
             profiles_connect_sqlite,
             profiles_connect_postgres,
+            profiles_connect_mysql,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
