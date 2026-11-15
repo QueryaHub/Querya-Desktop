@@ -10,9 +10,9 @@ pub use connection::{
 pub use profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 
 use commands::{
-    db_connect_sqlite, db_describe_object, db_disconnect, db_execute_query, db_is_connected,
-    db_list_children, db_list_columns, db_list_schemas, db_list_tables, db_sqlite_overview,
-    profiles_connect_sqlite, profiles_delete, profiles_list, profiles_upsert,
+    db_connect_postgres, db_connect_sqlite, db_describe_object, db_disconnect, db_execute_query,
+    db_is_connected, db_list_children, db_list_columns, db_list_schemas, db_list_tables,
+    db_sqlite_overview, profiles_connect_sqlite, profiles_delete, profiles_list, profiles_upsert,
 };
 
 #[tauri::command]
@@ -54,6 +54,7 @@ pub fn run() {
             app_info,
             host_platform,
             db_connect_sqlite,
+            db_connect_postgres,
             db_disconnect,
             db_is_connected,
             db_list_schemas,
