@@ -90,6 +90,9 @@ const ctxItems = computed<CtxItem[]>(() => {
       })),
     ];
     return [
+      nav.isExpanded(t.connectionId)
+        ? { id: "collapse", label: "Collapse" }
+        : { id: "expand", label: "Expand" },
       { id: "disconnect", label: "Disconnect" },
       { id: "remove", label: "Remove connection" },
       {
@@ -143,8 +146,9 @@ function onConnClick(id: string) {
 
 function onConnExpand(id: string, e: MouseEvent) {
   e.stopPropagation();
+  const willExpand = !nav.isExpanded(id);
   nav.toggleExpanded(id);
-  void tree.ensureLoaded(id);
+  if (willExpand) void tree.ensureLoaded(id);
 }
 
 function onFolderExpand(id: string, e: MouseEvent) {
@@ -189,8 +193,14 @@ function onCtxSelect(id: string) {
   else if (id === "remove-folder" && t.type === "folder") {
     connections.detachFolder(t.folderId);
     foldersStore.remove(t.folderId);
+  } else if (id === "expand" && t.type === "connection") {
+    nav.setExpanded(t.connectionId, true);
+    void tree.ensureLoaded(t.connectionId);
+  } else if (id === "collapse" && t.type === "connection") {
+    nav.setExpanded(t.connectionId, false);
   } else if (id === "disconnect" && t.type === "connection") {
     void connections.disconnect(t.connectionId);
+    nav.setExpanded(t.connectionId, false);
     tree.drop(t.connectionId);
   } else if (id === "remove" && t.type === "connection") {
     void connections.removeConnection(t.connectionId);
@@ -299,7 +309,11 @@ onUnmounted(() => {
                     type="button"
                     class="chev"
                     :aria-expanded="nav.isExpanded(c.id)"
-                    :aria-label="`Expand ${c.name}`"
+                    :aria-label="
+                      nav.isExpanded(c.id)
+                        ? `Collapse ${c.name}`
+                        : `Expand ${c.name}`
+                    "
                     @click="onConnExpand(c.id, $event)"
                   >
                     {{ nav.isExpanded(c.id) ? "▾" : "▸" }}
@@ -308,6 +322,7 @@ onUnmounted(() => {
                     type="button"
                     class="conn-main"
                     @click="onConnClick(c.id)"
+                    @dblclick="onConnExpand(c.id, $event)"
                   >
                     <span class="glyph" aria-hidden="true">{{
                       driverGlyph(c)
@@ -317,17 +332,6 @@ onUnmounted(() => {
                       {{ c.driver
                       }}<template v-if="c.mock"> · demo</template>
                     </span>
-                  </button>
-                  <button
-                    type="button"
-                    class="conn-x"
-                    :aria-label="`Remove ${c.name}`"
-                    @click.stop="
-                      connections.removeConnection(c.id);
-                      tree.drop(c.id);
-                    "
-                  >
-                    ×
                   </button>
                 </div>
 
@@ -399,7 +403,11 @@ onUnmounted(() => {
                 type="button"
                 class="chev"
                 :aria-expanded="nav.isExpanded(c.id)"
-                :aria-label="`Expand ${c.name}`"
+                :aria-label="
+                  nav.isExpanded(c.id)
+                    ? `Collapse ${c.name}`
+                    : `Expand ${c.name}`
+                "
                 @click="onConnExpand(c.id, $event)"
               >
                 {{ nav.isExpanded(c.id) ? "▾" : "▸" }}
@@ -408,6 +416,7 @@ onUnmounted(() => {
                 type="button"
                 class="conn-main"
                 @click="onConnClick(c.id)"
+                @dblclick="onConnExpand(c.id, $event)"
               >
                 <span class="glyph" aria-hidden="true">{{
                   driverGlyph(c)
@@ -416,17 +425,6 @@ onUnmounted(() => {
                 <span class="conn-meta">
                   {{ c.driver }}<template v-if="c.mock"> · demo</template>
                 </span>
-              </button>
-              <button
-                type="button"
-                class="conn-x"
-                :aria-label="`Remove ${c.name}`"
-                @click.stop="
-                  connections.removeConnection(c.id);
-                  tree.drop(c.id);
-                "
-              >
-                ×
               </button>
             </div>
 
@@ -670,7 +668,6 @@ onUnmounted(() => {
   font-family: var(--q-font-mono);
 }
 
-.conn-x,
 .refresh {
   appearance: none;
   border: 0;
@@ -682,7 +679,6 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-.conn-x:hover,
 .refresh:hover {
   background: var(--q-accent);
   color: var(--q-foreground);
