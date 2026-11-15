@@ -27,6 +27,7 @@ import WelcomeTourDialog from "./ui/WelcomeTourDialog.vue";
 import AboutDialog from "./ui/AboutDialog.vue";
 import NewFolderDialog from "./ui/NewFolderDialog.vue";
 import NewConnectionDialog, {
+  type MongoConnectPayload,
   type MysqlConnectPayload,
   type PostgresConnectPayload,
   type RedisConnectPayload,
@@ -125,6 +126,22 @@ async function onConnectRedisFromDialog(payload: RedisConnectPayload) {
       database: payload.database,
       username: payload.username || null,
       password: payload.password || null,
+    });
+  } catch {
+    // status already set in store
+  }
+}
+
+async function onConnectMongoFromDialog(payload: MongoConnectPayload) {
+  try {
+    await connections.connectMongo({
+      name: payload.name,
+      host: payload.host,
+      port: payload.port,
+      database: payload.database,
+      username: payload.username || null,
+      password: payload.password || null,
+      authSource: payload.authSource || "admin",
     });
   } catch {
     // status already set in store
@@ -317,6 +334,7 @@ onUnmounted(() => {
       @connect-postgres="onConnectPostgresFromDialog"
       @connect-mysql="onConnectMysqlFromDialog"
       @connect-redis="onConnectRedisFromDialog"
+      @connect-mongo="onConnectMongoFromDialog"
     />
   </div>
 </template>

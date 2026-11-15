@@ -378,6 +378,20 @@ onUnmounted(() => {
                   </ul>
                 </div>
                 <div
+                  v-else-if="nav.isExpanded(c.id) && c.driver === 'mongo'"
+                  class="tree"
+                  data-testid="mongo-db-tree"
+                >
+                  <div class="tree-header">
+                    <span class="tree-label">DATABASE</span>
+                  </div>
+                  <ul class="nodes">
+                    <li class="redis-db">
+                      {{ c.database ?? "querya" }}
+                    </li>
+                  </ul>
+                </div>
+                <div
                   v-else-if="nav.isExpanded(c.id)"
                   class="tree"
                   data-testid="sqlite-object-tree"
@@ -487,6 +501,20 @@ onUnmounted(() => {
               <ul class="nodes">
                 <li class="redis-db">
                   db{{ c.database ?? "0" }}
+                </li>
+              </ul>
+            </div>
+            <div
+              v-else-if="nav.isExpanded(c.id) && c.driver === 'mongo'"
+              class="tree"
+              data-testid="mongo-db-tree"
+            >
+              <div class="tree-header">
+                <span class="tree-label">DATABASE</span>
+              </div>
+              <ul class="nodes">
+                <li class="redis-db">
+                  {{ c.database ?? "querya" }}
                 </li>
               </ul>
             </div>
