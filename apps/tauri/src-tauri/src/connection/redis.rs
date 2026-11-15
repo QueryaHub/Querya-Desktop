@@ -203,11 +203,7 @@ pub fn open_redis(params: RedisConnectParams) -> ConnectionResult<RedisSession> 
 
     Ok(RedisSession {
         id,
-        host: if host.contains("://") {
-            host.to_owned()
-        } else {
-            host.to_owned()
-        },
+        host: host.to_owned(),
         port: params.port,
         db,
         conn: Arc::new(Mutex::new(Some(conn))),
