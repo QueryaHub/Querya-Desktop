@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { storeToRefs } from "pinia";
 import { useShellStore } from "./stores/shell";
+import { useWorkspaceStore } from "./stores/workspace";
 import {
   applyTheme,
   initTheme,
@@ -14,8 +16,11 @@ import {
 import QueryaGlass from "./ui/QueryaGlass.vue";
 import TitleBar from "./ui/TitleBar.vue";
 import SidebarShell from "./ui/SidebarShell.vue";
+import TabStrip from "./ui/TabStrip.vue";
 
 const shell = useShellStore();
+const workspace = useWorkspaceStore();
+const { activeTab } = storeToRefs(workspace);
 const motion = provideQueryaMotion();
 const { level: motionLevel, springsOn, manual: motionManual } = motion;
 const backend = ref<string>("…");
@@ -66,9 +71,12 @@ function setMotion(level: QueryaMotionLevel) {
     <div class="body">
       <SidebarShell />
       <main class="workspace">
+        <TabStrip />
       <div class="hero">
         <header class="brand">Querya</header>
-        <p class="tagline">Tauri 2 + Vue 3 — shell chrome (title + sidebar)</p>
+        <p class="tagline">
+          Active tab: {{ activeTab?.title ?? "—" }} ({{ activeTab?.kind }})
+        </p>
         <p class="meta" data-testid="backend-info">{{ backend }}</p>
         <p class="meta">
           springs: {{ springsOn ? "on" : "off" }} · level: {{ motionLevel }}
@@ -190,11 +198,15 @@ function setMotion(level: QueryaMotionLevel) {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .hero {
-  min-height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   display: grid;
   place-content: center;
   justify-items: center;
