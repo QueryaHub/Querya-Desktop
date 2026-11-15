@@ -546,7 +546,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
           />
         </label>
         <p class="hint-inline">
-          Password stays in-session only until OS keyring lands.
+          Password is stored in the OS keyring (not in the profile database).
         </p>
         <p v-if="error" class="err">{{ error }}</p>
       </div>

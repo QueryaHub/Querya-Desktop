@@ -295,16 +295,8 @@ export const useConnectionsStore = defineStore("connections", () => {
         id: conn.id,
       });
     }
+    // Prefer in-memory cache; otherwise Rust loads from OS keyring (#1878).
     const password = sessionPasswords.get(id) ?? null;
-    if (!password) {
-      const status = useShellStatusStore();
-      status.setQueryMetrics({
-        message:
-          "Postgres password not in session — reconnect via New Connection (keyring later)",
-        busy: false,
-      });
-      throw new Error("postgres password required");
-    }
     return connectPostgres({
       name: conn.name,
       host: conn.host ?? "localhost",

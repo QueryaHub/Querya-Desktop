@@ -3,8 +3,24 @@ use crate::connection::{
     SchemaObject, SchemaObjectKind, SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
 };
 use crate::profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
+use crate::secrets::SharedSecretStore;
+use serde::Deserialize;
 use tauri::ipc::Channel;
 use tauri::State;
+
+/// Bundled IPC args for Postgres save+connect (keeps clippy under the limit).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectPostgresRequest {
+    pub name: String,
+    pub host: String,
+    pub port: u16,
+    pub database: String,
+    pub user: String,
+    pub password: Option<String>,
+    pub folder_id: Option<String>,
+    pub id: Option<String>,
+}
 
 #[tauri::command]
 pub fn db_connect_sqlite(
@@ -63,7 +79,10 @@ pub fn profiles_upsert(
 pub fn profiles_delete(
     id: String,
     store: State<'_, ProfileStore>,
+    secrets: State<'_, SharedSecretStore>,
 ) -> Result<bool, ProfileStoreError> {
+    // Best-effort secret cleanup — profile row is source of truth for "gone".
+    let _ = secrets.delete_password(&id);
     store.delete(&id)
 }
 
@@ -126,17 +145,22 @@ pub fn profiles_connect_sqlite(
 /// Save Postgres profile metadata (no password) and open a live session.
 #[tauri::command]
 pub fn profiles_connect_postgres(
-    name: String,
-    host: String,
-    port: u16,
-    database: String,
-    user: String,
-    password: Option<String>,
-    folder_id: Option<String>,
-    id: Option<String>,
+    request: ConnectPostgresRequest,
     store: State<'_, ProfileStore>,
+    secrets: State<'_, SharedSecretStore>,
     registry: State<'_, ConnectionRegistry>,
 ) -> Result<ConnectionProfile, ConnectionError> {
+    let ConnectPostgresRequest {
+        name,
+        host,
+        port,
+        database,
+        user,
+        password,
+        folder_id,
+        id,
+    } = request;
+
     let display_name = {
         let t = name.trim();
         if t.is_empty() {
@@ -174,8 +198,13 @@ pub fn profiles_connect_postgres(
                 p
             }),
         None => {
-            let mut p =
-                ConnectionProfile::new_postgres(display_name, host.clone(), port, database.clone(), user.clone());
+            let mut p = ConnectionProfile::new_postgres(
+                display_name,
+                host.clone(),
+                port,
+                database.clone(),
+                user.clone(),
+            );
             p.folder_id = folder_id;
             p
         }
@@ -184,6 +213,19 @@ pub fn profiles_connect_postgres(
     store
         .upsert(&profile)
         .map_err(|e| ConnectionError::io(e.to_string()))?;
+
+    // Resolve password: explicit form value wins; else OS keyring (#1878).
+    let password = match password {
+        Some(p) => {
+            secrets
+                .set_password(&profile.id, &p)
+                .map_err(|e| ConnectionError::io(format!("keyring write: {e}")))?;
+            Some(p)
+        }
+        None => secrets
+            .get_password(&profile.id)
+            .map_err(|e| ConnectionError::io(format!("keyring read: {e}")))?,
+    };
 
     if !registry.is_connected(&ConnectionId::from(profile.id.as_str())) {
         registry.connect(ConnectionConfig::Postgres {
