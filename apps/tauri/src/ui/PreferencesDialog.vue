@@ -371,14 +371,10 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
                 </select>
               </div>
             </div>
-            <div class="field-row">
+            <div class="field-row field-row-scale">
               <span class="field-label">Interface scale</span>
               <div class="field-control">
                 <InterfaceScaleSlider v-model="prefs.state.uiScale" />
-                <p class="field-hint">
-                  Snap to presets (75%, 85%, 90%, 100% …). Hold Shift for 1% fine
-                  control. Default is 100%.
-                </p>
               </div>
             </div>
             <label class="switch-row">
@@ -982,6 +978,14 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
   gap: 12px;
   align-items: flex-start;
   margin: 12px 0 16px;
+}
+
+.field-row-scale {
+  align-items: center;
+}
+
+.field-row-scale .field-label {
+  padding-top: 0;
 }
 
 .field-label {
