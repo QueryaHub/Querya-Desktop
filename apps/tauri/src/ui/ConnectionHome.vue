@@ -11,6 +11,8 @@ import { useShellNavStore } from "../stores/shellNav";
 import { useObjectTreeStore } from "../stores/objectTree";
 import QueryaButton from "./QueryaButton.vue";
 import SqlWorkspace from "./SqlWorkspace.vue";
+import { QueryaIcon } from "./icons";
+import ErdView from "./erd/ErdView.vue";
 
 const connections = useConnectionsStore();
 const nav = useShellNavStore();
@@ -167,6 +169,17 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
       >
         SQL
       </button>
+      <button
+        type="button"
+        role="tab"
+        class="tab"
+        :class="{ active: homeTab === 'erd' }"
+        :aria-selected="homeTab === 'erd'"
+        data-testid="home-tab-erd"
+        @click="nav.homeTab = 'erd'"
+      >
+        ER Diagram
+      </button>
     </div>
 
     <div
@@ -175,7 +188,9 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
       data-testid="home-overview"
     >
       <header class="head">
-        <div class="mark" aria-hidden="true">▣</div>
+        <div class="mark" aria-hidden="true">
+          <QueryaIcon name="database" :size="22" />
+        </div>
         <div class="titles">
           <div class="title-row">
             <h1>{{ conn.name }}</h1>
@@ -198,7 +213,7 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
       <template v-if="isServerSql">
         <section class="chips" aria-label="Database info">
           <div class="chip">
-            <span class="chip-ico" aria-hidden="true">⌂</span>
+            <QueryaIcon class="chip-ico" name="server" :size="16" />
             <div class="chip-body">
               <span class="chip-l">Host</span>
               <span class="chip-v"
@@ -209,21 +224,21 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
             </div>
           </div>
           <div class="chip">
-            <span class="chip-ico" aria-hidden="true">▤</span>
+            <QueryaIcon class="chip-ico" name="database" :size="16" />
             <div class="chip-body">
               <span class="chip-l">Database</span>
               <span class="chip-v">{{ conn.database || "—" }}</span>
             </div>
           </div>
           <div class="chip">
-            <span class="chip-ico" aria-hidden="true">☺</span>
+            <QueryaIcon class="chip-ico" name="user" :size="16" />
             <div class="chip-body">
               <span class="chip-l">User</span>
               <span class="chip-v">{{ conn.user || "—" }}</span>
             </div>
           </div>
           <div class="chip">
-            <span class="chip-ico" aria-hidden="true">▦</span>
+            <QueryaIcon class="chip-ico" name="tableGroup" :size="16" />
             <div class="chip-body">
               <span class="chip-l">Schemas / tables</span>
               <span class="chip-v"
@@ -245,28 +260,28 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
         aria-label="Database info"
       >
         <div class="chip">
-          <span class="chip-ico" aria-hidden="true">ⓘ</span>
+          <QueryaIcon class="chip-ico" name="info" :size="16" />
           <div class="chip-body">
             <span class="chip-l">SQLite Version</span>
             <span class="chip-v">{{ overview?.version || "—" }}</span>
           </div>
         </div>
         <div class="chip">
-          <span class="chip-ico" aria-hidden="true">▤</span>
+          <QueryaIcon class="chip-ico" name="hardDrive" :size="16" />
           <div class="chip-body">
             <span class="chip-l">Database Size</span>
             <span class="chip-v">{{ sizeLabel }}</span>
           </div>
         </div>
         <div class="chip">
-          <span class="chip-ico" aria-hidden="true">▦</span>
+          <QueryaIcon class="chip-ico" name="grid" :size="16" />
           <div class="chip-body">
             <span class="chip-l">Pages / Page Size</span>
             <span class="chip-v">{{ pagesLabel }}</span>
           </div>
         </div>
         <div class="chip">
-          <span class="chip-ico" aria-hidden="true">↺</span>
+          <QueryaIcon class="chip-ico" name="refresh" :size="16" />
           <div class="chip-body">
             <span class="chip-l">Journal Mode</span>
             <span class="chip-v">{{ overview?.journal_mode || "—" }}</span>
@@ -276,7 +291,7 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
 
       <section class="tables-card">
         <div class="card-head">
-          <span class="card-ico" aria-hidden="true">▦</span>
+          <QueryaIcon class="card-ico" name="tableGroup" :size="16" />
           <h2>Tables</h2>
           <span class="count">{{ tables.length }}</span>
           <span v-if="views.length" class="count muted"
@@ -295,7 +310,7 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
             :title="`Open ${o.name}`"
             @click="openRelation(o)"
           >
-            <span class="t-ico" aria-hidden="true">▥</span>
+            <QueryaIcon class="t-ico" name="table" :size="13" />
             {{ o.name }}
           </button>
           <button
@@ -306,15 +321,22 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
             :title="`Open ${o.name}`"
             @click="openRelation(o)"
           >
-            <span class="t-ico" aria-hidden="true">◇</span>
+            <QueryaIcon class="t-ico" name="view" :size="13" />
             {{ o.name }}
           </button>
         </div>
       </section>
     </div>
 
-    <div v-else class="sql-park" data-testid="home-sql">
+    <div v-else-if="homeTab === 'sql'" class="sql-park" data-testid="home-sql">
       <SqlWorkspace />
+    </div>
+
+    <div v-else class="erd-park" data-testid="home-erd">
+      <ErdView
+        :connection-id="conn.id"
+        :mock="!!conn.mock"
+      />
     </div>
   </div>
 </template>
@@ -582,7 +604,8 @@ h1 {
   line-height: 1;
 }
 
-.sql-park {
+.sql-park,
+.erd-park {
   flex: 1;
   min-height: 0;
 }

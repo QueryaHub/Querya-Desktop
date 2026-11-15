@@ -5,18 +5,19 @@ mod secrets;
 
 pub use connection::{
     ColumnMeta, ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager,
-    ConnectionRegistry, DriverKind, ObjectTreeProvider, PostgresObjectDetail, QueryEvent,
-    SchemaObject, SchemaObjectKind, SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
+    ConnectionRegistry, DriverKind, ErdColumn, ErdRelation, ErdSchema, ErdTable,
+    ObjectTreeProvider, PostgresObjectDetail, QueryEvent, SchemaObject, SchemaObjectKind,
+    SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
 };
 pub use profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 pub use secrets::{KeyringSecretStore, MemorySecretStore, SecretError, SecretStore, SharedSecretStore};
 
 use commands::{
     db_connect_mysql, db_connect_postgres, db_connect_sqlite, db_describe_object, db_disconnect,
-    db_execute_query, db_is_connected, db_list_children, db_list_columns, db_list_schemas,
-    db_list_tables, db_postgres_object_detail, db_sqlite_overview, profiles_connect_mysql,
-    profiles_connect_postgres, profiles_connect_sqlite, profiles_delete, profiles_list,
-    profiles_upsert,
+    db_erd_schema, db_execute_query, db_is_connected, db_list_children, db_list_columns,
+    db_list_schemas, db_list_tables, db_postgres_object_detail, db_sqlite_overview,
+    profiles_connect_mysql, profiles_connect_postgres, profiles_connect_sqlite, profiles_delete,
+    profiles_list, profiles_upsert,
 };
 
 #[tauri::command]
@@ -40,6 +41,29 @@ fn host_platform() -> String {
     }
 }
 
+/// Build the main window from `tauri.conf.json`, applying OS chrome rules.
+///
+/// - **macOS:** native traffic lights via `titleBarStyle: Overlay` + `hiddenTitle`
+///   (decorations stay on). Custom HTML title bar sits under the system controls.
+/// - **Windows / Linux:** undecorated; frontend draws Fluent-style caption buttons.
+fn open_main_window(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::WebviewWindowBuilder;
+
+    let mut cfg = app
+        .config()
+        .app
+        .windows
+        .first()
+        .cloned()
+        .ok_or_else(|| tauri::Error::WindowNotFound)?;
+
+    // Overlay + hiddenTitle + trafficLightPosition stay in tauri.conf.json (macOS).
+    cfg.decorations = cfg!(target_os = "macos");
+
+    WebviewWindowBuilder::from_config(app.handle(), &cfg)?.build()?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -53,6 +77,9 @@ pub fn run() {
                 std::io::Error::other(format!("open profile store: {e}"))
             })?;
             app.manage(store);
+            open_main_window(app).map_err(|e| {
+                std::io::Error::other(format!("open main window: {e}"))
+            })?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -70,6 +97,7 @@ pub fn run() {
             db_describe_object,
             db_postgres_object_detail,
             db_sqlite_overview,
+            db_erd_schema,
             db_execute_query,
             profiles_list,
             profiles_upsert,

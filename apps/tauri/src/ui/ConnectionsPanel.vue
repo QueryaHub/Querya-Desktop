@@ -2,10 +2,7 @@
 import { computed, onUnmounted, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { useShellStore } from "../stores/shell";
-import {
-  useConnectionsStore,
-  type LiveConnection,
-} from "../stores/connections";
+import { useConnectionsStore } from "../stores/connections";
 import { useFoldersStore } from "../stores/folders";
 import {
   isPgSchemaToolFolder,
@@ -16,6 +13,7 @@ import { useQueryaMotion } from "../motion";
 import SplitHandle from "./SplitHandle.vue";
 import QueryaContextMenu, { type CtxItem } from "./QueryaContextMenu.vue";
 import SqlObjectTreeNodes from "./SqlObjectTreeNodes.vue";
+import { QueryaIcon, QueryaDriverIcon } from "./icons";
 
 const emit = defineEmits<{
   newConnection: [];
@@ -242,11 +240,6 @@ function filteredRootsFor(connId: string) {
   return tree.filteredRootsFor(connId);
 }
 
-function driverGlyph(c: LiveConnection): string {
-  if (c.mock) return "◈";
-  if (c.driver === "postgres") return "◇";
-  return "▤";
-}
 
 onUnmounted(() => {
   dragging.value = false;
@@ -301,9 +294,16 @@ onUnmounted(() => {
                 :aria-label="`Expand ${row.folder.name}`"
                 @click="onFolderExpand(row.folder.id, $event)"
               >
-                {{ row.folder.expanded || row.forceOpen ? "▾" : "▸" }}
+                <QueryaIcon
+                  :name="
+                    row.folder.expanded || row.forceOpen
+                      ? 'chevronDown'
+                      : 'chevronRight'
+                  "
+                  :size="12"
+                />
               </button>
-              <span class="folder-ico" aria-hidden="true">▣</span>
+              <QueryaIcon class="folder-ico" name="folder" :size="14" />
               <span class="folder-name">{{ row.folder.name }}</span>
               <span class="count-sm">{{ row.children.length }}</span>
             </div>
@@ -338,7 +338,10 @@ onUnmounted(() => {
                     "
                     @click="onConnExpand(c.id, $event)"
                   >
-                    {{ nav.isExpanded(c.id) ? "▾" : "▸" }}
+                    <QueryaIcon
+                      :name="nav.isExpanded(c.id) ? 'chevronDown' : 'chevronRight'"
+                      :size="12"
+                    />
                   </button>
                   <button
                     type="button"
@@ -346,9 +349,12 @@ onUnmounted(() => {
                     @click="onConnClick(c.id)"
                     @dblclick="onConnExpand(c.id, $event)"
                   >
-                    <span class="glyph" aria-hidden="true">{{
-                      driverGlyph(c)
-                    }}</span>
+                    <QueryaDriverIcon
+                      class="glyph"
+                      :driver="c.driver"
+                      :mock="!!c.mock"
+                      :size="14"
+                    />
                     <span class="conn-name">{{ c.name }}</span>
                     <span class="conn-meta">
                       {{ c.driver
@@ -370,7 +376,7 @@ onUnmounted(() => {
                       aria-label="Refresh"
                       @click="tree.refresh(c.id)"
                     >
-                      ↻
+                      <QueryaIcon name="refresh" :size="12" />
                     </button>
                   </div>
                   <input
@@ -432,7 +438,10 @@ onUnmounted(() => {
                 "
                 @click="onConnExpand(c.id, $event)"
               >
-                {{ nav.isExpanded(c.id) ? "▾" : "▸" }}
+                <QueryaIcon
+                  :name="nav.isExpanded(c.id) ? 'chevronDown' : 'chevronRight'"
+                  :size="12"
+                />
               </button>
               <button
                 type="button"
@@ -440,9 +449,12 @@ onUnmounted(() => {
                 @click="onConnClick(c.id)"
                 @dblclick="onConnExpand(c.id, $event)"
               >
-                <span class="glyph" aria-hidden="true">{{
-                  driverGlyph(c)
-                }}</span>
+                <QueryaDriverIcon
+                  class="glyph"
+                  :driver="c.driver"
+                  :mock="!!c.mock"
+                  :size="14"
+                />
                 <span class="conn-name">{{ c.name }}</span>
                 <span class="conn-meta">
                   {{ c.driver }}<template v-if="c.mock"> · demo</template>
@@ -463,7 +475,7 @@ onUnmounted(() => {
                   aria-label="Refresh"
                   @click="tree.refresh(c.id)"
                 >
-                  ↻
+                  <QueryaIcon name="refresh" :size="12" />
                 </button>
               </div>
               <input
@@ -611,8 +623,7 @@ onUnmounted(() => {
 }
 
 .folder-ico {
-  font-size: 12px;
-  line-height: 1;
+  color: var(--q-muted-foreground);
 }
 
 .folder-name {
@@ -626,24 +637,28 @@ onUnmounted(() => {
 
 .chev {
   width: 18px;
+  height: 18px;
   flex: 0 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   appearance: none;
   border: 0;
   background: transparent;
   color: var(--q-muted-foreground);
   cursor: pointer;
-  font-size: 10px;
-  line-height: 1;
   padding: 0;
 }
 
 .conn-main {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 1px;
+  align-items: center;
   appearance: none;
   border: 0;
   background: transparent;
@@ -653,20 +668,21 @@ onUnmounted(() => {
   padding: 5px 6px;
   border-radius: var(--q-radius-control);
   cursor: pointer;
-  position: relative;
 }
 
 .conn-main .glyph {
-  position: absolute;
-  left: 6px;
-  top: 8px;
-  font-size: 10px;
+  grid-row: 1 / span 2;
   color: var(--q-muted-foreground);
 }
 
-.conn-main .conn-name,
+.conn-main .conn-name {
+  grid-column: 2;
+  grid-row: 1;
+}
+
 .conn-main .conn-meta {
-  padding-left: 16px;
+  grid-column: 2;
+  grid-row: 2;
 }
 
 .conn-main:hover {

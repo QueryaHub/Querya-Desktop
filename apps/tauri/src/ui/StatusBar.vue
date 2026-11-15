@@ -4,6 +4,7 @@ import { storeToRefs } from "pinia";
 import { useShellStore } from "../stores/shell";
 import { useShellStatusStore } from "../stores/shellStatus";
 import QueryaDivider from "./QueryaDivider.vue";
+import { QueryaIcon } from "./icons";
 
 const emit = defineEmits<{
   openPreferences: [];
@@ -49,7 +50,7 @@ const countsLabel = computed(() => {
         :title="shell.sidebarOpen ? 'Hide sidebar (Ctrl+B)' : 'Show sidebar (Ctrl+B)'"
         @click="shell.toggleSidebar()"
       >
-        ▤
+        <QueryaIcon name="sidebar" :size="14" />
       </button>
       <QueryaDivider vertical />
       <span
@@ -77,7 +78,7 @@ const countsLabel = computed(() => {
         aria-label="Preferences"
         @click="emit('openPreferences')"
       >
-        ⚙
+        <QueryaIcon name="settings" :size="14" />
       </button>
     </div>
   </footer>

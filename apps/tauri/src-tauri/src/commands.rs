@@ -1,6 +1,6 @@
 use crate::connection::{
     ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager, ConnectionRegistry,
-    PostgresObjectDetail, SchemaObject, SchemaObjectKind, SqlObjectKind, SqlObjectNode,
+    ErdSchema, PostgresObjectDetail, SchemaObject, SchemaObjectKind, SqlObjectKind, SqlObjectNode,
     SqliteOverview, TableSchema,
 };
 use crate::profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
@@ -463,6 +463,23 @@ pub fn db_sqlite_overview(
     registry: State<'_, ConnectionRegistry>,
 ) -> Result<SqliteOverview, ConnectionError> {
     registry.with_sqlite(&id, |s| s.database_overview())
+}
+
+/// ER diagram catalog: tables/views + FK edges (optional neighbourhood).
+#[tauri::command]
+pub fn db_erd_schema(
+    id: ConnectionId,
+    schema: Option<String>,
+    focus: Option<String>,
+    depth: Option<u32>,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<ErdSchema, ConnectionError> {
+    registry.erd_schema(
+        &id,
+        schema.as_deref(),
+        focus.as_deref(),
+        depth,
+    )
 }
 
 /// Execute SQL and stream `QueryEvent` batches over `on_event`.

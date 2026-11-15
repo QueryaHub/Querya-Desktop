@@ -315,6 +315,32 @@ impl ConnectionRegistry {
     ) -> ConnectionResult<super::introspect::TableSchema> {
         self.object_tree(id)?.describe(object_id)
     }
+
+    /// ER diagram catalog (tables + FK edges). Optional neighbourhood around `focus`.
+    pub fn erd_schema(
+        &self,
+        id: &ConnectionId,
+        schema: Option<&str>,
+        focus: Option<&str>,
+        depth: Option<u32>,
+    ) -> ConnectionResult<super::erd::ErdSchema> {
+        let depth = depth.unwrap_or(1) as usize;
+        match self.driver_of(id).ok_or_else(|| ConnectionError::NotFound {
+            id: id.clone(),
+        })? {
+            DriverKind::Sqlite => self.with_sqlite(id, |s| {
+                s.with_connection(|c| {
+                    super::sqlite_erd::load_schema(c, focus, depth)
+                })
+            }),
+            DriverKind::Postgres => self.with_postgres(id, |s| {
+                s.with_pool(|pool| {
+                    super::postgres_erd::load_schema(pool, schema, focus, depth)
+                })
+            }),
+            other => Err(ConnectionError::UnsupportedDriver { driver: other }),
+        }
+    }
 }
 
 impl ConnectionManager for ConnectionRegistry {

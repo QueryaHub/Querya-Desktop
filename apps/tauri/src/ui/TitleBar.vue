@@ -4,12 +4,14 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   detectPlatformFromUa,
   resolvePlatform,
+  usesNativeTrafficLights,
   windowControlsSide,
   type QueryaPlatform,
 } from "./platform";
 import { useQueryaMotion } from "../motion";
 import { useShellStore } from "../stores/shell";
 import TitleBarMenus from "./TitleBarMenus.vue";
+import { QueryaIcon } from "./icons";
 
 const props = withDefaults(
   defineProps<{
@@ -33,14 +35,22 @@ const shell = useShellStore();
 const platform = ref<QueryaPlatform>(detectPlatformFromUa());
 const maximized = ref(false);
 
-/** macOS: left traffic lights. Win/Linux: right caption buttons. */
+/** macOS: left (native). Win/Linux: right caption buttons. */
 const controlsSide = computed(() => windowControlsSide(platform.value));
-const controlsOnLeft = computed(() => controlsSide.value === "left");
+const nativeTrafficLights = computed(() =>
+  usesNativeTrafficLights(platform.value),
+);
 
 const barStyle = computed(() => ({
   transitionDuration: `${motion.duration("fast")}ms`,
   transitionTimingFunction: motion.easing("standard"),
 }));
+
+function isChromeInteractive(target: EventTarget | null): boolean {
+  return Boolean(
+    (target as HTMLElement | null)?.closest("button, a, input, [data-no-drag]"),
+  );
+}
 
 async function refreshMaximized() {
   try {
@@ -64,9 +74,7 @@ async function onClose() {
 }
 
 async function onDrag(e: MouseEvent) {
-  if (e.button !== 0) return;
-  const target = e.target as HTMLElement | null;
-  if (target?.closest("button, a, input, [data-no-drag]")) return;
+  if (e.button !== 0 || isChromeInteractive(e.target)) return;
   try {
     await getCurrentWindow().startDragging();
   } catch {
@@ -75,8 +83,7 @@ async function onDrag(e: MouseEvent) {
 }
 
 function onDblClick(e: MouseEvent) {
-  const target = e.target as HTMLElement | null;
-  if (target?.closest("button, a, input, [data-no-drag]")) return;
+  if (isChromeInteractive(e.target)) return;
   void onToggleMaximize();
 }
 
@@ -105,32 +112,19 @@ onUnmounted(() => {
     data-testid="title-bar"
     :data-platform="platform"
     :data-controls="controlsSide"
+    :data-native-traffic="String(nativeTrafficLights)"
     :style="barStyle"
     @mousedown="onDrag"
     @dblclick="onDblClick"
   >
-    <!-- Always three regions so Win/Linux keep controls pinned right. -->
+    <!-- Three regions keep Win/Linux caption buttons pinned right. -->
     <div class="region region--start" data-no-drag>
-      <div v-if="controlsOnLeft" class="controls controls--traffic">
-        <button
-          type="button"
-          class="traffic close"
-          aria-label="Close"
-          @click="onClose"
-        />
-        <button
-          type="button"
-          class="traffic minimize"
-          aria-label="Minimize"
-          @click="onMinimize"
-        />
-        <button
-          type="button"
-          class="traffic maximize"
-          :aria-label="maximized ? 'Restore' : 'Maximize'"
-          @click="onToggleMaximize"
-        />
-      </div>
+      <!-- macOS Overlay: reserve inset so sidebar/brand clear system lights. -->
+      <span
+        v-if="nativeTrafficLights"
+        class="mac-inset"
+        aria-hidden="true"
+      />
       <button
         type="button"
         class="sidebar-toggle"
@@ -139,7 +133,7 @@ onUnmounted(() => {
         :aria-label="shell.sidebarOpen ? 'Hide sidebar' : 'Show sidebar'"
         @click="shell.toggleSidebar()"
       >
-        ▤
+        <QueryaIcon name="sidebar" :size="16" />
       </button>
       <div class="brand" data-tauri-drag-region>
         <span class="mark" aria-hidden="true" />
@@ -160,14 +154,16 @@ onUnmounted(() => {
     <div class="region region--center" data-tauri-drag-region />
 
     <div class="region region--end" data-no-drag>
-      <div v-if="!controlsOnLeft" class="controls controls--caption">
+      <div v-if="!nativeTrafficLights" class="controls controls--caption">
         <button
           type="button"
           class="caption minimize"
           aria-label="Minimize"
           @click="onMinimize"
         >
-          <span class="glyph" aria-hidden="true">─</span>
+          <svg class="glyph" viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">
+            <path d="M1 5h8" />
+          </svg>
         </button>
         <button
           type="button"
@@ -175,9 +171,27 @@ onUnmounted(() => {
           :aria-label="maximized ? 'Restore' : 'Maximize'"
           @click="onToggleMaximize"
         >
-          <span class="glyph" aria-hidden="true">{{
-            maximized ? "❐" : "□"
-          }}</span>
+          <!-- Restore: overlapping squares (Win 10/11). Maximize: single square. -->
+          <svg
+            v-if="maximized"
+            class="glyph glyph--join"
+            viewBox="0 0 10 10"
+            width="10"
+            height="10"
+            aria-hidden="true"
+          >
+            <path d="M3 2.5h4.5V7M2.5 3.5H7v4.5H2.5z" />
+          </svg>
+          <svg
+            v-else
+            class="glyph"
+            viewBox="0 0 10 10"
+            width="10"
+            height="10"
+            aria-hidden="true"
+          >
+            <rect x="1.5" y="1.5" width="7" height="7" />
+          </svg>
         </button>
         <button
           type="button"
@@ -185,15 +199,19 @@ onUnmounted(() => {
           aria-label="Close"
           @click="onClose"
         >
-          <span class="glyph" aria-hidden="true">✕</span>
+          <svg
+            class="glyph glyph--close"
+            viewBox="0 0 10 10"
+            width="10"
+            height="10"
+            aria-hidden="true"
+          >
+            <path d="M2 2l6 6M8 2l-6 6" />
+          </svg>
         </button>
       </div>
-      <!-- Balance macOS traffic-light width so the title stays centered. -->
-      <div
-        v-else
-        class="mac-balance"
-        aria-hidden="true"
-      />
+      <!-- Balance the macOS traffic-light inset so the drag column stays even. -->
+      <span v-else class="mac-inset" aria-hidden="true" />
     </div>
   </header>
 </template>
@@ -288,45 +306,17 @@ onUnmounted(() => {
   flex: 0 0 auto;
 }
 
-/* macOS traffic lights — close / minimize / maximize */
-.controls--traffic {
-  gap: 8px;
-  padding: 0 4px 0 6px;
-  min-width: 52px;
-}
-
-.traffic {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  border: 0;
-  padding: 0;
-  cursor: default;
-  background: var(--q-accent);
-}
-
-.traffic.close {
-  background: #ff5f57;
-}
-.traffic.minimize {
-  background: #febc2e;
-}
-.traffic.maximize {
-  background: #28c840;
-}
-
-.traffic:hover {
-  filter: brightness(1.06);
-}
-
-.mac-balance {
-  /* traffic cluster (~52) + sidebar toggle (~28) + gaps ≈ start cluster */
-  width: 5.5rem;
+/* Reserved width for system traffic lights (Overlay titlebar on macOS).
+   Native lights use window coords; counter-scale so UI zoom does not shrink the gap. */
+.mac-inset {
+  display: inline-block;
+  width: calc(var(--q-mac-traffic-inset) / var(--q-ui-scale, 1));
   height: 1px;
+  flex: 0 0 auto;
   pointer-events: none;
 }
 
-/* Windows / Linux caption buttons — min / max / close on the right */
+/* Windows / Linux — Fluent-style caption buttons (min / max / close). */
 .controls--caption {
   gap: 0;
   height: 100%;
@@ -352,17 +342,28 @@ onUnmounted(() => {
 }
 
 .caption.close:hover {
-  background: var(--q-destructive);
-  color: var(--q-destructive-foreground);
+  background: #e81123;
+  color: #ffffff;
 }
 
 .glyph {
-  font-size: 11px;
-  line-height: 1;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
 }
 
-/* Extra inset on macOS so lights clear the rounded corner / notch feel */
-.titlebar[data-controls="left"] .region--start {
-  padding-left: 12px;
+.glyph--join {
+  stroke-linejoin: round;
+}
+
+.glyph--close {
+  stroke-width: 1.1;
+}
+
+/* macOS Overlay: content starts after the system lights. */
+.titlebar[data-native-traffic="true"] .region--start {
+  padding-left: 0;
 }
 </style>

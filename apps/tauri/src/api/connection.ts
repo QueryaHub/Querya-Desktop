@@ -332,6 +332,56 @@ export async function dbSqliteOverview(id: string): Promise<SqliteOverview> {
   return invoke<SqliteOverview>("db_sqlite_overview", { id });
 }
 
+/** ER diagram catalog (mirrors Rust `ErdSchema`). */
+export type ErdColumn = {
+  name: string;
+  dataType: string;
+  isPrimaryKey: boolean;
+  isForeignKey: boolean;
+  isNullable: boolean;
+  isUnique?: boolean;
+  defaultValue?: string | null;
+  isIdentity?: boolean;
+};
+
+export type ErdTable = {
+  name: string;
+  schema?: string | null;
+  columns: ErdColumn[];
+  isView?: boolean;
+};
+
+export type ErdRelation = {
+  fromTable: string;
+  fromColumn: string;
+  toTable: string;
+  toColumn: string;
+  optional?: boolean;
+  oneToOne?: boolean;
+};
+
+export type ErdSchema = {
+  tables: ErdTable[];
+  relations: ErdRelation[];
+  truncated?: boolean;
+};
+
+export async function dbErdSchema(
+  id: string,
+  opts?: {
+    schema?: string | null;
+    focus?: string | null;
+    depth?: number | null;
+  },
+): Promise<ErdSchema> {
+  return invoke<ErdSchema>("db_erd_schema", {
+    id,
+    schema: opts?.schema ?? null,
+    focus: opts?.focus ?? null,
+    depth: opts?.depth ?? null,
+  });
+}
+
 export function isConnectionError(err: unknown): err is ConnectionError {
   return (
     !!err &&

@@ -4,6 +4,7 @@ import {
   type SelectedObject,
 } from "../stores/shellNav";
 import type { TreeUiNode } from "../stores/objectTree";
+import { QueryaIcon, iconForObjectNode } from "./icons";
 
 defineProps<{
   nodes: TreeUiNode[];
@@ -16,33 +17,6 @@ const emit = defineEmits<{
   toggle: [node: TreeUiNode, e: MouseEvent];
   selectRelation: [node: TreeUiNode];
 }>();
-
-function kindGlyph(kind: TreeUiNode["kind"]): string {
-  switch (kind) {
-    case "schema":
-      return "▣";
-    case "folder":
-      return "▸";
-    case "view":
-    case "materialized_view":
-      return "◌";
-    case "function":
-    case "procedure":
-      return "ƒ";
-    case "sequence":
-      return "#";
-    case "index":
-      return "⌘";
-    case "trigger":
-      return "⚡";
-    case "type":
-      return "T";
-    case "column":
-      return "·";
-    default:
-      return "▤";
-  }
-}
 
 function isRelation(
   kind: TreeUiNode["kind"],
@@ -101,7 +75,10 @@ function isSelected(
         :aria-label="`Expand ${node.name}`"
         @click="emit('toggle', node, $event)"
       >
-        {{ node.expanded ? "▾" : "▸" }}
+        <QueryaIcon
+          :name="node.expanded ? 'chevronDown' : 'chevronRight'"
+          :size="12"
+        />
       </button>
       <span v-else class="chev-spacer" />
       <button
@@ -110,7 +87,11 @@ function isSelected(
         :disabled="!isSelectable(node)"
         @click="isSelectable(node) && emit('selectRelation', node)"
       >
-        <span class="glyph" aria-hidden="true">{{ kindGlyph(node.kind) }}</span>
+        <QueryaIcon
+          class="glyph"
+          :name="iconForObjectNode(node.kind, node.name)"
+          :size="13"
+        />
         <span class="name">{{ node.name }}</span>
         <span class="kind">{{ node.kind }}</span>
       </button>
@@ -156,14 +137,16 @@ function isSelected(
 .chev,
 .chev-spacer {
   width: 18px;
+  height: 18px;
   flex: 0 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   appearance: none;
   border: 0;
   background: transparent;
   color: var(--q-muted-foreground);
   cursor: pointer;
-  font-size: 10px;
-  line-height: 1;
   padding: 0;
 }
 
@@ -198,10 +181,7 @@ function isSelected(
 }
 
 .glyph {
-  width: 12px;
-  text-align: center;
   color: var(--q-muted-foreground);
-  font-size: 10px;
 }
 
 .name {

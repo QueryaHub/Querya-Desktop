@@ -18,6 +18,8 @@
   --q-control-h-md: 32px;
   --q-control-h-lg: 36px;
   --q-titlebar-h: 40px;
+  /* Space reserved for macOS system traffic lights under Overlay titlebar. */
+  --q-mac-traffic-inset: 78px;
   --q-statusbar-h: 26px;
   --q-split-handle: 6px;
   --q-sidebar-min: 180px;
