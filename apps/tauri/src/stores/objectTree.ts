@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { computed, ref, watch } from "vue";
+import { computed, reactive, watch } from "vue";
 import {
   dbListChildren,
   formatConnectionError,
@@ -15,6 +15,24 @@ export type TreeUiNode = SqlObjectNode & {
   children: TreeUiNode[] | null;
   error: string | null;
 };
+
+type ConnTreeState = {
+  roots: TreeUiNode[];
+  loading: boolean;
+  error: string | null;
+  filter: string;
+  loaded: boolean;
+};
+
+function emptyState(): ConnTreeState {
+  return {
+    roots: [],
+    loading: false,
+    error: null,
+    filter: "",
+    loaded: false,
+  };
+}
 
 function toUi(nodes: SqlObjectNode[]): TreeUiNode[] {
   return nodes.map((n) => ({
@@ -56,12 +74,27 @@ export function filterTree(nodes: TreeUiNode[], q: string): TreeUiNode[] {
   return out;
 }
 
+function relationsOf(roots: TreeUiNode[]): TreeUiNode[] {
+  const out: TreeUiNode[] = [];
+  for (const root of roots) {
+    for (const child of root.children ?? []) {
+      if (child.kind === "table" || child.kind === "view") out.push(child);
+    }
+  }
+  return out;
+}
+
+/**
+ * Per-connection object tree cache so multiple SERVERS rows can stay expanded
+ * (Flutter `_expandedConnections` behavior).
+ */
 export const useObjectTreeStore = defineStore("objectTree", () => {
-  const connectionId = ref<string | null>(null);
-  const roots = ref<TreeUiNode[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-  const filter = ref("");
+  const byConnection = reactive<Record<string, ConnTreeState>>({});
+
+  function stateOf(connId: string): ConnTreeState {
+    if (!byConnection[connId]) byConnection[connId] = emptyState();
+    return byConnection[connId]!;
+  }
 
   function isMock(id: string): boolean {
     return Boolean(useConnectionsStore().byId.get(id)?.mock);
@@ -73,28 +106,6 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
   ): Promise<SqlObjectNode[]> {
     if (isMock(connId)) return demoListChildren(parentId);
     return dbListChildren(connId, parentId);
-  }
-
-  async function loadFor(id: string | null) {
-    connectionId.value = id;
-    roots.value = [];
-    error.value = null;
-    filter.value = "";
-    if (!id) return;
-
-    loading.value = true;
-    try {
-      roots.value = toUi(await fetchChildren(id, null));
-      // SQLite / Demo: single `main` schema — expand so tables show immediately.
-      const [only] = roots.value;
-      if (roots.value.length === 1 && only?.expandable) {
-        await expandNode(id, only);
-      }
-    } catch (err) {
-      error.value = formatConnectionError(err);
-    } finally {
-      loading.value = false;
-    }
   }
 
   async function expandNode(connId: string, node: TreeUiNode) {
@@ -112,51 +123,114 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
     }
   }
 
-  async function toggleExpand(nodeId: string) {
-    const id = connectionId.value;
-    const node = findNode(roots.value, nodeId);
-    if (!id || !node || !node.expandable) return;
+  async function ensureLoaded(connId: string, force = false) {
+    const st = stateOf(connId);
+    if (st.loaded && !force) return;
+    st.loading = true;
+    st.error = null;
+    try {
+      st.roots = toUi(await fetchChildren(connId, null));
+      const [only] = st.roots;
+      if (st.roots.length === 1 && only?.expandable) {
+        await expandNode(connId, only);
+      }
+      st.loaded = true;
+    } catch (err) {
+      st.error = formatConnectionError(err);
+      st.roots = [];
+      st.loaded = false;
+    } finally {
+      st.loading = false;
+    }
+  }
 
+  async function loadFor(id: string | null, force = false) {
+    if (!id) return;
+    await ensureLoaded(id, force);
+  }
+
+  async function toggleExpand(connId: string, nodeId: string) {
+    const st = stateOf(connId);
+    const node = findNode(st.roots, nodeId);
+    if (!node || !node.expandable) return;
     if (node.expanded) {
       node.expanded = false;
       return;
     }
-    await expandNode(id, node);
+    await expandNode(connId, node);
   }
 
-  /** Flat tables/views under loaded schema children (for ConnectionHome quick list). */
-  const relations = computed(() => {
-    const out: TreeUiNode[] = [];
-    for (const root of roots.value) {
-      for (const child of root.children ?? []) {
-        if (child.kind === "table" || child.kind === "view") out.push(child);
-      }
-    }
-    return out;
-  });
+  function setFilter(connId: string, value: string) {
+    stateOf(connId).filter = value;
+  }
 
-  function refresh() {
-    return loadFor(connectionId.value);
+  function drop(connId: string) {
+    delete byConnection[connId];
+  }
+
+  function refresh(connId: string) {
+    return ensureLoaded(connId, true);
   }
 
   const nav = useShellNavStore();
+
+  /** Selected connection — for ConnectionHome / QuickSwitcher. */
+  const connectionId = computed(() => nav.selectedConnectionId);
+  const roots = computed(() => {
+    const id = nav.selectedConnectionId;
+    return id ? stateOf(id).roots : [];
+  });
+  const loading = computed(() => {
+    const id = nav.selectedConnectionId;
+    return id ? stateOf(id).loading : false;
+  });
+  const error = computed(() => {
+    const id = nav.selectedConnectionId;
+    return id ? stateOf(id).error : null;
+  });
+  const filter = computed({
+    get: () => {
+      const id = nav.selectedConnectionId;
+      return id ? stateOf(id).filter : "";
+    },
+    set: (v: string) => {
+      const id = nav.selectedConnectionId;
+      if (id) setFilter(id, v);
+    },
+  });
+  const relations = computed(() => relationsOf(roots.value));
+
   watch(
     () => nav.selectedConnectionId,
     (id) => {
-      void loadFor(id);
+      if (id) void ensureLoaded(id);
+    },
+    { immediate: true },
+  );
+
+  watch(
+    () => nav.expandedConnectionIds.slice(),
+    (ids) => {
+      for (const id of ids) void ensureLoaded(id);
     },
     { immediate: true },
   );
 
   return {
+    byConnection,
     connectionId,
     roots,
     relations,
     loading,
     error,
     filter,
+    stateOf,
+    ensureLoaded,
     loadFor,
     toggleExpand,
+    setFilter,
+    drop,
     refresh,
+    relationsOf,
   };
 });

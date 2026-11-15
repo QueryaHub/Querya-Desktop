@@ -6,6 +6,7 @@ import {
   formatConnectionError,
 } from "../api/connection";
 import { DEMO_CONNECTION } from "../mock/demoCatalog";
+import { useFoldersStore } from "./folders";
 import { useShellNavStore } from "./shellNav";
 import { useShellStatusStore } from "./shellStatus";
 
@@ -16,6 +17,8 @@ export type LiveConnection = {
   path: string;
   /** Offline UI demo — no Rust session. */
   mock?: boolean;
+  /** Optional SERVERS folder id. */
+  folderId?: string | null;
 };
 
 function fileName(path: string): string {
@@ -42,14 +45,18 @@ export const useConnectionsStore = defineStore("connections", () => {
   function launchDemo() {
     const nav = useShellNavStore();
     const status = useShellStatusStore();
+    const folders = useFoldersStore();
+    const samples = folders.ensureDemoFolder();
     const conn: LiveConnection = {
       id: DEMO_CONNECTION.id,
       driver: "sqlite",
       name: DEMO_CONNECTION.name,
       path: DEMO_CONNECTION.path,
       mock: true,
+      folderId: samples.id,
     };
     upsert(conn);
+    folders.setExpanded(samples.id, true);
     nav.setExpanded(conn.id, true);
     nav.selectConnection(conn.id);
     status.setConnection(conn.name, "Demo (offline)");
@@ -60,7 +67,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     return conn;
   }
 
-  async function connectSqlite(path: string) {
+  async function connectSqlite(path: string, folderId?: string | null) {
     const status = useShellStatusStore();
     const nav = useShellNavStore();
     status.setQueryMetrics({
@@ -74,6 +81,7 @@ export const useConnectionsStore = defineStore("connections", () => {
         driver: "sqlite",
         name: fileName(path),
         path,
+        folderId: folderId ?? null,
       };
       upsert(conn);
       nav.setExpanded(id, true);
@@ -127,6 +135,19 @@ export const useConnectionsStore = defineStore("connections", () => {
     });
   }
 
+  function moveToFolder(connectionId: string, folderId: string | null) {
+    const conn = items.value.find((c) => c.id === connectionId);
+    if (!conn) return;
+    conn.folderId = folderId;
+  }
+
+  /** Detach all connections from a folder (Flutter: folder delete keeps connections). */
+  function detachFolder(folderId: string) {
+    for (const c of items.value) {
+      if (c.folderId === folderId) c.folderId = null;
+    }
+  }
+
   return {
     items,
     byId,
@@ -134,5 +155,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     connectSqlite,
     disconnect,
     select,
+    moveToFolder,
+    detachFolder,
   };
 });
