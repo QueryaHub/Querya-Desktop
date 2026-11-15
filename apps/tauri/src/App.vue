@@ -7,6 +7,7 @@ import { useShellStore } from "./stores/shell";
 import { useShellStatusStore } from "./stores/shellStatus";
 import { useConnectionsStore } from "./stores/connections";
 import { useShellNavStore } from "./stores/shellNav";
+import { usePreferencesStore } from "./stores/preferences";
 import { initTheme } from "./theme/queryaTheme";
 import { provideQueryaMotion } from "./motion";
 import { buildCoreCommands, type AppCommand } from "./commands/registry";
@@ -27,6 +28,7 @@ const shell = useShellStore();
 const status = useShellStatusStore();
 const connections = useConnectionsStore();
 const nav = useShellNavStore();
+usePreferencesStore(); // hydrate prefs + --q-ui-scale on boot
 const { surface } = storeToRefs(nav);
 
 const prefsOpen = ref(false);

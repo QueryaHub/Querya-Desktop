@@ -8,6 +8,11 @@
   box-sizing: border-box;
 }
 
+html {
+  /* Preferences → Appearance → Interface scale (Flutter ui_scale). */
+  --q-ui-scale: 1;
+}
+
 html,
 body,
 #app {
@@ -27,4 +32,5 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  zoom: var(--q-ui-scale);
 }
