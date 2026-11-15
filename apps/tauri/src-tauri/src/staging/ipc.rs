@@ -88,6 +88,9 @@ pub fn apply_staging_request(
                     .map_err(map_apply_error)
             })
         }),
+        DriverKind::Redis => Err(ConnectionError::UnsupportedDriver {
+            driver: DriverKind::Redis,
+        }),
     }?;
 
     Ok(result)

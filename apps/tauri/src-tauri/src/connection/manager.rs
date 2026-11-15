@@ -3,6 +3,7 @@ use super::id::{ConnectionId, DriverKind};
 use super::mysql::MysqlSession;
 use super::postgres::PostgresSession;
 use super::query::QueryEvent;
+use super::redis::RedisSession;
 use super::sqlite::SqliteSession;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
@@ -42,6 +43,18 @@ pub enum ConnectionConfig {
         #[serde(default)]
         id: Option<String>,
     },
+    Redis {
+        host: String,
+        port: u16,
+        #[serde(default)]
+        password: Option<String>,
+        #[serde(default)]
+        username: Option<String>,
+        #[serde(default)]
+        db: Option<u8>,
+        #[serde(default)]
+        id: Option<String>,
+    },
 }
 
 impl ConnectionConfig {
@@ -50,6 +63,7 @@ impl ConnectionConfig {
             Self::Sqlite { .. } => DriverKind::Sqlite,
             Self::Postgres { .. } => DriverKind::Postgres,
             Self::Mysql { .. } => DriverKind::Mysql,
+            Self::Redis { .. } => DriverKind::Redis,
         }
     }
 }
@@ -91,7 +105,7 @@ impl ConnectionRegistry {
         Self::with_builtin_drivers()
     }
 
-    /// Registry with SQLite + Postgres + MySQL openers.
+    /// Registry with SQLite + Postgres + MySQL + Redis openers.
     pub fn with_builtin_drivers() -> Self {
         Self::with_opener(|config| match config {
             ConnectionConfig::Sqlite { path, id } => {
@@ -135,6 +149,24 @@ impl ConnectionRegistry {
                     database,
                     user,
                     password,
+                    id: id.filter(|s| !s.trim().is_empty()).map(ConnectionId::from),
+                })?;
+                Ok(Arc::new(session) as SessionArc)
+            }
+            ConnectionConfig::Redis {
+                host,
+                port,
+                password,
+                username,
+                db,
+                id,
+            } => {
+                let session = super::redis::open_redis(super::redis::RedisConnectParams {
+                    host,
+                    port,
+                    password,
+                    username,
+                    db,
                     id: id.filter(|s| !s.trim().is_empty()).map(ConnectionId::from),
                 })?;
                 Ok(Arc::new(session) as SessionArc)
@@ -225,6 +257,21 @@ impl ConnectionRegistry {
         f(mysql)
     }
 
+    pub fn with_redis<T>(
+        &self,
+        id: &ConnectionId,
+        f: impl FnOnce(&RedisSession) -> ConnectionResult<T>,
+    ) -> ConnectionResult<T> {
+        let session = self.session_arc(id)?;
+        let redis = session
+            .as_any()
+            .downcast_ref::<RedisSession>()
+            .ok_or(ConnectionError::UnsupportedDriver {
+                driver: session.driver(),
+            })?;
+        f(redis)
+    }
+
     /// Driver-aware query stream (SQLite + Postgres + MySQL).
     ///
     /// `confirmed` must be true for DROP / TRUNCATE / unconditional DELETE|UPDATE
@@ -241,6 +288,9 @@ impl ConnectionRegistry {
         let driver = self
             .driver_of(id)
             .ok_or_else(|| ConnectionError::NotFound { id: id.clone() })?;
+        if matches!(driver, DriverKind::Redis) {
+            return Err(ConnectionError::UnsupportedDriver { driver });
+        }
         super::sql_guard::assert_query_allowed(sql, driver, confirmed)?;
         match driver {
             DriverKind::Sqlite => self.execute_sqlite_query(id, sql, limit, emit),
@@ -248,6 +298,7 @@ impl ConnectionRegistry {
                 self.with_postgres(id, |s| s.execute_streaming(sql, limit, emit))
             }
             DriverKind::Mysql => self.with_mysql(id, |s| s.execute_streaming(sql, limit, emit)),
+            DriverKind::Redis => Err(ConnectionError::UnsupportedDriver { driver }),
         }
     }
 
@@ -302,6 +353,9 @@ impl ConnectionRegistry {
                     mysql.clone_handle(),
                 )))
             }
+            DriverKind::Redis => Err(ConnectionError::UnsupportedDriver {
+                driver: DriverKind::Redis,
+            }),
         }
     }
 
@@ -343,7 +397,12 @@ impl ConnectionRegistry {
                     super::postgres_erd::load_schema(pool, schema, focus, depth)
                 })
             }),
-            other => Err(ConnectionError::UnsupportedDriver { driver: other }),
+            DriverKind::Mysql => Err(ConnectionError::UnsupportedDriver {
+                driver: DriverKind::Mysql,
+            }),
+            DriverKind::Redis => Err(ConnectionError::UnsupportedDriver {
+                driver: DriverKind::Redis,
+            }),
         }
     }
 }

@@ -41,13 +41,14 @@ impl From<&str> for ConnectionId {
     }
 }
 
-/// Driver family wired (or stubbed) in this crate. Redis/Mongo land with their epics.
+/// Driver family wired (or stubbed) in this crate. Mongo lands with its epic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DriverKind {
     Sqlite,
     Postgres,
     Mysql,
+    Redis,
 }
 
 impl DriverKind {
@@ -56,6 +57,7 @@ impl DriverKind {
             Self::Sqlite => "sqlite",
             Self::Postgres => "postgres",
             Self::Mysql => "mysql",
+            Self::Redis => "redis",
         }
     }
 }
