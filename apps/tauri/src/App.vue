@@ -8,6 +8,7 @@ import { useShellStatusStore } from "./stores/shellStatus";
 import { useConnectionsStore } from "./stores/connections";
 import { useShellNavStore } from "./stores/shellNav";
 import { usePreferencesStore } from "./stores/preferences";
+import { useFoldersStore } from "./stores/folders";
 import { initTheme } from "./theme/queryaTheme";
 import { provideQueryaMotion } from "./motion";
 import { buildCoreCommands, type AppCommand } from "./commands/registry";
@@ -23,10 +24,12 @@ import CommandPalette from "./ui/CommandPalette.vue";
 import QuickSwitcher from "./ui/QuickSwitcher.vue";
 import WelcomeTourDialog from "./ui/WelcomeTourDialog.vue";
 import AboutDialog from "./ui/AboutDialog.vue";
+import NewFolderDialog from "./ui/NewFolderDialog.vue";
 
 const shell = useShellStore();
 const status = useShellStatusStore();
 const connections = useConnectionsStore();
+const folders = useFoldersStore();
 const nav = useShellNavStore();
 usePreferencesStore(); // hydrate prefs + --q-ui-scale on boot
 const { surface } = storeToRefs(nav);
@@ -36,6 +39,7 @@ const paletteOpen = ref(false);
 const switcherOpen = ref(false);
 const tourOpen = ref(false);
 const aboutOpen = ref(false);
+const newFolderOpen = ref(false);
 
 provideQueryaMotion();
 
@@ -69,10 +73,22 @@ function onNewConnection() {
 }
 
 function onNewFolder() {
-  status.setQueryMetrics({
-    message: "New folder — LocalDb folders land next",
-    busy: false,
-  });
+  newFolderOpen.value = true;
+}
+
+function onCreateFolder(name: string) {
+  try {
+    folders.create(name);
+    status.setQueryMetrics({
+      message: `Folder “${name}” created`,
+      busy: false,
+    });
+  } catch (err) {
+    status.setQueryMetrics({
+      message: err instanceof Error ? err.message : String(err),
+      busy: false,
+    });
+  }
 }
 
 function onLaunchDemo() {
@@ -226,6 +242,11 @@ onUnmounted(() => {
       @open-preferences="onOpenPreferences"
     />
     <AboutDialog :open="aboutOpen" @close="aboutOpen = false" />
+    <NewFolderDialog
+      :open="newFolderOpen"
+      @close="newFolderOpen = false"
+      @create="onCreateFolder"
+    />
   </div>
 </template>
 

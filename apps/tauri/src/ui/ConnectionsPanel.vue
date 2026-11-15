@@ -2,7 +2,11 @@
 import { computed, onUnmounted, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { useShellStore } from "../stores/shell";
-import { useConnectionsStore } from "../stores/connections";
+import {
+  useConnectionsStore,
+  type LiveConnection,
+} from "../stores/connections";
+import { useFoldersStore } from "../stores/folders";
 import { useShellNavStore } from "../stores/shellNav";
 import {
   filterTree,
@@ -21,27 +25,28 @@ const emit = defineEmits<{
 
 const shell = useShellStore();
 const connections = useConnectionsStore();
+const foldersStore = useFoldersStore();
 const nav = useShellNavStore();
 const tree = useObjectTreeStore();
 const { items } = storeToRefs(connections);
+const { folders } = storeToRefs(foldersStore);
 const { selectedConnectionId, expandedConnectionIds, selectedObject } =
   storeToRefs(nav);
-const { roots, filter: objectFilter, loading, error } = storeToRefs(tree);
 const motion = useQueryaMotion();
 const filter = ref("");
 const dragging = ref(false);
-const ctx = ref({ open: false, x: 0, y: 0 });
 
-const ctxItems: CtxItem[] = [
-  {
-    id: "create",
-    label: "Create",
-    children: [
-      { id: "new-connection", label: "New Connection" },
-      { id: "new-folder", label: "New Folder" },
-    ],
-  },
-];
+type CtxTarget =
+  | { type: "panel" }
+  | { type: "folder"; folderId: string }
+  | { type: "connection"; connectionId: string };
+
+const ctx = ref<{ open: boolean; x: number; y: number; target: CtxTarget }>({
+  open: false,
+  x: 0,
+  y: 0,
+  target: { type: "panel" },
+});
 
 const filteredConnections = computed(() => {
   const q = filter.value.trim().toLowerCase();
@@ -52,9 +57,60 @@ const filteredConnections = computed(() => {
   );
 });
 
-const filteredRoots = computed(() =>
-  filterTree(roots.value, objectFilter.value.trim().toLowerCase()),
+const rootConnections = computed(() =>
+  filteredConnections.value.filter((c) => !c.folderId),
 );
+
+const folderRows = computed(() => {
+  const q = filter.value.trim().toLowerCase();
+  return folders.value
+    .map((f) => {
+      const children = filteredConnections.value.filter(
+        (c) => c.folderId === f.id,
+      );
+      const nameHit = !q || f.name.toLowerCase().includes(q);
+      if (!nameHit && !children.length) return null;
+      return { folder: f, children, forceOpen: Boolean(q) && children.length > 0 };
+    })
+    .filter((row): row is NonNullable<typeof row> => row != null);
+});
+
+const ctxItems = computed<CtxItem[]>(() => {
+  const t = ctx.value.target;
+  if (t.type === "folder") {
+    return [
+      { id: "new-connection", label: "New Connection" },
+      { id: "remove-folder", label: "Remove folder" },
+    ];
+  }
+  if (t.type === "connection") {
+    const moveKids: CtxItem[] = [
+      { id: "move-root", label: "No folder" },
+      ...folders.value.map((f) => ({
+        id: `move:${f.id}`,
+        label: f.name,
+      })),
+    ];
+    return [
+      { id: "disconnect", label: "Disconnect" },
+      {
+        id: "move",
+        label: "Move to folder",
+        children: moveKids,
+      },
+    ];
+  }
+  return [
+    {
+      id: "create",
+      label: "Create",
+      children: [
+        { id: "new-connection", label: "New Connection" },
+        { id: "new-folder", label: "New Folder" },
+      ],
+    },
+  ];
+});
 
 const panelStyle = computed(() => ({
   width: shell.sidebarOpen ? `${shell.sidebarWidth}px` : "0px",
@@ -89,14 +145,19 @@ function onConnClick(id: string) {
 function onConnExpand(id: string, e: MouseEvent) {
   e.stopPropagation();
   nav.toggleExpanded(id);
-  connections.select(id);
+  void tree.ensureLoaded(id);
 }
 
-function onRelationClick(node: TreeUiNode) {
-  const id = selectedConnectionId.value;
-  if (!id || (node.kind !== "table" && node.kind !== "view")) return;
+function onFolderExpand(id: string, e: MouseEvent) {
+  e.stopPropagation();
+  foldersStore.toggleExpanded(id);
+}
+
+function onRelationClick(connectionId: string, node: TreeUiNode) {
+  if (node.kind !== "table" && node.kind !== "view") return;
+  connections.select(connectionId);
   nav.selectObject({
-    connectionId: id,
+    connectionId,
     name: node.name,
     kind: node.kind,
     objectId: node.id,
@@ -104,22 +165,53 @@ function onRelationClick(node: TreeUiNode) {
   });
 }
 
-function onNodeChevron(node: TreeUiNode, e: MouseEvent) {
+function onNodeChevron(connectionId: string, node: TreeUiNode, e: MouseEvent) {
   e.stopPropagation();
-  void tree.toggleExpand(node.id);
+  void tree.toggleExpand(connectionId, node.id);
+}
+
+function openCtx(e: MouseEvent, target: CtxTarget) {
+  e.preventDefault();
+  e.stopPropagation();
+  ctx.value = { open: true, x: e.clientX, y: e.clientY, target };
 }
 
 function onPanelContext(e: MouseEvent) {
-  // Only empty fill / panel chrome — not rows (they get their own menus later).
   const t = e.target as HTMLElement | null;
-  if (t?.closest(".conn-row, .node-row, .cols, input, button")) return;
-  e.preventDefault();
-  ctx.value = { open: true, x: e.clientX, y: e.clientY };
+  if (t?.closest(".conn-row, .folder-row, .node-row, .cols, input, button"))
+    return;
+  openCtx(e, { type: "panel" });
 }
 
 function onCtxSelect(id: string) {
+  const t = ctx.value.target;
   if (id === "new-connection") emit("newConnection");
   else if (id === "new-folder") emit("newFolder");
+  else if (id === "remove-folder" && t.type === "folder") {
+    connections.detachFolder(t.folderId);
+    foldersStore.remove(t.folderId);
+  } else if (id === "disconnect" && t.type === "connection") {
+    void connections.disconnect(t.connectionId);
+    tree.drop(t.connectionId);
+  } else if (id === "move-root" && t.type === "connection") {
+    connections.moveToFolder(t.connectionId, null);
+  } else if (id.startsWith("move:") && t.type === "connection") {
+    connections.moveToFolder(t.connectionId, id.slice(5));
+  }
+}
+
+function treeState(connId: string) {
+  return tree.stateOf(connId);
+}
+
+function filteredRootsFor(connId: string) {
+  const st = tree.stateOf(connId);
+  return filterTree(st.roots, st.filter.trim().toLowerCase());
+}
+
+function driverGlyph(c: LiveConnection): string {
+  if (c.mock) return "◈";
+  return "▤";
 }
 
 onUnmounted(() => {
@@ -152,17 +244,142 @@ onUnmounted(() => {
       </div>
 
       <div class="body">
-        <p v-if="!filteredConnections.length" class="empty-title">
+        <p v-if="!filteredConnections.length && !folderRows.length" class="empty-title">
           {{ filter ? `No connections match "${filter}"` : "No connections yet" }}
         </p>
 
-        <ul
-          v-else
-          class="list"
-          data-testid="connections-list"
-        >
+        <ul v-else class="list" data-testid="connections-list">
+          <!-- Folders -->
           <li
-            v-for="c in filteredConnections"
+            v-for="row in folderRows"
+            :key="row.folder.id"
+            class="folder"
+            :class="{ expanded: row.folder.expanded || row.forceOpen }"
+          >
+            <div
+              class="folder-row"
+              @contextmenu="openCtx($event, { type: 'folder', folderId: row.folder.id })"
+            >
+              <button
+                type="button"
+                class="chev"
+                :aria-expanded="row.folder.expanded || row.forceOpen"
+                :aria-label="`Expand ${row.folder.name}`"
+                @click="onFolderExpand(row.folder.id, $event)"
+              >
+                {{ row.folder.expanded || row.forceOpen ? "▾" : "▸" }}
+              </button>
+              <span class="folder-ico" aria-hidden="true">▣</span>
+              <span class="folder-name">{{ row.folder.name }}</span>
+              <span class="count-sm">{{ row.children.length }}</span>
+            </div>
+
+            <ul
+              v-if="row.folder.expanded || row.forceOpen"
+              class="folder-kids"
+            >
+              <li
+                v-for="c in row.children"
+                :key="c.id"
+                class="conn"
+                :class="{
+                  active: c.id === selectedConnectionId && !selectedObject,
+                  expanded: expandedConnectionIds.includes(c.id),
+                }"
+              >
+                <div
+                  class="conn-row"
+                  @contextmenu="
+                    openCtx($event, { type: 'connection', connectionId: c.id })
+                  "
+                >
+                  <button
+                    type="button"
+                    class="chev"
+                    :aria-expanded="expandedConnectionIds.includes(c.id)"
+                    :aria-label="`Expand ${c.name}`"
+                    @click="onConnExpand(c.id, $event)"
+                  >
+                    {{ expandedConnectionIds.includes(c.id) ? "▾" : "▸" }}
+                  </button>
+                  <button
+                    type="button"
+                    class="conn-main"
+                    @click="onConnClick(c.id)"
+                  >
+                    <span class="glyph" aria-hidden="true">{{
+                      driverGlyph(c)
+                    }}</span>
+                    <span class="conn-name">{{ c.name }}</span>
+                    <span class="conn-meta">
+                      {{ c.driver
+                      }}<template v-if="c.mock"> · demo</template>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="conn-x"
+                    :aria-label="`Remove ${c.name}`"
+                    @click.stop="
+                      connections.disconnect(c.id);
+                      tree.drop(c.id);
+                    "
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div
+                  v-if="expandedConnectionIds.includes(c.id)"
+                  class="tree"
+                  data-testid="sqlite-object-tree"
+                >
+                  <div class="tree-header">
+                    <span class="tree-label">OBJECTS</span>
+                    <button
+                      type="button"
+                      class="refresh"
+                      aria-label="Refresh"
+                      @click="tree.refresh(c.id)"
+                    >
+                      ↻
+                    </button>
+                  </div>
+                  <input
+                    class="filter"
+                    type="search"
+                    placeholder="Filter objects…"
+                    aria-label="Filter objects"
+                    :value="treeState(c.id).filter"
+                    @input="
+                      tree.setFilter(
+                        c.id,
+                        ($event.target as HTMLInputElement).value,
+                      )
+                    "
+                  />
+                  <p v-if="treeState(c.id).loading" class="hint">Loading…</p>
+                  <p v-else-if="treeState(c.id).error" class="hint err">
+                    {{ treeState(c.id).error }}
+                  </p>
+                  <ul v-else class="nodes">
+                    <SqlObjectTreeNodes
+                      :nodes="filteredRootsFor(c.id)"
+                      :connection-id="c.id"
+                      :selected-object="selectedObject"
+                      :depth="0"
+                      @toggle="(n, e) => onNodeChevron(c.id, n, e)"
+                      @select-relation="(n) => onRelationClick(c.id, n)"
+                    />
+                  </ul>
+                </div>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Root connections (no folder) -->
+          <li
+            v-for="c in rootConnections"
             :key="c.id"
             class="conn"
             :class="{
@@ -170,7 +387,12 @@ onUnmounted(() => {
               expanded: expandedConnectionIds.includes(c.id),
             }"
           >
-            <div class="conn-row">
+            <div
+              class="conn-row"
+              @contextmenu="
+                openCtx($event, { type: 'connection', connectionId: c.id })
+              "
+            >
               <button
                 type="button"
                 class="chev"
@@ -185,6 +407,9 @@ onUnmounted(() => {
                 class="conn-main"
                 @click="onConnClick(c.id)"
               >
+                <span class="glyph" aria-hidden="true">{{
+                  driverGlyph(c)
+                }}</span>
                 <span class="conn-name">{{ c.name }}</span>
                 <span class="conn-meta">
                   {{ c.driver }}<template v-if="c.mock"> · demo</template>
@@ -194,14 +419,17 @@ onUnmounted(() => {
                 type="button"
                 class="conn-x"
                 :aria-label="`Remove ${c.name}`"
-                @click.stop="connections.disconnect(c.id)"
+                @click.stop="
+                  connections.disconnect(c.id);
+                  tree.drop(c.id);
+                "
               >
                 ×
               </button>
             </div>
 
             <div
-              v-if="expandedConnectionIds.includes(c.id) && c.id === selectedConnectionId"
+              v-if="expandedConnectionIds.includes(c.id)"
               class="tree"
               data-testid="sqlite-object-tree"
             >
@@ -211,28 +439,36 @@ onUnmounted(() => {
                   type="button"
                   class="refresh"
                   aria-label="Refresh"
-                  @click="tree.refresh()"
+                  @click="tree.refresh(c.id)"
                 >
                   ↻
                 </button>
               </div>
               <input
-                v-model="objectFilter"
                 class="filter"
                 type="search"
                 placeholder="Filter objects…"
                 aria-label="Filter objects"
+                :value="treeState(c.id).filter"
+                @input="
+                  tree.setFilter(
+                    c.id,
+                    ($event.target as HTMLInputElement).value,
+                  )
+                "
               />
-              <p v-if="loading" class="hint">Loading…</p>
-              <p v-else-if="error" class="hint err">{{ error }}</p>
-              <ul v-else class="nodes" data-testid="sql-object-tree-roots">
+              <p v-if="treeState(c.id).loading" class="hint">Loading…</p>
+              <p v-else-if="treeState(c.id).error" class="hint err">
+                {{ treeState(c.id).error }}
+              </p>
+              <ul v-else class="nodes">
                 <SqlObjectTreeNodes
-                  :nodes="filteredRoots"
+                  :nodes="filteredRootsFor(c.id)"
                   :connection-id="c.id"
                   :selected-object="selectedObject"
                   :depth="0"
-                  @toggle="onNodeChevron"
-                  @select-relation="onRelationClick"
+                  @toggle="(n, e) => onNodeChevron(c.id, n, e)"
+                  @select-relation="(n) => onRelationClick(c.id, n)"
                 />
               </ul>
             </div>
@@ -288,20 +524,17 @@ onUnmounted(() => {
 
 .servers-label,
 .tree-label {
-  font-family: var(--q-font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.85px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   color: var(--q-muted-foreground);
 }
 
-.count {
-  font-size: 11px;
+.count,
+.count-sm {
+  font-size: 10px;
   color: var(--q-muted-foreground);
-  background: var(--q-accent);
-  border-radius: 999px;
-  padding: 0 6px;
-  line-height: 18px;
+  font-variant-numeric: tabular-nums;
 }
 
 .filter-row {
@@ -310,9 +543,9 @@ onUnmounted(() => {
 
 .filter {
   width: 100%;
-  height: var(--q-control-h-sm);
-  border: 1px solid var(--q-border);
-  border-radius: var(--q-radius-control);
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--q-border) 70%, transparent);
   background: var(--q-surface);
   color: var(--q-foreground);
   padding: 0 8px;
@@ -320,102 +553,115 @@ onUnmounted(() => {
   font-size: 12px;
 }
 
-.filter:focus {
-  outline: 2px solid color-mix(in srgb, var(--q-primary) 45%, transparent);
-  outline-offset: 0;
-}
-
 .body {
   flex: 1;
-  padding: 4px 8px 16px;
+  min-height: 0;
   overflow: auto;
+  padding: 0 6px 12px;
 }
 
 .empty-title {
-  margin: 12px 4px 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--q-muted-foreground);
-}
-
-.hint {
-  margin: 6px 4px 0;
+  margin: 16px 8px;
   font-size: 12px;
   color: var(--q-muted-foreground);
-  line-height: 1.4;
 }
 
-.hint.err,
-.col.err {
-  color: var(--q-danger, #c44);
-}
-
-.list {
+.list,
+.folder-kids,
+.nodes {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
+.folder-row,
 .conn-row {
   display: flex;
   align-items: center;
   gap: 2px;
   border-radius: var(--q-radius-control);
+  padding-right: 2px;
 }
 
+.folder-row:hover,
 .conn.active > .conn-row {
-  background: color-mix(in srgb, var(--q-primary) 16%, transparent);
+  background: color-mix(in srgb, var(--q-primary) 10%, transparent);
+}
+
+.folder-ico {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.folder-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chev {
+  width: 18px;
+  flex: 0 0 18px;
   appearance: none;
   border: 0;
   background: transparent;
-  width: 1.25rem;
-  height: 1.5rem;
   color: var(--q-muted-foreground);
   cursor: pointer;
   font-size: 10px;
-  flex-shrink: 0;
+  line-height: 1;
+  padding: 0;
 }
 
-.chev.sm {
-  width: 1rem;
-}
-
-.conn-main,
-.node-main {
+.conn-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
   appearance: none;
   border: 0;
   background: transparent;
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-  padding: 6px 6px;
-  cursor: pointer;
   color: var(--q-foreground);
   font: inherit;
-  font-size: 12px;
+  text-align: left;
+  padding: 5px 6px;
   border-radius: var(--q-radius-control);
+  cursor: pointer;
+  position: relative;
 }
 
-.conn-main:hover,
-.node-main:hover {
+.conn-main .glyph {
+  position: absolute;
+  left: 6px;
+  top: 8px;
+  font-size: 10px;
+  color: var(--q-muted-foreground);
+}
+
+.conn-main .conn-name,
+.conn-main .conn-meta {
+  padding-left: 16px;
+}
+
+.conn-main:hover {
   background: var(--q-accent);
 }
 
-.conn-name,
-.name {
+.conn-name {
   display: block;
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
+  font-size: 12px;
 }
 
-.conn-meta,
-.kind,
-.type {
+.conn-meta {
   display: block;
   font-size: 10px;
   color: var(--q-muted-foreground);
@@ -440,11 +686,16 @@ onUnmounted(() => {
   color: var(--q-foreground);
 }
 
+.folder-kids {
+  margin: 0 0 4px 6px;
+  padding-left: 4px;
+  border-left: 1px solid color-mix(in srgb, var(--q-border) 45%, transparent);
+}
+
 .tree {
   margin: 2px 0 8px 6px;
   padding: 6px 0 4px 6px;
-  border-left: 1px solid
-    color-mix(in srgb, var(--q-border) 55%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--q-border) 55%, transparent);
 }
 
 .tree-header {
@@ -454,45 +705,21 @@ onUnmounted(() => {
   margin-bottom: 4px;
 }
 
-.nodes,
-.cols {
-  list-style: none;
-  margin: 6px 0 0;
-  padding: 0;
+.tree .filter {
+  margin-bottom: 4px;
 }
 
-.node-row {
-  display: flex;
-  align-items: center;
-  border-radius: var(--q-radius-control);
-}
-
-.node-row.selected {
-  background: color-mix(in srgb, var(--q-primary) 14%, transparent);
-}
-
-.cols {
-  padding: 0 0 4px 1rem;
-}
-
-.col {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 2px 6px;
+.hint {
+  margin: 6px 4px;
   font-size: 11px;
-}
-
-.col.muted {
   color: var(--q-muted-foreground);
 }
 
-.pk {
-  margin-left: 4px;
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--q-primary);
-  font-family: var(--q-font-mono);
+.hint.err {
+  color: var(--q-destructive);
 }
 
+.nodes {
+  margin: 4px 0 0;
+}
 </style>
