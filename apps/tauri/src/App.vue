@@ -11,6 +11,7 @@ import {
   provideQueryaMotion,
   type QueryaMotionLevel,
 } from "./motion";
+import QueryaGlass from "./ui/QueryaGlass.vue";
 
 const shell = useShellStore();
 const motion = provideQueryaMotion();
@@ -144,6 +145,13 @@ function setMotion(level: QueryaMotionLevel) {
       :style="panelStyle"
       data-testid="motion-demo-panel"
     />
+
+    <QueryaGlass class="glass-demo" data-testid="glass-demo">
+      <p class="glass-title">Liquid Glass</p>
+      <p class="glass-copy">
+        backdrop-filter material · softer on Win/Linux · solid when blur is off
+      </p>
+    </QueryaGlass>
   </div>
 </template>
 
@@ -258,5 +266,24 @@ function setMotion(level: QueryaMotionLevel) {
 .demo-panel.open {
   height: 3rem;
   opacity: 1;
+}
+
+.glass-demo {
+  margin-top: var(--q-space-6);
+  padding: var(--q-space-4) var(--q-space-6);
+  max-width: 22rem;
+  text-align: left;
+}
+
+.glass-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--q-foreground);
+}
+
+.glass-copy {
+  margin: var(--q-space-1) 0 0;
+  font-size: var(--q-text-sm);
+  color: var(--q-muted-foreground);
 }
 </style>
