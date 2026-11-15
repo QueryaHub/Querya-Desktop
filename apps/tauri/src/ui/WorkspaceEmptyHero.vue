@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useConnectionsStore } from "../stores/connections";
+import QueryaButton from "./QueryaButton.vue";
 
 const emit = defineEmits<{
   newConnection: [];
@@ -20,38 +21,38 @@ const recents = computed(() => connections.items.slice(0, 5));
     <h1 class="brand">Querya</h1>
     <p class="lead">Connect to a database to start exploring.</p>
     <div class="actions">
-      <button
-        type="button"
-        class="btn primary"
+      <QueryaButton
+        variant="primary"
+        size="lg"
         data-testid="hero-new-connection"
         @click="emit('newConnection')"
       >
         New connection
-      </button>
-      <button
-        type="button"
-        class="btn"
+      </QueryaButton>
+      <QueryaButton
+        variant="secondary"
+        size="lg"
         data-testid="hero-open-sqlite"
         @click="emit('openSqlite')"
       >
         Open SQLite file…
-      </button>
-      <button
-        type="button"
-        class="btn"
+      </QueryaButton>
+      <QueryaButton
+        variant="secondary"
+        size="lg"
         data-testid="hero-demo"
         @click="emit('launchDemo')"
       >
         Demo
-      </button>
-      <button
-        type="button"
-        class="btn ghost"
+      </QueryaButton>
+      <QueryaButton
+        variant="ghost"
+        size="lg"
         data-testid="hero-tour"
         @click="emit('openTour')"
       >
         Welcome tour
-      </button>
+      </QueryaButton>
     </div>
 
     <section v-if="recents.length" class="recents" data-testid="hero-recents">
@@ -109,37 +110,6 @@ const recents = computed(() => connections.items.slice(0, 5));
   justify-content: center;
   gap: 8px;
   margin-top: var(--q-space-4);
-}
-
-.btn {
-  appearance: none;
-  height: var(--q-control-h);
-  padding: 0 14px;
-  border: 1px solid var(--q-border);
-  border-radius: var(--q-radius-control);
-  background: var(--q-surface);
-  color: var(--q-foreground);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.btn:hover {
-  background: var(--q-accent);
-}
-
-.btn.primary {
-  background: var(--q-primary);
-  border-color: transparent;
-  color: var(--q-primary-foreground);
-}
-
-.btn.primary:hover {
-  filter: brightness(1.05);
-}
-
-.btn.ghost {
-  background: transparent;
 }
 
 .recents {

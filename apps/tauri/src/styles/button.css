@@ -1,0 +1,167 @@
+/**
+ * QueryaButton — one control, four variants, three sizes (Flutter ui-kit).
+ * Prefer <QueryaButton> / class="q-btn q-btn--*" over local .btn copies.
+ */
+
+:root {
+  --q-btn-radius: var(--q-radius-control);
+  --q-btn-h-sm: var(--q-control-h-sm);
+  --q-btn-h-md: var(--q-control-h-md);
+  --q-btn-h-lg: var(--q-control-h-lg);
+  --q-btn-pad-sm: 8px;
+  --q-btn-pad-md: 12px;
+  --q-btn-pad-lg: 16px;
+  --q-btn-font-sm: 12px;
+  --q-btn-font-md: 13px;
+  --q-btn-font-lg: 14px;
+}
+
+a.q-btn {
+  text-decoration: none;
+}
+
+.q-btn {
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--q-btn-h-md);
+  padding: 0 var(--q-btn-pad-md);
+  border-radius: var(--q-btn-radius);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--q-foreground);
+  font: inherit;
+  font-size: var(--q-btn-font-md);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease,
+    filter 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.q-btn:focus-visible {
+  outline: 2px solid var(--q-ring);
+  outline-offset: 2px;
+}
+
+.q-btn:disabled,
+.q-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Sizes — Flutter QueryaControlSize */
+.q-btn--sm {
+  height: var(--q-btn-h-sm);
+  padding: 0 var(--q-btn-pad-sm);
+  font-size: var(--q-btn-font-sm);
+  gap: 6px;
+}
+
+.q-btn--md {
+  height: var(--q-btn-h-md);
+  padding: 0 var(--q-btn-pad-md);
+  font-size: var(--q-btn-font-md);
+}
+
+.q-btn--lg {
+  height: var(--q-btn-h-lg);
+  padding: 0 var(--q-btn-pad-lg);
+  font-size: var(--q-btn-font-lg);
+  gap: 8px;
+}
+
+/* primary — filled accent */
+.q-btn--primary {
+  background: var(--q-primary);
+  border-color: transparent;
+  color: var(--q-primary-foreground);
+  font-weight: 600;
+}
+
+.q-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+/* secondary — outlined neutral (default .btn in old dialogs) */
+.q-btn--secondary {
+  background: var(--q-surface);
+  border-color: var(--q-border);
+  color: var(--q-foreground);
+}
+
+.q-btn--secondary:hover:not(:disabled) {
+  background: var(--q-accent);
+}
+
+.q-btn--secondary.q-btn--tone-destructive {
+  border-color: color-mix(in srgb, var(--q-destructive) 55%, var(--q-border));
+  color: var(--q-destructive);
+}
+
+.q-btn--secondary.q-btn--tone-destructive:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--q-destructive) 12%, transparent);
+}
+
+/* ghost — no fill, no outline (Cancel / Back / tertiary) */
+.q-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--q-foreground);
+  font-weight: 500;
+}
+
+.q-btn--ghost:hover:not(:disabled) {
+  background: var(--q-accent);
+}
+
+.q-btn--ghost.q-btn--tone-destructive {
+  color: var(--q-destructive);
+}
+
+.q-btn--ghost.q-btn--tone-destructive:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--q-destructive) 12%, transparent);
+}
+
+/* destructive — filled red */
+.q-btn--destructive {
+  background: var(--q-destructive);
+  border-color: transparent;
+  color: var(--q-destructive-foreground);
+  font-weight: 600;
+}
+
+.q-btn--destructive:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+/* icon-only square */
+.q-btn--icon {
+  width: var(--q-btn-h-md);
+  padding: 0;
+}
+
+.q-btn--icon.q-btn--sm {
+  width: var(--q-btn-h-sm);
+}
+
+.q-btn--icon.q-btn--lg {
+  width: var(--q-btn-h-lg);
+}
+
+.q-btn--active:not(.q-btn--primary):not(.q-btn--destructive) {
+  background: color-mix(in srgb, var(--q-primary) 16%, transparent);
+  color: var(--q-primary);
+}

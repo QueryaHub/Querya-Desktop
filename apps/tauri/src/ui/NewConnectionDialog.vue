@@ -3,6 +3,7 @@ import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 // Must not be named `open` — it would shadow the `open` prop/model in the
 // template and make `v-if="open"` always truthy (Save connected, dialog stuck).
 import { open as pickSqliteFile } from "@tauri-apps/plugin-dialog";
+import QueryaButton from "./QueryaButton.vue";
 
 export type BuiltInDriverId =
   | "postgresql"
@@ -348,17 +349,17 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
       </div>
 
       <footer>
-        <button type="button" class="btn ghost" @click="dismiss">
+        <QueryaButton variant="ghost" size="lg" @click="dismiss">
           Cancel
-        </button>
-        <button
-          type="button"
-          class="btn primary"
+        </QueryaButton>
+        <QueryaButton
+          variant="primary"
+          size="lg"
           :disabled="!canNext"
           @click="goNext"
         >
           Next
-        </button>
+        </QueryaButton>
       </footer>
     </div>
 
@@ -395,9 +396,9 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
               placeholder="/path/to/database.db"
               spellcheck="false"
             />
-            <button type="button" class="btn" @click="browseSqlite">
+            <QueryaButton variant="secondary" size="lg" @click="browseSqlite">
               Browse…
-            </button>
+            </QueryaButton>
           </div>
         </label>
         <label class="switch">
@@ -408,18 +409,20 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
       </div>
 
       <footer>
-        <button type="button" class="btn ghost" @click="goBack">Back</button>
-        <button type="button" class="btn ghost" @click="dismiss">
+        <QueryaButton variant="ghost" size="lg" @click="goBack">
+          Back
+        </QueryaButton>
+        <QueryaButton variant="ghost" size="lg" @click="dismiss">
           Cancel
-        </button>
-        <button
-          type="button"
-          class="btn primary"
+        </QueryaButton>
+        <QueryaButton
+          variant="primary"
+          size="lg"
           :disabled="!canSaveSqlite"
           @click="submitSqlite"
         >
           Save
-        </button>
+        </QueryaButton>
       </footer>
     </div>
 
@@ -454,10 +457,12 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
         </p>
       </div>
       <footer>
-        <button type="button" class="btn ghost" @click="goBack">Back</button>
-        <button type="button" class="btn primary" @click="dismiss">
+        <QueryaButton variant="ghost" size="lg" @click="goBack">
+          Back
+        </QueryaButton>
+        <QueryaButton variant="primary" size="lg" @click="dismiss">
           Close
-        </button>
+        </QueryaButton>
       </footer>
     </div>
   </div>
@@ -770,45 +775,4 @@ footer {
   border-top: 1px solid color-mix(in srgb, var(--q-border) 30%, transparent);
 }
 
-.btn {
-  appearance: none;
-  height: 36px;
-  padding: 0 16px;
-  border-radius: 8px;
-  border: 1px solid var(--q-border);
-  background: var(--q-surface);
-  color: var(--q-foreground);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.btn:hover:not(:disabled) {
-  background: var(--q-accent);
-}
-
-.btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.btn.ghost {
-  border-color: transparent;
-  background: transparent;
-}
-
-.btn.ghost:hover:not(:disabled) {
-  background: var(--q-accent);
-}
-
-.btn.primary {
-  background: var(--q-primary);
-  border-color: transparent;
-  color: var(--q-primary-foreground);
-}
-
-.btn.primary:hover:not(:disabled) {
-  filter: brightness(1.06);
-}
 </style>

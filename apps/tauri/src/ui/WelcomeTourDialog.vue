@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import QueryaButton from "./QueryaButton.vue";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{
@@ -101,26 +102,21 @@ onUnmounted(() => window.removeEventListener("keydown", onKey));
         />
       </div>
       <footer class="foot">
-        <button
+        <QueryaButton
           v-if="index === slides.length - 2 || isLast"
-          type="button"
-          class="ghost"
+          variant="ghost"
+          size="md"
           @click="emit('launchDemo'); emit('close')"
         >
           Launch Demo
-        </button>
+        </QueryaButton>
         <div class="spacer" />
-        <button
-          v-if="index > 0"
-          type="button"
-          class="ghost"
-          @click="back"
-        >
+        <QueryaButton v-if="index > 0" variant="ghost" size="md" @click="back">
           Back
-        </button>
-        <button type="button" class="primary" @click="next">
+        </QueryaButton>
+        <QueryaButton variant="primary" size="md" @click="next">
           {{ isLast ? "Done" : "Next" }}
-        </button>
+        </QueryaButton>
       </footer>
     </div>
   </div>
@@ -216,31 +212,4 @@ h2 {
   flex: 1;
 }
 
-.primary,
-.ghost {
-  appearance: none;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: var(--q-radius-control);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.primary {
-  border: 0;
-  background: var(--q-primary);
-  color: var(--q-primary-foreground);
-  font-weight: 600;
-}
-
-.ghost {
-  border: 1px solid var(--q-border);
-  background: transparent;
-  color: var(--q-foreground);
-}
-
-.ghost:hover {
-  background: var(--q-accent);
-}
 </style>
