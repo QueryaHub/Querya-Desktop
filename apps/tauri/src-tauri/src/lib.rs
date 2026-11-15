@@ -2,6 +2,7 @@ mod commands;
 mod connection;
 mod profiles;
 mod secrets;
+mod staging;
 
 pub use connection::{
     ColumnMeta, ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager,
@@ -11,6 +12,7 @@ pub use connection::{
 };
 pub use profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 pub use secrets::{KeyringSecretStore, MemorySecretStore, SecretError, SecretStore, SharedSecretStore};
+pub use staging::{StagedCellStatus, StagedRowStatus, StagingBuffer, NULL_SENTINEL};
 
 use commands::{
     db_connect_mysql, db_connect_postgres, db_connect_sqlite, db_describe_object, db_disconnect,
