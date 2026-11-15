@@ -484,16 +484,22 @@ pub fn db_erd_schema(
 
 /// Execute SQL and stream `QueryEvent` batches over `on_event`.
 /// Failures return as the invoke `Err` only (no dual channel `Error` event).
+///
+/// Pass `confirmed: true` after the UI acknowledged a
+/// [`ConnectionError::NeedsConfirmation`] for DROP / TRUNCATE / unconditional
+/// DELETE|UPDATE.
 #[tauri::command]
 pub fn db_execute_query(
     id: ConnectionId,
     sql: String,
     limit: Option<u32>,
+    confirmed: Option<bool>,
     on_event: Channel<crate::connection::QueryEvent>,
     registry: State<'_, ConnectionRegistry>,
 ) -> Result<(), ConnectionError> {
     let limit = limit.map(|n| n as usize);
-    registry.execute_query(&id, &sql, limit, |ev| {
+    let confirmed = confirmed.unwrap_or(false);
+    registry.execute_query(&id, &sql, limit, confirmed, |ev| {
         on_event
             .send(ev)
             .map_err(|e| ConnectionError::io(format!("query channel closed: {e}")))

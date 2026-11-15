@@ -18,6 +18,12 @@ pub enum ConnectionError {
         rule: super::sql_guard::SqlGuardRule,
         message: String,
     },
+    /// Dangerous DML/DDL needs an explicit UI confirm flag before execute.
+    NeedsConfirmation {
+        #[serde(rename = "danger")]
+        kind: super::sql_guard::DangerousSqlKind,
+        message: String,
+    },
 }
 
 impl ConnectionError {
@@ -49,6 +55,16 @@ impl ConnectionError {
             message: message.into(),
         }
     }
+
+    pub fn needs_confirmation(
+        kind: super::sql_guard::DangerousSqlKind,
+        message: impl Into<String>,
+    ) -> Self {
+        Self::NeedsConfirmation {
+            kind,
+            message: message.into(),
+        }
+    }
 }
 
 impl fmt::Display for ConnectionError {
@@ -67,6 +83,9 @@ impl fmt::Display for ConnectionError {
             }
             Self::SqlGuard { rule, message } => {
                 write!(f, "sql guard ({}): {message}", rule.as_str())
+            }
+            Self::NeedsConfirmation { kind, message } => {
+                write!(f, "needs confirmation ({}): {message}", kind.as_str())
             }
         }
     }
