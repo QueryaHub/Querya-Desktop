@@ -4,10 +4,15 @@ import { storeToRefs } from "pinia";
 import { useShellNavStore } from "../stores/shellNav";
 import { useConnectionsStore } from "../stores/connections";
 import { useQueryResultStore } from "../stores/queryResult";
+import { useGridStagingStore } from "../stores/gridStaging";
 import { useShellStatusStore } from "../stores/shellStatus";
 import { findDemoObject } from "../mock/demoCatalog";
 import { dbExecuteQuery } from "../api/query";
-import { formatConnectionError } from "../api/connection";
+import {
+  dbDescribeObject,
+  dbListColumns,
+  formatConnectionError,
+} from "../api/connection";
 import ResultGrid from "./ResultGrid.vue";
 import { QueryaIcon } from "./icons";
 import ErdView from "./erd/ErdView.vue";
@@ -15,6 +20,7 @@ import ErdView from "./erd/ErdView.vue";
 const nav = useShellNavStore();
 const connections = useConnectionsStore();
 const query = useQueryResultStore();
+const staging = useGridStagingStore();
 const status = useShellStatusStore();
 const { selectedObject, objectTab } = storeToRefs(nav);
 const { columns, running, error, rowCount } = storeToRefs(query);
@@ -24,12 +30,31 @@ const conn = computed(() => {
   return id ? (connections.byId.get(id) ?? null) : null;
 });
 
+async function resolvePrimaryKeys(
+  connectionId: string,
+  tableName: string,
+  objectId?: string,
+): Promise<string[]> {
+  try {
+    if (objectId) {
+      const schema = await dbDescribeObject(connectionId, objectId);
+      return schema.primary_keys ?? [];
+    }
+    const schema = await dbListColumns(connectionId, tableName);
+    return schema.primary_keys ?? [];
+  } catch {
+    return [];
+  }
+}
+
 async function loadTableData() {
   const obj = selectedObject.value;
   const c = conn.value;
   if (!obj || !c) return;
 
   query.reset();
+  staging.setTarget(null);
+
   if (c.mock) {
     const demo = findDemoObject(obj.name);
     if (!demo) {
@@ -40,6 +65,15 @@ async function loadTableData() {
       });
       return;
     }
+    const pks = demo.columns
+      .filter((col) => col.name === "id")
+      .map((col) => col.name);
+    staging.setTarget({
+      connectionId: c.id,
+      tableName: obj.name,
+      schema: obj.schema ?? null,
+      primaryKeys: pks,
+    });
     query.setSnapshot({
       columns: demo.columns.map((col) => col.name),
       rows: demo.rows,
@@ -51,6 +85,13 @@ async function loadTableData() {
   query.running = true;
   status.setQueryMetrics({ message: `Loading ${obj.name}…`, busy: true });
   try {
+    const pks = await resolvePrimaryKeys(c.id, obj.name, obj.objectId);
+    staging.setTarget({
+      connectionId: c.id,
+      tableName: obj.name,
+      schema: obj.schema ?? null,
+      primaryKeys: pks,
+    });
     const ident = (s: string) => `"${s.replace(/"/g, '""')}"`;
     const sql =
       (c.driver === "postgres" || c.driver === "mysql") && obj.schema
@@ -72,6 +113,10 @@ async function loadTableData() {
   } finally {
     query.running = false;
   }
+}
+
+function onStagingApplied() {
+  void loadTableData();
 }
 
 watch(
@@ -137,7 +182,7 @@ watch(
         </template>
       </div>
       <div v-if="!error && columns.length" class="grid-host">
-        <ResultGrid />
+        <ResultGrid @applied="onStagingApplied" />
       </div>
       <p v-else-if="!running && !error" class="empty">No rows</p>
     </div>

@@ -28,6 +28,8 @@ export type ResultDataEditorProps = {
   cellStatus?: (row: number, col: number) => StagedCellStatus;
   rowStatus?: (row: number) => StagedRowStatus;
   onCellEdited?: (row: number, col: number, value: string) => void;
+  /** Fired when the user activates a row (click). */
+  onRowActivated?: (row: number) => void;
 };
 
 function cellText(value: unknown): string {
@@ -50,6 +52,7 @@ export function ResultDataEditor(props: ResultDataEditorProps): ReactElement {
     cellStatus,
     rowStatus,
     onCellEdited,
+    onRowActivated,
   } = props;
 
   const gridColumns = useMemo(
@@ -131,12 +134,20 @@ export function ResultDataEditor(props: ResultDataEditorProps): ReactElement {
     [onCellEdited, editable],
   );
 
+  const handleCellClicked = useCallback(
+    (cell: Item) => {
+      onRowActivated?.(cell[1]);
+    },
+    [onRowActivated],
+  );
+
   return createElement(DataEditor, {
     columns: gridColumns,
     rows: rows.length,
     getCellContent,
     getRowThemeOverride,
     onCellEdited: editable ? handleCellEdited : undefined,
+    onCellClicked: handleCellClicked,
     width,
     height,
     theme,

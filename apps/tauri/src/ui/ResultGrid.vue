@@ -11,7 +11,12 @@ import {
   buildQueryaGlideTheme,
   subscribeThemeChanges,
 } from "./glide/queryaGlideTheme";
+import GridStagingToolbar from "./GridStagingToolbar.vue";
 import "@glideapps/glide-data-grid/dist/index.css";
+
+const emit = defineEmits<{
+  applied: [];
+}>();
 
 const query = useQueryResultStore();
 const staging = useGridStagingStore();
@@ -26,8 +31,11 @@ let ro: ResizeObserver | null = null;
 let unsubTheme: (() => void) | null = null;
 let glideTheme: Partial<Theme> = buildQueryaGlideTheme();
 
+const showToolbar = computed(
+  () => columns.value.length > 0 && !running.value,
+);
+
 const displayRows = computed(() => {
-  // Prefer staged effective values when dirty so edits show immediately.
   if (staging.isDirty && staging.rowCount > 0) {
     return staging.effectiveRows();
   }
@@ -40,6 +48,10 @@ const editable = computed(
 
 function onCellEdited(row: number, col: number, value: string) {
   staging.setCell(row, col, value);
+}
+
+function onCellClicked(row: number) {
+  staging.selectedRowIndex = row;
 }
 
 function render() {
@@ -55,6 +67,7 @@ function render() {
       cellStatus: (r, c) => staging.cellStatus(r, c),
       rowStatus: (r) => staging.rowStatus(r),
       onCellEdited,
+      onRowActivated: onCellClicked,
     }),
   );
 }
@@ -97,24 +110,35 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    ref="host"
-    class="result-grid"
-    data-testid="result-grid"
-    :data-staging-dirty="isDirty ? 'true' : 'false'"
-    :aria-label="
-      isDirty
-        ? `Query results, ${changeCount} staged change(s)`
-        : 'Query results'
-    "
-  />
+  <div class="result-grid-wrap" data-testid="result-grid-wrap">
+    <GridStagingToolbar v-if="showToolbar" @applied="emit('applied')" />
+    <div
+      ref="host"
+      class="result-grid"
+      data-testid="result-grid"
+      :data-staging-dirty="isDirty ? 'true' : 'false'"
+      :aria-label="
+        isDirty
+          ? `Query results, ${changeCount} staged change(s)`
+          : 'Query results'
+      "
+    />
+  </div>
 </template>
 
 <style scoped>
-.result-grid {
+.result-grid-wrap {
   width: 100%;
   height: 100%;
   min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.result-grid {
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   background: var(--q-editor-bg);
   color: var(--q-foreground);

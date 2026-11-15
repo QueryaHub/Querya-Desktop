@@ -41,4 +41,16 @@ describe("StagingBuffer (frontend)", () => {
     expect(buf.effectiveRows()[0]?.[2]).toBe("NULL");
     expect(NULL_SENTINEL).toContain("QUERYA_NULL");
   });
+
+  it("addRow and toApplySnapshot", () => {
+    const buf = sample();
+    buf.setCell(0, 1, "Alicia");
+    buf.addRow(["3", "Carol", "carol@test.com"]);
+    const snap = buf.toApplySnapshot();
+    expect(snap.modifiedCells).toEqual([
+      { row: 0, col: 1, value: "Alicia" },
+    ]);
+    expect(snap.insertedRows).toHaveLength(1);
+    expect(snap.primaryKeys).toEqual(["id"]);
+  });
 });

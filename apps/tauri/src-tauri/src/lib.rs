@@ -20,9 +20,9 @@ pub use staging::{
 };
 
 use commands::{
-    db_connect_mysql, db_connect_postgres, db_connect_sqlite, db_describe_object, db_disconnect,
-    db_erd_schema, db_execute_query, db_is_connected, db_list_children, db_list_columns,
-    db_list_schemas, db_list_tables, db_postgres_object_detail, db_sqlite_overview,
+    db_apply_staging, db_connect_mysql, db_connect_postgres, db_connect_sqlite, db_describe_object,
+    db_disconnect, db_erd_schema, db_execute_query, db_is_connected, db_list_children,
+    db_list_columns, db_list_schemas, db_list_tables, db_postgres_object_detail, db_sqlite_overview,
     profiles_connect_mysql, profiles_connect_postgres, profiles_connect_sqlite, profiles_delete,
     profiles_list, profiles_upsert,
 };
@@ -106,6 +106,7 @@ pub fn run() {
             db_sqlite_overview,
             db_erd_schema,
             db_execute_query,
+            db_apply_staging,
             profiles_list,
             profiles_upsert,
             profiles_delete,

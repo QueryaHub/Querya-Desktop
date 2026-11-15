@@ -8,6 +8,7 @@ mod apply;
 mod apply_live;
 mod buffer;
 mod dml;
+mod ipc;
 
 pub use apply::{
     apply_plan_mysql, apply_plan_postgres, apply_plan_sqlite, apply_staging_mysql,
@@ -20,3 +21,4 @@ pub use dml::{
     generate_plan, MutationType, SqlDialect, StagingColumnMeta, TableMutationPlan,
     TableMutationStatement,
 };
+pub use ipc::{apply_staging_request, StagingApplyRequest};
