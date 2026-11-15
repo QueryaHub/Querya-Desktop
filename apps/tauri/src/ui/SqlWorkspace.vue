@@ -5,12 +5,13 @@ import { useWorkspaceStore } from "../stores/workspace";
 import { useQueryResultStore } from "../stores/queryResult";
 import { useConnectionsStore } from "../stores/connections";
 import SqlEditor from "./SqlEditor.vue";
+import ResultGrid from "./ResultGrid.vue";
 
 const workspace = useWorkspaceStore();
 const query = useQueryResultStore();
 const connections = useConnectionsStore();
 const { activeTab } = storeToRefs(workspace);
-const { columns, rows, running, error, rowCount, elapsedMs, truncated } =
+const { columns, running, error, rowCount, elapsedMs, truncated, affectedRows } =
   storeToRefs(query);
 
 const editorRef = ref<InstanceType<typeof SqlEditor> | null>(null);
@@ -41,7 +42,7 @@ async function onRun() {
   await query.run(text);
 }
 
-const previewRows = computed(() => rows.value.slice(0, 50));
+const hasGrid = computed(() => columns.value.length > 0);
 </script>
 
 <template>
@@ -68,31 +69,22 @@ const previewRows = computed(() => rows.value.slice(0, 50));
       />
     </div>
     <div class="result-pane" data-testid="sql-result-preview">
-      <p v-if="error" class="error">{{ error }}</p>
-      <template v-else-if="columns.length">
-        <div class="meta">
+      <div class="meta" v-if="hasGrid || affectedRows != null || error">
+        <template v-if="error">{{ error }}</template>
+        <template v-else-if="hasGrid">
           {{ rowCount }} rows
           <template v-if="elapsedMs != null"> · {{ elapsedMs }} ms</template>
           <template v-if="truncated"> · truncated</template>
-          · preview (grid in #1876)
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th v-for="c in columns" :key="c">{{ c }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, i) in previewRows" :key="i">
-                <td v-for="(cell, j) in row" :key="j">
-                  {{ cell === null || cell === undefined ? "NULL" : String(cell) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </template>
+        </template>
+        <template v-else-if="affectedRows != null">
+          {{ affectedRows }} rows affected
+          <template v-if="elapsedMs != null"> · {{ elapsedMs }} ms</template>
+        </template>
+      </div>
+      <p v-if="error" class="error">{{ error }}</p>
+      <div v-else-if="hasGrid" class="grid-host">
+        <ResultGrid />
+      </div>
       <p v-else class="empty">Results appear here after Run.</p>
     </div>
   </div>
@@ -158,7 +150,9 @@ const previewRows = computed(() => rows.value.slice(0, 50));
 
 .result-pane {
   min-height: 0;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 8px 10px 10px;
   border-top: 1px solid
     color-mix(
@@ -169,10 +163,16 @@ const previewRows = computed(() => rows.value.slice(0, 50));
 }
 
 .meta {
+  flex: 0 0 auto;
   font-size: 11px;
   color: var(--q-muted-foreground);
   margin-bottom: 6px;
   font-family: var(--q-font-mono);
+}
+
+.grid-host {
+  flex: 1;
+  min-height: 0;
 }
 
 .empty,
@@ -184,36 +184,5 @@ const previewRows = computed(() => rows.value.slice(0, 50));
 
 .error {
   color: var(--q-danger, #c44);
-}
-
-.table-wrap {
-  overflow: auto;
-}
-
-table {
-  border-collapse: collapse;
-  width: max-content;
-  min-width: 100%;
-  font-size: 12px;
-  font-family: var(--q-font-mono);
-}
-
-th,
-td {
-  border: 1px solid
-    color-mix(in srgb, var(--q-border) 70%, transparent);
-  padding: 4px 8px;
-  text-align: left;
-  white-space: nowrap;
-  max-width: 28rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-th {
-  background: var(--q-sidebar-bg);
-  position: sticky;
-  top: 0;
-  font-weight: 600;
 }
 </style>
