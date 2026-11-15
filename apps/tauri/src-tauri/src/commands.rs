@@ -5,6 +5,7 @@ use crate::connection::{
 };
 use crate::profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 use crate::secrets::SharedSecretStore;
+use crate::staging::{apply_staging_request, ApplyResult, StagingApplyRequest};
 use serde::Deserialize;
 use tauri::ipc::Channel;
 use tauri::State;
@@ -504,4 +505,13 @@ pub fn db_execute_query(
             .send(ev)
             .map_err(|e| ConnectionError::io(format!("query channel closed: {e}")))
     })
+}
+
+/// Apply frontend staging edits in a single transaction (#1891).
+#[tauri::command]
+pub fn db_apply_staging(
+    request: StagingApplyRequest,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<ApplyResult, ConnectionError> {
+    apply_staging_request(&registry, request)
 }

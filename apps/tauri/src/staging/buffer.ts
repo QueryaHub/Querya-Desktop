@@ -33,11 +33,11 @@ export class StagingBuffer {
   replaceBaseline(
     columns: string[],
     rows: string[][],
-    primaryKeys: string[] = [],
+    primaryKeys?: string[],
   ): void {
     this.columns = [...columns];
     this.originalRows = rows.map((r) => [...r]);
-    this.primaryKeys = [...primaryKeys];
+    if (primaryKeys) this.primaryKeys = [...primaryKeys];
     this.modifiedCells.clear();
     this.insertedRows = [];
     this.deletedRowIndices.clear();
@@ -162,6 +162,44 @@ export class StagingBuffer {
     this.modifiedCells.clear();
     this.insertedRows = [];
     this.deletedRowIndices.clear();
+    this.revision += 1;
+  }
+
+  addRow(initial?: string[]): number {
+    const row =
+      initial ?? Array.from({ length: this.columns.length }, () => "");
+    this.insertedRows.push([...row]);
+    this.revision += 1;
+    return this.totalRowCount() - 1;
+  }
+
+  /** Snapshot for `db_apply_staging` IPC. */
+  toApplySnapshot(): {
+    columns: string[];
+    primaryKeys: string[];
+    originalRows: string[][];
+    modifiedCells: { row: number; col: number; value: string }[];
+    insertedRows: string[][];
+    deletedRowIndices: number[];
+  } {
+    const modifiedCells: { row: number; col: number; value: string }[] = [];
+    for (const [row, cols] of this.modifiedCells) {
+      for (const [col, value] of cols) {
+        modifiedCells.push({ row, col, value });
+      }
+    }
+    return {
+      columns: [...this.columns],
+      primaryKeys: [...this.primaryKeys],
+      originalRows: this.originalRows.map((r) => [...r]),
+      modifiedCells,
+      insertedRows: this.insertedRows.map((r) => [...r]),
+      deletedRowIndices: [...this.deletedRowIndices],
+    };
+  }
+
+  setPrimaryKeys(keys: string[]): void {
+    this.primaryKeys = [...keys];
     this.revision += 1;
   }
 

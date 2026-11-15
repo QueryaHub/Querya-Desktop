@@ -37,4 +37,20 @@ describe("useGridStagingStore", () => {
     expect(store.isDirty).toBe(false);
     expect(store.getCellValue(0, 0)).toBe("2");
   });
+
+  it("revertAll discards dirty markers", () => {
+    const store = useGridStagingStore();
+    store.setTarget({
+      connectionId: "c1",
+      tableName: "users",
+      primaryKeys: ["id"],
+    });
+    store.attachFromQuery(["id", "name"], [["1", "A"]]);
+    store.setCell(0, 1, "B");
+    expect(store.isDirty).toBe(true);
+    expect(store.canApply).toBe(true);
+    store.revertAll();
+    expect(store.isDirty).toBe(false);
+    expect(store.getCellValue(0, 1)).toBe("A");
+  });
 });

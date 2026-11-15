@@ -61,7 +61,9 @@ export const useQueryResultStore = defineStore("queryResult", () => {
     acc = emptyAccumulatedQuery();
     bindBuffers();
     syncScalars();
-    useGridStagingStore().clear();
+    const staging = useGridStagingStore();
+    staging.clear();
+    staging.setTarget(null);
     bump();
   }
 
