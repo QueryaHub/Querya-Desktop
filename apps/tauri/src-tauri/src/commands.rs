@@ -9,7 +9,7 @@ use serde::Deserialize;
 use tauri::ipc::Channel;
 use tauri::State;
 
-/// Bundled IPC args for Postgres save+connect (keeps clippy under the limit).
+/// Bundled IPC args for Postgres/MySQL save+connect (keeps clippy under the limit).
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectPostgresRequest {
@@ -22,6 +22,9 @@ pub struct ConnectPostgresRequest {
     pub folder_id: Option<String>,
     pub id: Option<String>,
 }
+
+/// Same shape as Postgres — separate type so Tauri command names stay clear.
+pub type ConnectMysqlRequest = ConnectPostgresRequest;
 
 #[tauri::command]
 pub fn db_connect_sqlite(
@@ -43,6 +46,26 @@ pub fn db_connect_postgres(
     registry: State<'_, ConnectionRegistry>,
 ) -> Result<ConnectionId, ConnectionError> {
     registry.connect(ConnectionConfig::Postgres {
+        host,
+        port,
+        database,
+        user,
+        password,
+        id,
+    })
+}
+
+#[tauri::command]
+pub fn db_connect_mysql(
+    host: String,
+    port: u16,
+    database: String,
+    user: String,
+    password: Option<String>,
+    id: Option<String>,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<ConnectionId, ConnectionError> {
+    registry.connect(ConnectionConfig::Mysql {
         host,
         port,
         database,
@@ -230,6 +253,103 @@ pub fn profiles_connect_postgres(
 
     if !registry.is_connected(&ConnectionId::from(profile.id.as_str())) {
         registry.connect(ConnectionConfig::Postgres {
+            host,
+            port,
+            database,
+            user,
+            password,
+            id: Some(profile.id.clone()),
+        })?;
+    }
+    Ok(profile)
+}
+
+/// Save MySQL profile metadata (no password) and open a live session.
+#[tauri::command]
+pub fn profiles_connect_mysql(
+    request: ConnectMysqlRequest,
+    store: State<'_, ProfileStore>,
+    secrets: State<'_, SharedSecretStore>,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<ConnectionProfile, ConnectionError> {
+    let ConnectMysqlRequest {
+        name,
+        host,
+        port,
+        database,
+        user,
+        password,
+        folder_id,
+        id,
+    } = request;
+
+    let display_name = {
+        let t = name.trim();
+        if t.is_empty() {
+            format!("{user}@{host}/{database}")
+        } else {
+            t.to_owned()
+        }
+    };
+
+    let mut profile = match id.filter(|s| !s.trim().is_empty()) {
+        Some(existing_id) => store
+            .get(&existing_id)
+            .map_err(|e| ConnectionError::io(e.to_string()))?
+            .map(|mut p| {
+                p.name = display_name.clone();
+                p.host = Some(host.clone());
+                p.port = Some(i64::from(port));
+                p.database_name = Some(database.clone());
+                p.username = Some(user.clone());
+                p.folder_id = folder_id.clone();
+                p.driver = "mysql".into();
+                p.path = None;
+                p
+            })
+            .unwrap_or_else(|| {
+                let mut p = ConnectionProfile::new_mysql(
+                    display_name.clone(),
+                    host.clone(),
+                    port,
+                    database.clone(),
+                    user.clone(),
+                );
+                p.id = existing_id;
+                p.folder_id = folder_id.clone();
+                p
+            }),
+        None => {
+            let mut p = ConnectionProfile::new_mysql(
+                display_name,
+                host.clone(),
+                port,
+                database.clone(),
+                user.clone(),
+            );
+            p.folder_id = folder_id;
+            p
+        }
+    };
+    profile.touch();
+    store
+        .upsert(&profile)
+        .map_err(|e| ConnectionError::io(e.to_string()))?;
+
+    let password = match password {
+        Some(p) => {
+            secrets
+                .set_password(&profile.id, &p)
+                .map_err(|e| ConnectionError::io(format!("keyring write: {e}")))?;
+            Some(p)
+        }
+        None => secrets
+            .get_password(&profile.id)
+            .map_err(|e| ConnectionError::io(format!("keyring read: {e}")))?,
+    };
+
+    if !registry.is_connected(&ConnectionId::from(profile.id.as_str())) {
+        registry.connect(ConnectionConfig::Mysql {
             host,
             port,
             database,

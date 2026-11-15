@@ -3,6 +3,7 @@ import { reactive, ref } from "vue";
 import {
   dbDisconnect,
   formatConnectionError,
+  profilesConnectMysql,
   profilesConnectPostgres,
   profilesConnectSqlite,
   profilesDelete,
@@ -17,7 +18,7 @@ import { useShellStatusStore } from "./shellStatus";
 
 export type LiveConnection = {
   id: string;
-  driver: "sqlite" | "postgres";
+  driver: "sqlite" | "postgres" | "mysql";
   name: string;
   /** SQLite file path. */
   path?: string;
@@ -45,7 +46,8 @@ function endpointLabel(conn: LiveConnection): string {
   if (conn.mock) return "Demo (offline)";
   if (conn.driver === "sqlite") return conn.path ?? "";
   const host = conn.host ?? "localhost";
-  const port = conn.port ?? 5432;
+  const port =
+    conn.port ?? (conn.driver === "mysql" ? 3306 : 5432);
   const db = conn.database ?? "";
   return `${host}:${port}/${db}`;
 }
@@ -63,17 +65,18 @@ function fromProfile(p: ConnectionProfile, connected = false): LiveConnection | 
       connected,
     };
   }
-  if (p.driver === "postgres") {
+  if (p.driver === "postgres" || p.driver === "mysql") {
     const host = p.host?.trim();
     const database = p.database_name?.trim();
     const user = p.username?.trim();
     if (!host || !database || !user) return null;
+    const defaultPort = p.driver === "mysql" ? 3306 : 5432;
     return {
       id: p.id,
-      driver: "postgres",
+      driver: p.driver,
       name: p.name,
       host,
-      port: p.port != null ? Number(p.port) : 5432,
+      port: p.port != null ? Number(p.port) : defaultPort,
       database,
       user,
       folderId: p.folder_id ?? null,
@@ -85,13 +88,13 @@ function fromProfile(p: ConnectionProfile, connected = false): LiveConnection | 
 
 function toProfile(conn: LiveConnection): ConnectionProfile {
   const now = String(Math.floor(Date.now() / 1000));
-  if (conn.driver === "postgres") {
+  if (conn.driver === "postgres" || conn.driver === "mysql") {
     return {
       id: conn.id,
-      driver: "postgres",
+      driver: conn.driver,
       name: conn.name,
       host: conn.host ?? null,
-      port: conn.port ?? 5432,
+      port: conn.port ?? (conn.driver === "mysql" ? 3306 : 5432),
       username: conn.user ?? null,
       database_name: conn.database ?? null,
       folder_id: conn.folderId ?? null,
@@ -236,6 +239,35 @@ export const useConnectionsStore = defineStore("connections", () => {
     folderId?: string | null;
     id?: string | null;
   }) {
+    return connectServerDriver("postgres", opts);
+  }
+
+  async function connectMysql(opts: {
+    name: string;
+    host: string;
+    port: number;
+    database: string;
+    user: string;
+    password?: string | null;
+    folderId?: string | null;
+    id?: string | null;
+  }) {
+    return connectServerDriver("mysql", opts);
+  }
+
+  async function connectServerDriver(
+    driver: "postgres" | "mysql",
+    opts: {
+      name: string;
+      host: string;
+      port: number;
+      database: string;
+      user: string;
+      password?: string | null;
+      folderId?: string | null;
+      id?: string | null;
+    },
+  ) {
     const status = useShellStatusStore();
     const nav = useShellNavStore();
     const name =
@@ -246,20 +278,32 @@ export const useConnectionsStore = defineStore("connections", () => {
       message: `Connecting ${opts.host}:${opts.port}…`,
     });
     try {
-      const profile = await profilesConnectPostgres({
-        name,
-        host: opts.host,
-        port: opts.port,
-        database: opts.database,
-        user: opts.user,
-        password: opts.password ?? null,
-        folderId: opts.folderId ?? null,
-        id: opts.id ?? null,
-      });
+      const profile =
+        driver === "postgres"
+          ? await profilesConnectPostgres({
+              name,
+              host: opts.host,
+              port: opts.port,
+              database: opts.database,
+              user: opts.user,
+              password: opts.password ?? null,
+              folderId: opts.folderId ?? null,
+              id: opts.id ?? null,
+            })
+          : await profilesConnectMysql({
+              name,
+              host: opts.host,
+              port: opts.port,
+              database: opts.database,
+              user: opts.user,
+              password: opts.password ?? null,
+              folderId: opts.folderId ?? null,
+              id: opts.id ?? null,
+            });
       if (opts.password) sessionPasswords.set(profile.id, opts.password);
       const conn: LiveConnection = {
         id: profile.id,
-        driver: "postgres",
+        driver,
         name: profile.name,
         host: profile.host ?? opts.host,
         port: profile.port != null ? Number(profile.port) : opts.port,
@@ -297,16 +341,19 @@ export const useConnectionsStore = defineStore("connections", () => {
     }
     // Prefer in-memory cache; otherwise Rust loads from OS keyring (#1878).
     const password = sessionPasswords.get(id) ?? null;
-    return connectPostgres({
+    const opts = {
       name: conn.name,
       host: conn.host ?? "localhost",
-      port: conn.port ?? 5432,
-      database: conn.database ?? "postgres",
-      user: conn.user ?? "postgres",
+      port: conn.port ?? (conn.driver === "mysql" ? 3306 : 5432),
+      database: conn.database ?? (conn.driver === "mysql" ? "mysql" : "postgres"),
+      user: conn.user ?? (conn.driver === "mysql" ? "root" : "postgres"),
       password,
       folderId: conn.folderId,
       id: conn.id,
-    });
+    };
+    return conn.driver === "mysql"
+      ? connectMysql(opts)
+      : connectPostgres(opts);
   }
 
   async function disconnect(id: string) {
@@ -424,6 +471,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     launchDemo,
     connectSqlite,
     connectPostgres,
+    connectMysql,
     ensureConnected,
     disconnect,
     removeConnection,

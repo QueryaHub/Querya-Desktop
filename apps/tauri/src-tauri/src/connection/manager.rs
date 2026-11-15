@@ -1,5 +1,6 @@
 use super::error::{ConnectionError, ConnectionResult};
 use super::id::{ConnectionId, DriverKind};
+use super::mysql::MysqlSession;
 use super::postgres::PostgresSession;
 use super::query::QueryEvent;
 use super::sqlite::SqliteSession;
@@ -31,7 +32,6 @@ pub enum ConnectionConfig {
         #[serde(default)]
         id: Option<String>,
     },
-    /// Stub until the MySQL adapter epic wires connect.
     Mysql {
         host: String,
         port: u16,
@@ -91,7 +91,7 @@ impl ConnectionRegistry {
         Self::with_builtin_drivers()
     }
 
-    /// Registry with SQLite + Postgres openers (MySQL still UnsupportedDriver).
+    /// Registry with SQLite + Postgres + MySQL openers.
     pub fn with_builtin_drivers() -> Self {
         Self::with_opener(|config| match config {
             ConnectionConfig::Sqlite { path, id } => {
@@ -121,9 +121,24 @@ impl ConnectionRegistry {
                 })?;
                 Ok(Arc::new(session) as SessionArc)
             }
-            other => Err(ConnectionError::UnsupportedDriver {
-                driver: other.driver_kind(),
-            }),
+            ConnectionConfig::Mysql {
+                host,
+                port,
+                database,
+                user,
+                password,
+                id,
+            } => {
+                let session = super::mysql::open_mysql(super::mysql::MysqlConnectParams {
+                    host,
+                    port,
+                    database,
+                    user,
+                    password,
+                    id: id.filter(|s| !s.trim().is_empty()).map(ConnectionId::from),
+                })?;
+                Ok(Arc::new(session) as SessionArc)
+            }
         })
     }
 
@@ -195,7 +210,22 @@ impl ConnectionRegistry {
         f(pg)
     }
 
-    /// Driver-aware query stream (SQLite + Postgres).
+    pub fn with_mysql<T>(
+        &self,
+        id: &ConnectionId,
+        f: impl FnOnce(&MysqlSession) -> ConnectionResult<T>,
+    ) -> ConnectionResult<T> {
+        let session = self.session_arc(id)?;
+        let mysql = session
+            .as_any()
+            .downcast_ref::<MysqlSession>()
+            .ok_or(ConnectionError::UnsupportedDriver {
+                driver: session.driver(),
+            })?;
+        f(mysql)
+    }
+
+    /// Driver-aware query stream (SQLite + Postgres + MySQL).
     pub fn execute_query(
         &self,
         id: &ConnectionId,
@@ -212,7 +242,7 @@ impl ConnectionRegistry {
             DriverKind::Postgres => {
                 self.with_postgres(id, |s| s.execute_streaming(sql, limit, emit))
             }
-            other => Err(ConnectionError::UnsupportedDriver { driver: other }),
+            DriverKind::Mysql => self.with_mysql(id, |s| s.execute_streaming(sql, limit, emit)),
         }
     }
 
@@ -256,7 +286,17 @@ impl ConnectionRegistry {
                     super::postgres_object_tree::PostgresObjectTree::new(pg.clone_handle()),
                 ))
             }
-            other => Err(ConnectionError::UnsupportedDriver { driver: other }),
+            DriverKind::Mysql => {
+                let mysql = session
+                    .as_any()
+                    .downcast_ref::<MysqlSession>()
+                    .ok_or(ConnectionError::UnsupportedDriver {
+                        driver: DriverKind::Mysql,
+                    })?;
+                Ok(Arc::new(super::mysql_object_tree::MysqlObjectTree::new(
+                    mysql.clone_handle(),
+                )))
+            }
         }
     }
 
@@ -411,11 +451,11 @@ mod tests {
     }
 
     #[test]
-    fn registry_mysql_is_unsupported_for_now() {
+    fn registry_mysql_rejects_empty_host() {
         let reg = ConnectionRegistry::with_builtin_drivers();
         let err = reg
             .connect(ConnectionConfig::Mysql {
-                host: "localhost".into(),
+                host: "  ".into(),
                 port: 3306,
                 database: "db".into(),
                 user: "u".into(),
@@ -423,12 +463,7 @@ mod tests {
                 id: None,
             })
             .unwrap_err();
-        assert!(matches!(
-            err,
-            ConnectionError::UnsupportedDriver {
-                driver: DriverKind::Mysql
-            }
-        ));
+        assert!(matches!(err, ConnectionError::InvalidConfig { .. }));
     }
 
     #[test]

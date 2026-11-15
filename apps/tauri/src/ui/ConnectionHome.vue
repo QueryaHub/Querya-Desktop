@@ -99,18 +99,23 @@ async function loadOverview() {
 }
 
 const isSqlite = computed(() => conn.value?.driver === "sqlite");
-const isPostgres = computed(() => conn.value?.driver === "postgres");
+const isServerSql = computed(
+  () =>
+    conn.value?.driver === "postgres" || conn.value?.driver === "mysql",
+);
 const driverLabel = computed(() => {
   const d = conn.value?.driver;
   if (d === "sqlite") return "SQLite";
   if (d === "postgres") return "PostgreSQL";
+  if (d === "mysql") return "MySQL";
   return d ?? "";
 });
 const endpointLabel = computed(() => {
   const c = conn.value;
   if (!c) return "";
   if (c.driver === "sqlite") return c.path ?? "";
-  return `${c.host ?? "localhost"}:${c.port ?? 5432}/${c.database ?? ""}`;
+  const port = c.port ?? (c.driver === "mysql" ? 3306 : 5432);
+  return `${c.host ?? "localhost"}:${port}/${c.database ?? ""}`;
 });
 
 watch(
@@ -205,14 +210,16 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
         </QueryaButton>
       </header>
 
-      <template v-if="isPostgres">
+      <template v-if="isServerSql">
         <section class="chips" aria-label="Database info">
           <div class="chip">
             <QueryaIcon class="chip-ico" name="server" :size="16" />
             <div class="chip-body">
               <span class="chip-l">Host</span>
               <span class="chip-v"
-                >{{ conn.host }}:{{ conn.port ?? 5432 }}</span
+                >{{ conn.host }}:{{
+                  conn.port ?? (conn.driver === "mysql" ? 3306 : 5432)
+                }}</span
               >
             </div>
           </div>

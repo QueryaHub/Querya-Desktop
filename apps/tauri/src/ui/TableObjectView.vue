@@ -53,7 +53,7 @@ async function loadTableData() {
   try {
     const ident = (s: string) => `"${s.replace(/"/g, '""')}"`;
     const sql =
-      c.driver === "postgres" && obj.schema
+      (c.driver === "postgres" || c.driver === "mysql") && obj.schema
         ? `SELECT * FROM ${ident(obj.schema)}.${ident(obj.name)} LIMIT 200`
         : `SELECT * FROM ${ident(obj.name)} LIMIT 200`;
     await dbExecuteQuery(c.id, sql, (ev) => query.feedEvent(ev));

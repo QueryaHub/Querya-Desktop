@@ -102,6 +102,24 @@ export async function dbConnectPostgres(opts: {
   });
 }
 
+export async function dbConnectMysql(opts: {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password?: string | null;
+  id?: string | null;
+}): Promise<string> {
+  return invoke<string>("db_connect_mysql", {
+    host: opts.host,
+    port: opts.port,
+    database: opts.database,
+    user: opts.user,
+    password: opts.password ?? null,
+    id: opts.id ?? null,
+  });
+}
+
 export async function profilesList(): Promise<ConnectionProfile[]> {
   return invoke<ConnectionProfile[]>("profiles_list");
 }
@@ -143,6 +161,31 @@ export async function profilesConnectPostgres(opts: {
   id?: string | null;
 }): Promise<ConnectionProfile> {
   return invoke<ConnectionProfile>("profiles_connect_postgres", {
+    request: {
+      name: opts.name,
+      host: opts.host,
+      port: opts.port,
+      database: opts.database,
+      user: opts.user,
+      password: opts.password ?? null,
+      folderId: opts.folderId ?? null,
+      id: opts.id ?? null,
+    },
+  });
+}
+
+/** Persist MySQL metadata (no password on disk) + open live session. */
+export async function profilesConnectMysql(opts: {
+  name: string;
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password?: string | null;
+  folderId?: string | null;
+  id?: string | null;
+}): Promise<ConnectionProfile> {
+  return invoke<ConnectionProfile>("profiles_connect_mysql", {
     request: {
       name: opts.name,
       host: opts.host,
