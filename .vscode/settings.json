@@ -1,0 +1,18 @@
+{
+  "rust-analyzer.linkedProjects": [
+    "apps/tauri/src-tauri/Cargo.toml"
+  ],
+  "rust-analyzer.cargo.targetDir": true,
+  "files.watcherExclude": {
+    "**/apps/tauri/src-tauri/target/**": true,
+    "**/apps/tauri/node_modules/**": true,
+    "**/apps/tauri/dist/**": true,
+    "**/.dart_tool/**": true,
+    "**/build/**": true
+  },
+  "search.exclude": {
+    "**/apps/tauri/src-tauri/target": true,
+    "**/apps/tauri/node_modules": true,
+    "**/apps/tauri/dist": true
+  }
+}

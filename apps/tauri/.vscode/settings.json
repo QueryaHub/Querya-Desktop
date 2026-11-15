@@ -1,0 +1,13 @@
+{
+  "rust-analyzer.linkedProjects": [
+    "src-tauri/Cargo.toml"
+  ],
+  "rust-analyzer.cargo.targetDir": true,
+  "[vue]": {
+    "editor.defaultFormatter": "Vue.volar"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "Vue.volar"
+  },
+  "typescript.tsdk": "node_modules/typescript/lib"
+}

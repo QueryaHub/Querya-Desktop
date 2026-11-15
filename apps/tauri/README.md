@@ -90,7 +90,7 @@ apps/tauri/
 - **`ERR_PNPM_IGNORED_BUILDS` / missing esbuild** — this package lists `esbuild` under `onlyBuiltDependencies` in `pnpm-workspace.yaml`. Re-run `pnpm install`. On older pnpm, `pnpm approve-builds --all` then reinstall.
 - **`cargo` cannot find webkit** — install the Linux packages above; wrong webkit major (4.0 vs 4.1) is a common miss.
 - **Port 1420 in use** — Vite is fixed to `1420` for Tauri (`vite.config.ts`). Free the port or stop the other process.
-- **Flutter analysis noisy after opening this folder** — use the repo editor settings from issue `#1859` / `.vscode` so rust-analyzer points at `apps/tauri/src-tauri` only.
+- **Flutter analysis noisy after opening this folder** — open `querya-desktop.code-workspace` (or use root `.vscode/settings.json`) so rust-analyzer links only `apps/tauri/src-tauri`.
 
 ## GitFlow
 
