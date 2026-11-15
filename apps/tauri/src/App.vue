@@ -15,6 +15,7 @@ import TabStrip from "./ui/TabStrip.vue";
 import StatusBar from "./ui/StatusBar.vue";
 import WorkspaceEmptyHero from "./ui/WorkspaceEmptyHero.vue";
 import QueryaDivider from "./ui/QueryaDivider.vue";
+import SqlWorkspace from "./ui/SqlWorkspace.vue";
 
 const shell = useShellStore();
 const status = useShellStatusStore();
@@ -26,6 +27,8 @@ provideQueryaMotion();
 const showEmpty = computed(
   () => !connections.active && activeTab.value?.kind === "welcome",
 );
+
+const showSql = computed(() => activeTab.value?.kind === "sql");
 
 async function onOpenSqlite() {
   try {
@@ -42,7 +45,6 @@ async function onOpenSqlite() {
     const conn = await connections.connectSqlite(selected);
     workspace.addTab({ title: conn.name, kind: "sql" });
   } catch (err) {
-    // Status already set by connections store on connect failure.
     if (String(err).includes("cancel")) return;
   }
 }
@@ -110,12 +112,12 @@ onUnmounted(() => {
             @open-sqlite="onOpenSqlite"
             @open-tour="onOpenTour"
           />
+          <SqlWorkspace v-else-if="showSql" />
           <div v-else class="tab-placeholder" data-testid="tab-placeholder">
             <h2>{{ activeTab?.title }}</h2>
             <p v-if="connections.active">
               Connected: {{ connections.active.path }}
             </p>
-            <p>Kind: {{ activeTab?.kind }} — editor/grid land next in the slice.</p>
           </div>
         </div>
       </main>
@@ -154,7 +156,9 @@ onUnmounted(() => {
 .workspace-body {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .tab-placeholder {
