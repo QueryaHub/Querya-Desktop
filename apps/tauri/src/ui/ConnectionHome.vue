@@ -169,28 +169,28 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
       <section v-else class="chips" aria-label="Database info">
         <div class="chip">
           <span class="chip-ico" aria-hidden="true">ⓘ</span>
-          <div>
+          <div class="chip-body">
             <span class="chip-l">SQLite Version</span>
             <span class="chip-v">{{ overview?.version || "—" }}</span>
           </div>
         </div>
         <div class="chip">
           <span class="chip-ico" aria-hidden="true">▤</span>
-          <div>
+          <div class="chip-body">
             <span class="chip-l">Database Size</span>
             <span class="chip-v">{{ sizeLabel }}</span>
           </div>
         </div>
         <div class="chip">
           <span class="chip-ico" aria-hidden="true">▦</span>
-          <div>
+          <div class="chip-body">
             <span class="chip-l">Pages / Page Size</span>
             <span class="chip-v">{{ pagesLabel }}</span>
           </div>
         </div>
         <div class="chip">
           <span class="chip-ico" aria-hidden="true">↺</span>
-          <div>
+          <div class="chip-body">
             <span class="chip-l">Journal Mode</span>
             <span class="chip-v">{{ overview?.journal_mode || "—" }}</span>
           </div>
@@ -380,7 +380,7 @@ h1 {
   min-height: 88px;
   display: flex;
   gap: 12px;
-  align-items: flex-start;
+  align-items: center;
   padding: 12px 16px;
   border-radius: 10px;
   background: var(--q-card);
@@ -388,21 +388,33 @@ h1 {
 }
 
 .chip-ico {
-  margin-top: 2px;
+  flex: 0 0 auto;
+  width: 20px;
+  text-align: center;
   color: var(--q-primary);
   font-size: 16px;
   line-height: 1;
 }
 
+.chip-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
 .chip-l {
   display: block;
   font-size: 11px;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
   color: var(--q-muted-foreground);
 }
 
 .chip-v {
   display: block;
-  margin-top: 2px;
   font-size: 13px;
   font-weight: 600;
   color: var(--q-foreground);
@@ -468,15 +480,16 @@ h1 {
   padding: 6px 10px;
   border-radius: 6px;
   border: 1px solid color-mix(in srgb, var(--q-border) 30%, transparent);
-  background: color-mix(in srgb, var(--q-muted-foreground) 14%, transparent);
+  background: color-mix(in srgb, var(--q-muted) 40%, transparent);
   color: var(--q-foreground);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13px;
+  line-height: 1.25;
   cursor: pointer;
 }
 
 .table-chip:hover {
-  background: color-mix(in srgb, var(--q-muted-foreground) 28%, transparent);
+  background: color-mix(in srgb, var(--q-muted) 70%, transparent);
 }
 
 .table-chip.view {
@@ -484,8 +497,12 @@ h1 {
 }
 
 .t-ico {
+  flex: 0 0 auto;
+  width: 14px;
+  text-align: center;
   color: var(--q-primary);
   font-size: 12px;
+  line-height: 1;
 }
 
 .sql-park {

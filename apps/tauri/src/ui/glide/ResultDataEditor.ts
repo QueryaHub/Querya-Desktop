@@ -40,6 +40,7 @@ export function ResultDataEditor(props: ResultDataEditorProps): ReactElement {
   );
 
   const muted = theme.textMedium ?? theme.textLight ?? "#94a3b8";
+  const stripeBg = theme.bgCellMedium;
 
   const getCellContent = useCallback(
     ([col, row]: Item): GridCell => {
@@ -57,10 +58,20 @@ export function ResultDataEditor(props: ResultDataEditorProps): ReactElement {
     [rows, muted],
   );
 
+  // Flutter grid: odd rows use muted @ 0.12 (chessboard readability).
+  const getRowThemeOverride = useCallback(
+    (row: number): Partial<Theme> | undefined => {
+      if (row % 2 === 0 || !stripeBg) return undefined;
+      return { bgCell: stripeBg };
+    },
+    [stripeBg],
+  );
+
   return createElement(DataEditor, {
     columns: gridColumns,
     rows: rows.length,
     getCellContent,
+    getRowThemeOverride,
     width,
     height,
     theme,
