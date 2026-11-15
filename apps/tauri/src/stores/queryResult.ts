@@ -10,6 +10,7 @@ import {
   formatConnectionError,
 } from "../api/connection";
 import { useConnectionsStore } from "./connections";
+import { useGridStagingStore } from "./gridStaging";
 import { usePreferencesStore } from "./preferences";
 import { useShellNavStore } from "./shellNav";
 import { useShellStatusStore } from "./shellStatus";
@@ -47,10 +48,20 @@ export const useQueryResultStore = defineStore("queryResult", () => {
     error.value = acc.error;
   }
 
+  function syncStagingBaseline() {
+    const staging = useGridStagingStore();
+    if (acc.columns.length === 0) {
+      staging.clear();
+      return;
+    }
+    staging.attachFromQuery(acc.columns, acc.rows);
+  }
+
   function reset() {
     acc = emptyAccumulatedQuery();
     bindBuffers();
     syncScalars();
+    useGridStagingStore().clear();
     bump();
   }
 
@@ -67,7 +78,12 @@ export const useQueryResultStore = defineStore("queryResult", () => {
     } else {
       syncScalars();
     }
-    if (ev.type === "error") error.value = acc.error;
+    if (ev.type === "error") {
+      error.value = acc.error;
+      useGridStagingStore().clear();
+    } else if (ev.type === "done") {
+      syncStagingBaseline();
+    }
     bump();
   }
 
@@ -83,6 +99,7 @@ export const useQueryResultStore = defineStore("queryResult", () => {
     acc.elapsedMs = 0;
     bindBuffers();
     syncScalars();
+    syncStagingBaseline();
     bump();
     if (opts.message) {
       useShellStatusStore().setQueryMetrics({
