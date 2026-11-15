@@ -21,6 +21,11 @@ const props = withDefaults(
 const emit = defineEmits<{
   openSqlite: [];
   openPreferences: [];
+  openPalette: [];
+  openQuickSwitcher: [];
+  openTour: [];
+  openAbout: [];
+  checkUpdates: [];
 }>();
 
 const motion = useQueryaMotion();
@@ -143,7 +148,12 @@ onUnmounted(() => {
       <TitleBarMenus
         @open-sqlite="emit('openSqlite')"
         @open-preferences="emit('openPreferences')"
+        @open-palette="emit('openPalette')"
+        @open-quick-switcher="emit('openQuickSwitcher')"
         @toggle-sidebar="shell.toggleSidebar()"
+        @open-tour="emit('openTour')"
+        @open-about="emit('openAbout')"
+        @check-updates="emit('checkUpdates')"
       />
     </div>
 

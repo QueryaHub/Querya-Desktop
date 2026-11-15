@@ -4,10 +4,15 @@ import { onMounted, onUnmounted, ref } from "vue";
 const emit = defineEmits<{
   openSqlite: [];
   openPreferences: [];
+  openPalette: [];
+  openQuickSwitcher: [];
   toggleSidebar: [];
+  openTour: [];
+  openAbout: [];
+  checkUpdates: [];
 }>();
 
-type MenuId = "file" | "edit" | "view" | null;
+type MenuId = "file" | "edit" | "view" | "help" | null;
 
 const openMenu = ref<MenuId>(null);
 
@@ -81,6 +86,20 @@ onUnmounted(() => {
         <button
           type="button"
           role="menuitem"
+          @click="act(() => emit('openPalette'))"
+        >
+          Command Palette…
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          @click="act(() => emit('openQuickSwitcher'))"
+        >
+          Go to Object…
+        </button>
+        <button
+          type="button"
+          role="menuitem"
           data-testid="menu-preferences"
           @click="act(() => emit('openPreferences'))"
         >
@@ -105,6 +124,40 @@ onUnmounted(() => {
           @click="act(() => emit('toggleSidebar'))"
         >
           Toggle Sidebar
+        </button>
+      </div>
+    </div>
+
+    <div class="slot">
+      <button
+        type="button"
+        class="top"
+        :aria-expanded="openMenu === 'help'"
+        @click="toggle('help')"
+      >
+        Help
+      </button>
+      <div v-if="openMenu === 'help'" class="drop" role="menu">
+        <button
+          type="button"
+          role="menuitem"
+          @click="act(() => emit('openTour'))"
+        >
+          Welcome Tour
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          @click="act(() => emit('checkUpdates'))"
+        >
+          Check for Updates…
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          @click="act(() => emit('openAbout'))"
+        >
+          About Querya
         </button>
       </div>
     </div>
