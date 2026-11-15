@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
+import {
+  dbSqliteOverview,
+  formatConnectionError,
+  type SqliteOverview,
+} from "../api/connection";
 import { useConnectionsStore } from "../stores/connections";
 import { useShellNavStore } from "../stores/shellNav";
 import { useObjectTreeStore } from "../stores/objectTree";
+import QueryaButton from "./QueryaButton.vue";
 import SqlWorkspace from "./SqlWorkspace.vue";
 
 const connections = useConnectionsStore();
@@ -13,7 +19,7 @@ const { homeTab, selectedConnectionId } = storeToRefs(nav);
 
 const conn = computed(() =>
   selectedConnectionId.value
-    ? connections.byId.get(selectedConnectionId.value) ?? null
+    ? (connections.byId.get(selectedConnectionId.value) ?? null)
     : null,
 );
 
@@ -23,10 +29,88 @@ const tables = computed(() =>
 const views = computed(() =>
   tree.relations.filter((o) => o.kind === "view"),
 );
+
+const overview = ref<SqliteOverview | null>(null);
+const loading = ref(false);
+const error = ref<string | null>(null);
+
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let size = bytes;
+  let idx = 0;
+  while (size >= 1024 && idx < units.length - 1) {
+    size /= 1024;
+    idx += 1;
+  }
+  return `${size.toFixed(idx === 0 ? 0 : 2)} ${units[idx]}`;
+}
+
+const sizeLabel = computed(() => {
+  const info = overview.value;
+  if (!info) return "—";
+  const disk = info.file_size_bytes ?? 0;
+  if (disk > 0) return formatBytes(disk);
+  return formatBytes(info.page_count * info.page_size);
+});
+
+const pagesLabel = computed(() => {
+  const info = overview.value;
+  if (!info) return "—";
+  return `${info.page_count} / ${info.page_size} B`;
+});
+
+async function loadOverview() {
+  const c = conn.value;
+  if (!c) return;
+  if (c.mock) {
+    overview.value = {
+      version: "demo",
+      page_count: 0,
+      page_size: 0,
+      journal_mode: "—",
+      table_count: tables.value.length,
+      file_size_bytes: null,
+    };
+    error.value = null;
+    loading.value = false;
+    return;
+  }
+  loading.value = true;
+  error.value = null;
+  try {
+    overview.value = await dbSqliteOverview(c.id);
+  } catch (err) {
+    overview.value = null;
+    error.value = formatConnectionError(err);
+  } finally {
+    loading.value = false;
+  }
+}
+
+watch(
+  selectedConnectionId,
+  () => {
+    void loadOverview();
+  },
+  { immediate: true },
+);
+
+function openRelation(o: { id: string; name: string; kind: string; schema?: string | null }) {
+  if (!conn.value) return;
+  if (o.kind !== "table" && o.kind !== "view") return;
+  nav.selectObject({
+    connectionId: conn.value.id,
+    name: o.name,
+    kind: o.kind,
+    objectId: o.id,
+    schema: o.schema,
+  });
+}
 </script>
 
 <template>
-  <div class="home" data-testid="connection-home" v-if="conn">
+  <div v-if="conn" class="home" data-testid="connection-home">
     <div class="strip" role="tablist" aria-label="Connection workspace">
       <button
         type="button"
@@ -52,53 +136,103 @@ const views = computed(() =>
       </button>
     </div>
 
-    <div v-if="homeTab === 'overview'" class="overview" data-testid="home-overview">
+    <div
+      v-if="homeTab === 'overview'"
+      class="overview"
+      data-testid="home-overview"
+    >
       <header class="head">
-        <h1>{{ conn.name }}</h1>
-        <p class="meta">
-          <span class="driver">{{ conn.driver }}</span>
-          <span v-if="conn.mock" class="badge">demo</span>
-          <span class="path">{{ conn.path }}</span>
-        </p>
+        <div class="mark" aria-hidden="true">▣</div>
+        <div class="titles">
+          <div class="title-row">
+            <h1>{{ conn.name }}</h1>
+            <span class="driver-pill">{{
+              conn.driver === "sqlite" ? "SQLite" : conn.driver
+            }}</span>
+            <span v-if="conn.mock" class="badge">demo</span>
+          </div>
+          <p class="path">{{ conn.path }}</p>
+        </div>
+        <QueryaButton
+          variant="secondary"
+          size="md"
+          :disabled="loading"
+          @click="loadOverview"
+        >
+          Refresh
+        </QueryaButton>
       </header>
 
-      <section class="cards">
-        <div class="card">
-          <span class="n">{{ tables.length }}</span>
-          <span class="l">Tables</span>
+      <p v-if="loading && !overview" class="status">Loading database overview…</p>
+      <p v-else-if="error" class="status err">{{ error }}</p>
+
+      <section v-else class="chips" aria-label="Database info">
+        <div class="chip">
+          <span class="chip-ico" aria-hidden="true">ⓘ</span>
+          <div>
+            <span class="chip-l">SQLite Version</span>
+            <span class="chip-v">{{ overview?.version || "—" }}</span>
+          </div>
         </div>
-        <div class="card">
-          <span class="n">{{ views.length }}</span>
-          <span class="l">Views</span>
+        <div class="chip">
+          <span class="chip-ico" aria-hidden="true">▤</span>
+          <div>
+            <span class="chip-l">Database Size</span>
+            <span class="chip-v">{{ sizeLabel }}</span>
+          </div>
+        </div>
+        <div class="chip">
+          <span class="chip-ico" aria-hidden="true">▦</span>
+          <div>
+            <span class="chip-l">Pages / Page Size</span>
+            <span class="chip-v">{{ pagesLabel }}</span>
+          </div>
+        </div>
+        <div class="chip">
+          <span class="chip-ico" aria-hidden="true">↺</span>
+          <div>
+            <span class="chip-l">Journal Mode</span>
+            <span class="chip-v">{{ overview?.journal_mode || "—" }}</span>
+          </div>
         </div>
       </section>
 
-      <section class="quick">
-        <h2>Objects</h2>
-        <p class="hint">
-          Open a table from the sidebar to browse its <strong>Data</strong> grid —
-          same as Flutter. SQL stays on this tab when you need it.
+      <section class="tables-card">
+        <div class="card-head">
+          <span class="card-ico" aria-hidden="true">▦</span>
+          <h2>Tables</h2>
+          <span class="count">{{ tables.length }}</span>
+          <span v-if="views.length" class="count muted"
+            >{{ views.length }} views</span
+          >
+        </div>
+        <p v-if="tables.length === 0 && views.length === 0" class="empty">
+          No user tables in database.
         </p>
-        <ul class="obj-list">
-          <li v-for="o in tree.relations" :key="o.id">
-            <button
-              type="button"
-              class="obj"
-              @click="
-                nav.selectObject({
-                  connectionId: conn!.id,
-                  name: o.name,
-                  kind: o.kind as 'table' | 'view',
-                  objectId: o.id,
-                  schema: o.schema,
-                })
-              "
-            >
-              <span class="obj-name">{{ o.name }}</span>
-              <span class="obj-kind">{{ o.kind }}</span>
-            </button>
-          </li>
-        </ul>
+        <div v-else class="wrap">
+          <button
+            v-for="o in tables"
+            :key="o.id"
+            type="button"
+            class="table-chip"
+            :title="`Open ${o.name}`"
+            @click="openRelation(o)"
+          >
+            <span class="t-ico" aria-hidden="true">▥</span>
+            {{ o.name }}
+          </button>
+          <button
+            v-for="o in views"
+            :key="o.id"
+            type="button"
+            class="table-chip view"
+            :title="`Open ${o.name}`"
+            @click="openRelation(o)"
+          >
+            <span class="t-ico" aria-hidden="true">◇</span>
+            {{ o.name }}
+          </button>
+        </div>
       </section>
     </div>
 
@@ -151,32 +285,54 @@ const views = computed(() =>
 .overview {
   flex: 1;
   overflow: auto;
-  padding: 24px 28px;
+  padding: 24px;
+  background: var(--q-canvas);
 }
 
-.head h1 {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 650;
-  letter-spacing: -0.03em;
-}
-
-.meta {
-  margin: 6px 0 0;
+.head {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
   align-items: center;
-  font-size: 12px;
-  color: var(--q-muted-foreground);
-  font-family: var(--q-font-mono);
+  gap: 16px;
 }
 
-.driver {
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.mark {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--q-primary) 12%, transparent);
+  color: var(--q-primary);
+  font-size: 18px;
+}
+
+.titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.driver-pill {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--q-muted);
+  color: var(--q-muted-foreground);
 }
 
 .badge {
@@ -189,89 +345,147 @@ const views = computed(() =>
 }
 
 .path {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--q-muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status {
+  margin: 24px 0 0;
+  font-size: 13px;
+  color: var(--q-muted-foreground);
+}
+
+.status.err {
+  color: var(--q-destructive);
+}
+
+.chips {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .chips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.chip {
+  min-height: 88px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--q-card);
+  border: 1px solid color-mix(in srgb, var(--q-border) 50%, transparent);
+}
+
+.chip-ico {
+  margin-top: 2px;
+  color: var(--q-primary);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.chip-l {
+  display: block;
+  font-size: 11px;
+  color: var(--q-muted-foreground);
+}
+
+.chip-v {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--q-foreground);
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.tables-card {
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--q-card);
+  border: 1px solid color-mix(in srgb, var(--q-border) 50%, transparent);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-ico {
+  color: var(--q-primary);
+}
+
+.card-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.count {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--q-muted);
+  color: var(--q-muted-foreground);
+}
+
+.count.muted {
   opacity: 0.85;
 }
 
-.cards {
-  display: flex;
-  gap: 12px;
-  margin: 22px 0;
-}
-
-.card {
-  min-width: 88px;
-  padding: 12px 14px;
-  border-radius: var(--q-radius-control);
-  background: var(--q-surface);
-  border: 1px solid
-    color-mix(in srgb, var(--q-border) 70%, transparent);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.card .n {
-  font-size: 20px;
-  font-weight: 650;
-  color: var(--q-foreground);
-}
-
-.card .l {
-  font-size: 11px;
-  color: var(--q-muted-foreground);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.quick h2 {
-  margin: 0 0 6px;
+.empty {
+  margin: 24px 0 0;
+  text-align: center;
   font-size: 13px;
-  font-weight: 650;
-}
-
-.hint {
-  margin: 0 0 12px;
-  font-size: 12px;
   color: var(--q-muted-foreground);
-  max-width: 36rem;
-  line-height: 1.45;
 }
 
-.obj-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.wrap {
+  margin-top: 16px;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-width: 28rem;
-}
-
-.obj {
-  appearance: none;
-  width: 100%;
-  border: 0;
-  background: transparent;
-  display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: var(--q-radius-control);
-  cursor: pointer;
+}
+
+.table-chip {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--q-border) 30%, transparent);
+  background: color-mix(in srgb, var(--q-muted-foreground) 14%, transparent);
   color: var(--q-foreground);
   font: inherit;
-  font-size: 13px;
-  text-align: left;
+  font-size: 12.5px;
+  cursor: pointer;
 }
 
-.obj:hover {
-  background: var(--q-accent);
+.table-chip:hover {
+  background: color-mix(in srgb, var(--q-muted-foreground) 28%, transparent);
 }
 
-.obj-kind {
-  font-size: 10px;
-  color: var(--q-muted-foreground);
-  font-family: var(--q-font-mono);
+.table-chip.view {
+  opacity: 0.95;
+}
+
+.t-ico {
+  color: var(--q-primary);
+  font-size: 12px;
 }
 
 .sql-park {

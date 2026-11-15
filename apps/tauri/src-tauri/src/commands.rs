@@ -1,6 +1,6 @@
 use crate::connection::{
     ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager, ConnectionRegistry,
-    SchemaObject, SchemaObjectKind, SqlObjectKind, SqlObjectNode, TableSchema,
+    SchemaObject, SchemaObjectKind, SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
 };
 use tauri::ipc::Channel;
 use tauri::State;
@@ -96,6 +96,15 @@ pub fn db_list_columns(
     registry: State<'_, ConnectionRegistry>,
 ) -> Result<TableSchema, ConnectionError> {
     registry.with_sqlite(&id, |s| s.list_columns(&table))
+}
+
+/// SQLite Overview / Database Info (Flutter `SqliteOverviewTab`).
+#[tauri::command]
+pub fn db_sqlite_overview(
+    id: ConnectionId,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<SqliteOverview, ConnectionError> {
+    registry.with_sqlite(&id, |s| s.database_overview())
 }
 
 /// Execute SQL and stream `QueryEvent` batches over `on_event`.

@@ -4,12 +4,12 @@ mod connection;
 pub use connection::{
     ColumnMeta, ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager,
     ConnectionRegistry, DriverKind, ObjectTreeProvider, QueryEvent, SchemaObject, SchemaObjectKind,
-    SqlObjectKind, SqlObjectNode, TableSchema,
+    SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
 };
 
 use commands::{
     db_connect_sqlite, db_describe_object, db_disconnect, db_execute_query, db_is_connected,
-    db_list_children, db_list_columns, db_list_schemas, db_list_tables,
+    db_list_children, db_list_columns, db_list_schemas, db_list_tables, db_sqlite_overview,
 };
 
 #[tauri::command]
@@ -50,6 +50,7 @@ pub fn run() {
             db_list_columns,
             db_list_children,
             db_describe_object,
+            db_sqlite_overview,
             db_execute_query,
         ])
         .run(tauri::generate_context!())

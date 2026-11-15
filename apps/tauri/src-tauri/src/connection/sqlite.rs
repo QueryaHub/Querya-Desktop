@@ -61,6 +61,15 @@ impl SqliteSession {
         self.with_connection(|c| super::sqlite_introspect::list_columns(c, table))
     }
 
+    /// Flutter `databaseOverview` for the Overview / Database Info tab.
+    pub fn database_overview(
+        &self,
+    ) -> ConnectionResult<super::sqlite_introspect::SqliteOverview> {
+        self.with_connection(|c| {
+            super::sqlite_introspect::database_overview(c, &self.path)
+        })
+    }
+
     pub fn execute_streaming(
         &self,
         sql: &str,

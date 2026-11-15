@@ -4,6 +4,61 @@ use super::error::{ConnectionError, ConnectionResult};
 use super::id::DriverKind;
 use super::introspect::{ColumnMeta, SchemaObject, SchemaObjectKind, TableSchema};
 use rusqlite::Connection;
+use serde::Serialize;
+
+/// Flutter `SqliteConnection.databaseOverview` (+ on-disk file size).
+#[derive(Debug, Clone, Serialize)]
+pub struct SqliteOverview {
+    pub version: String,
+    pub page_count: i64,
+    pub page_size: i64,
+    pub journal_mode: String,
+    pub table_count: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_size_bytes: Option<u64>,
+}
+
+pub fn database_overview(
+    conn: &Connection,
+    path: &str,
+) -> ConnectionResult<SqliteOverview> {
+    let version: String = conn
+        .query_row("SELECT sqlite_version()", [], |r| r.get(0))
+        .unwrap_or_default();
+    let page_count: i64 = conn
+        .query_row("PRAGMA page_count", [], |r| r.get(0))
+        .unwrap_or(0);
+    let page_size: i64 = conn
+        .query_row("PRAGMA page_size", [], |r| r.get(0))
+        .unwrap_or(0);
+    let journal_mode: String = conn
+        .query_row("PRAGMA journal_mode", [], |r| r.get::<_, String>(0))
+        .map(|s| s.to_uppercase())
+        .unwrap_or_else(|_| "—".into());
+    let table_count: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM sqlite_master \
+             WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let file_size_bytes = if path.is_empty() || path == ":memory:" {
+        None
+    } else {
+        std::fs::metadata(path).ok().map(|m| m.len())
+    };
+
+    Ok(SqliteOverview {
+        version,
+        page_count,
+        page_size,
+        journal_mode,
+        table_count,
+        file_size_bytes,
+    })
+}
 
 /// SQLite has no real schemas; expose the default attached DB name.
 pub fn list_schemas(_conn: &Connection) -> ConnectionResult<Vec<String>> {

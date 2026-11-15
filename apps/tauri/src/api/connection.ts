@@ -88,6 +88,20 @@ export async function dbListColumns(
   return invoke<TableSchema>("db_list_columns", { id, table });
 }
 
+/** Flutter `SqliteConnection.databaseOverview`. */
+export type SqliteOverview = {
+  version: string;
+  page_count: number;
+  page_size: number;
+  journal_mode: string;
+  table_count: number;
+  file_size_bytes?: number | null;
+};
+
+export async function dbSqliteOverview(id: string): Promise<SqliteOverview> {
+  return invoke<SqliteOverview>("db_sqlite_overview", { id });
+}
+
 export function formatConnectionError(err: unknown): string {
   if (typeof err === "string") return err;
   if (err && typeof err === "object") {
