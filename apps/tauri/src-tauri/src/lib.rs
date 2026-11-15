@@ -2,6 +2,7 @@ mod commands;
 mod connection;
 mod profiles;
 mod secrets;
+mod ssh_tunnel;
 mod staging;
 
 pub use connection::{
@@ -12,6 +13,9 @@ pub use connection::{
 };
 pub use profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 pub use secrets::{KeyringSecretStore, MemorySecretStore, SecretError, SecretStore, SharedSecretStore};
+pub use ssh_tunnel::{
+    SshTunnelError, SshTunnelInfo, SshTunnelOpenRequest, SshTunnelRegistry,
+};
 pub use staging::{
     apply_plan_mysql, apply_plan_postgres, apply_plan_sqlite, apply_staging_mysql,
     apply_staging_postgres, apply_staging_sqlite, generate_plan, ApplyError, ApplyResult,
@@ -27,7 +31,7 @@ use commands::{
     mongo_list_databases, mongo_ping, profiles_connect_mongo, profiles_connect_mysql,
     profiles_connect_postgres, profiles_connect_redis, profiles_connect_sqlite, profiles_delete,
     profiles_list, profiles_upsert, redis_get, redis_key_metas, redis_ping, redis_read_key,
-    redis_scan, redis_set,
+    redis_scan, redis_set, ssh_tunnel_close, ssh_tunnel_list, ssh_tunnel_open,
 };
 
 #[tauri::command]
@@ -81,6 +85,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(ConnectionRegistry::new())
         .manage(KeyringSecretStore::shared())
+        .manage(SshTunnelRegistry::new())
         .setup(|app| {
             use tauri::Manager;
             let store = ProfileStore::open_default().map_err(|e| {
@@ -130,6 +135,9 @@ pub fn run() {
             profiles_connect_mysql,
             profiles_connect_redis,
             profiles_connect_mongo,
+            ssh_tunnel_open,
+            ssh_tunnel_close,
+            ssh_tunnel_list,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
