@@ -26,6 +26,9 @@ importers:
       '@glideapps/glide-data-grid':
         specifier: ^6.0.3
         version: 6.0.3(lodash@4.18.1)(marked@4.3.0)(react-dom@18.3.1(react@18.3.1))(react-responsive-carousel@3.2.23)(react@18.3.1)
+      '@lucide/vue':
+        specifier: ^1.73.0
+        version: 1.73.0(vue@3.5.45(typescript@5.8.3))
       '@tauri-apps/api':
         specifier: ^2
         version: 2.12.4
@@ -428,6 +431,11 @@ packages:
   '@linaria/utils@4.5.3':
     resolution: {integrity: sha512-tSpxA3Zn0DKJ2n/YBnYAgiDY+MNvkmzAHrD8R9PKrpGaZ+wz1jQEmE1vGn1cqh8dJyWK0NzPAA8sf1cqa+RmAg==}
     engines: {node: ^12.16.0 || >=13.7.0}
+
+  '@lucide/vue@1.73.0':
+    resolution: {integrity: sha512-QVVRSgu2rqRX3NAUktT9venW0Bvtr03aCZjhFRLwnV3uqLyR7KCTOx5mMlukhw0aiyjC3D6w2b+fmy4MeM5R3Q==}
+    peerDependencies:
+      vue: '>=3.0.1'
 
   '@marijn/find-cluster-break@1.0.4':
     resolution: {integrity: sha512-Wy0V7+SGUjnF9/TkiM1hKVDPj7jKXduPNboMVtHTA8dySMURWqfg/JZ9E2Sq8JgSJmkl7k7Qe9FLeMSrSraWmQ==}
@@ -1638,6 +1646,10 @@ snapshots:
       minimatch: 9.0.9
     transitivePeerDependencies:
       - supports-color
+
+  '@lucide/vue@1.73.0(vue@3.5.45(typescript@5.8.3))':
+    dependencies:
+      vue: 3.5.45(typescript@5.8.3)
 
   '@marijn/find-cluster-break@1.0.4': {}
 

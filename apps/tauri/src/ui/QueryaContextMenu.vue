@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { QueryaIcon } from "./icons";
 
 export type CtxItem = {
   id: string;
@@ -92,7 +93,12 @@ onUnmounted(() => {
         @mouseenter="item.children ? (submenu = item.id) : (submenu = null)"
       >
         <span>{{ item.label }}</span>
-        <span v-if="item.children" class="caret">▸</span>
+        <QueryaIcon
+          v-if="item.children"
+          class="caret"
+          name="chevronRight"
+          :size="12"
+        />
       </button>
       <div
         v-if="item.children && submenu === item.id"

@@ -9,6 +9,7 @@ import { findDemoObject } from "../mock/demoCatalog";
 import { dbExecuteQuery } from "../api/query";
 import { formatConnectionError } from "../api/connection";
 import ResultGrid from "./ResultGrid.vue";
+import { QueryaIcon } from "./icons";
 
 const nav = useShellNavStore();
 const connections = useConnectionsStore();
@@ -93,7 +94,9 @@ watch(
     data-testid="table-object-view"
   >
     <header class="chrome">
-      <button type="button" class="back" @click="nav.clearObject()">←</button>
+      <button type="button" class="back" aria-label="Back" @click="nav.clearObject()">
+        <QueryaIcon name="arrowLeft" :size="16" />
+      </button>
       <div class="titles">
         <h1>{{ selectedObject.name }}</h1>
         <p class="sub">
