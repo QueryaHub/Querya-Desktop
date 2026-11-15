@@ -7,10 +7,11 @@ import { useShellNavStore } from "../stores/shellNav";
 import { useObjectTreeStore } from "../stores/objectTree";
 import { useQueryaMotion } from "../motion";
 import SplitHandle from "./SplitHandle.vue";
+import QueryaContextMenu, { type CtxItem } from "./QueryaContextMenu.vue";
 
 const emit = defineEmits<{
-  openSqlite: [];
   newConnection: [];
+  newFolder: [];
 }>();
 
 const shell = useShellStore();
@@ -24,7 +25,18 @@ const { objects, filter: objectFilter, loading, error } = storeToRefs(tree);
 const motion = useQueryaMotion();
 const filter = ref("");
 const dragging = ref(false);
-const menuOpen = ref(false);
+const ctx = ref({ open: false, x: 0, y: 0 });
+
+const ctxItems: CtxItem[] = [
+  {
+    id: "create",
+    label: "Create",
+    children: [
+      { id: "new-connection", label: "New Connection" },
+      { id: "new-folder", label: "New Folder" },
+    ],
+  },
+];
 
 const filteredConnections = computed(() => {
   const q = filter.value.trim().toLowerCase();
@@ -88,10 +100,17 @@ function onObjectChevron(name: string, e: MouseEvent) {
   void tree.toggleColumns(name);
 }
 
-function onContextCreate(action: "connection" | "sqlite" | "folder") {
-  menuOpen.value = false;
-  if (action === "sqlite") emit("openSqlite");
-  else if (action === "connection") emit("newConnection");
+function onPanelContext(e: MouseEvent) {
+  // Only empty fill / panel chrome — not rows (they get their own menus later).
+  const t = e.target as HTMLElement | null;
+  if (t?.closest(".conn-row, .node-row, .cols, input, button")) return;
+  e.preventDefault();
+  ctx.value = { open: true, x: e.clientX, y: e.clientY };
+}
+
+function onCtxSelect(id: string) {
+  if (id === "new-connection") emit("newConnection");
+  else if (id === "new-folder") emit("newFolder");
 }
 
 onUnmounted(() => {
@@ -107,7 +126,7 @@ onUnmounted(() => {
     :style="panelStyle"
     :aria-hidden="!shell.sidebarOpen"
   >
-    <div class="inner" @contextmenu.prevent="menuOpen = true">
+    <div class="inner" @contextmenu="onPanelContext">
       <div class="servers-header" data-testid="connections-servers-header">
         <span class="servers-label">SERVERS</span>
         <span class="count">{{ items.length }}</span>
@@ -125,10 +144,7 @@ onUnmounted(() => {
 
       <div class="body">
         <p v-if="!filteredConnections.length" class="empty-title">
-          {{ filter ? "No connections match" : "No connections yet" }}
-        </p>
-        <p v-if="!filteredConnections.length" class="empty-hint">
-          Right-click → Create, or use the empty workspace actions.
+          {{ filter ? `No connections match "${filter}"` : "No connections yet" }}
         </p>
 
         <ul
@@ -247,22 +263,16 @@ onUnmounted(() => {
           </li>
         </ul>
       </div>
-
-      <div v-if="menuOpen" class="ctx" @click.stop>
-        <p class="ctx-label">Create</p>
-        <button type="button" @click="onContextCreate('connection')">
-          New Connection
-        </button>
-        <button type="button" @click="onContextCreate('sqlite')">
-          Open SQLite…
-        </button>
-        <button type="button" class="muted" disabled>New Folder</button>
-        <button type="button" class="dismiss" @click="menuOpen = false">
-          Close
-        </button>
-      </div>
     </div>
     <SplitHandle v-if="shell.sidebarOpen" @pointerdown="onResizeStart" />
+    <QueryaContextMenu
+      :open="ctx.open"
+      :x="ctx.x"
+      :y="ctx.y"
+      :items="ctxItems"
+      @close="ctx.open = false"
+      @select="onCtxSelect"
+    />
   </aside>
 </template>
 
@@ -348,10 +358,10 @@ onUnmounted(() => {
 .empty-title {
   margin: 12px 4px 0;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
+  color: var(--q-muted-foreground);
 }
 
-.empty-hint,
 .hint {
   margin: 6px 4px 0;
   font-size: 12px;
@@ -509,57 +519,4 @@ onUnmounted(() => {
   font-family: var(--q-font-mono);
 }
 
-.ctx {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  z-index: 5;
-  min-width: 160px;
-  padding: 6px;
-  border-radius: var(--q-radius-control);
-  background: var(--q-surface);
-  border: 1px solid var(--q-border);
-  box-shadow: 0 8px 24px color-mix(in srgb, #000 35%, transparent);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.ctx-label {
-  margin: 0;
-  padding: 4px 8px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--q-muted-foreground);
-  text-transform: uppercase;
-}
-
-.ctx button {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  padding: 6px 8px;
-  border-radius: var(--q-radius-sm);
-  font: inherit;
-  font-size: 12px;
-  color: var(--q-foreground);
-  cursor: pointer;
-}
-
-.ctx button:hover:not(:disabled) {
-  background: var(--q-accent);
-}
-
-.ctx button:disabled,
-.ctx .muted {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.ctx .dismiss {
-  margin-top: 4px;
-  color: var(--q-muted-foreground);
-}
 </style>

@@ -46,8 +46,8 @@ const emit = defineEmits<{
       </button>
     </div>
     <p class="hint">
-      Tip: expand a connection in the sidebar, then click a table to open its
-      <strong>Data</strong> grid — SQL is on the connection home tab.
+      Tip: <kbd>Ctrl</kbd>+<kbd>N</kbd> new connection ·
+      <kbd>Ctrl</kbd>+<kbd>,</kbd> preferences · sidebar right-click → Create
     </p>
   </div>
 </template>
