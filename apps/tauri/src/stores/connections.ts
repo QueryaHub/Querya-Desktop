@@ -3,6 +3,7 @@ import { reactive, ref } from "vue";
 import {
   dbDisconnect,
   formatConnectionError,
+  profilesConnectPostgres,
   profilesConnectSqlite,
   profilesDelete,
   profilesList,
@@ -16,43 +17,94 @@ import { useShellStatusStore } from "./shellStatus";
 
 export type LiveConnection = {
   id: string;
-  driver: "sqlite";
+  driver: "sqlite" | "postgres";
   name: string;
-  path: string;
+  /** SQLite file path. */
+  path?: string;
+  host?: string;
+  port?: number;
+  database?: string;
+  user?: string;
   /** Offline UI demo — no Rust session. */
   mock?: boolean;
   /** Optional SERVERS folder id. */
   folderId?: string | null;
-  /** Live rusqlite session open in the registry. */
+  /** Live session open in the registry. */
   connected?: boolean;
 };
+
+/** Session-only passwords — never written to ProfileStore (keyring: #1878). */
+const sessionPasswords = reactive(new Map<string, string>());
 
 function fileName(path: string): string {
   const parts = path.split(/[/\\]/);
   return parts[parts.length - 1] || path;
 }
 
+function endpointLabel(conn: LiveConnection): string {
+  if (conn.mock) return "Demo (offline)";
+  if (conn.driver === "sqlite") return conn.path ?? "";
+  const host = conn.host ?? "localhost";
+  const port = conn.port ?? 5432;
+  const db = conn.database ?? "";
+  return `${host}:${port}/${db}`;
+}
+
 function fromProfile(p: ConnectionProfile, connected = false): LiveConnection | null {
-  if (p.driver !== "sqlite") return null;
-  const path = p.path?.trim();
-  if (!path) return null;
-  return {
-    id: p.id,
-    driver: "sqlite",
-    name: p.name,
-    path,
-    folderId: p.folder_id ?? null,
-    connected,
-  };
+  if (p.driver === "sqlite") {
+    const path = p.path?.trim();
+    if (!path) return null;
+    return {
+      id: p.id,
+      driver: "sqlite",
+      name: p.name,
+      path,
+      folderId: p.folder_id ?? null,
+      connected,
+    };
+  }
+  if (p.driver === "postgres") {
+    const host = p.host?.trim();
+    const database = p.database_name?.trim();
+    const user = p.username?.trim();
+    if (!host || !database || !user) return null;
+    return {
+      id: p.id,
+      driver: "postgres",
+      name: p.name,
+      host,
+      port: p.port != null ? Number(p.port) : 5432,
+      database,
+      user,
+      folderId: p.folder_id ?? null,
+      connected,
+    };
+  }
+  return null;
 }
 
 function toProfile(conn: LiveConnection): ConnectionProfile {
   const now = String(Math.floor(Date.now() / 1000));
+  if (conn.driver === "postgres") {
+    return {
+      id: conn.id,
+      driver: "postgres",
+      name: conn.name,
+      host: conn.host ?? null,
+      port: conn.port ?? 5432,
+      username: conn.user ?? null,
+      database_name: conn.database ?? null,
+      folder_id: conn.folderId ?? null,
+      sort_order: 0,
+      created_at: now,
+      updated_at: now,
+    };
+  }
   return {
     id: conn.id,
     driver: "sqlite",
     name: conn.name,
-    path: conn.path,
+    path: conn.path ?? null,
     folder_id: conn.folderId ?? null,
     sort_order: 0,
     created_at: now,
@@ -63,7 +115,6 @@ function toProfile(conn: LiveConnection): ConnectionProfile {
 /** Saved / live sessions shown in SERVERS (Flutter connections list). */
 export const useConnectionsStore = defineStore("connections", () => {
   const items = ref<LiveConnection[]>([]);
-  /** Incremental index — not rebuilt on every upsert. */
   const byId = reactive(new Map<string, LiveConnection>());
   const hydrated = ref(false);
 
@@ -77,12 +128,12 @@ export const useConnectionsStore = defineStore("connections", () => {
 
   function remove(id: string) {
     byId.delete(id);
+    sessionPasswords.delete(id);
     const list = items.value;
     const i = list.findIndex((c) => c.id === id);
     if (i >= 0) list.splice(i, 1);
   }
 
-  /** Load saved profiles into SERVERS (not connected until ensureConnected). */
   async function hydrate() {
     if (hydrated.value) return;
     const status = useShellStatusStore();
@@ -107,7 +158,6 @@ export const useConnectionsStore = defineStore("connections", () => {
     }
   }
 
-  /** Flutter-style Demo — full UI without opening a real file. */
   function launchDemo() {
     const nav = useShellNavStore();
     const status = useShellStatusStore();
@@ -163,7 +213,7 @@ export const useConnectionsStore = defineStore("connections", () => {
       upsert(conn);
       nav.setExpanded(conn.id, true);
       nav.selectConnection(conn.id);
-      status.setConnection(conn.name, conn.path);
+      status.setConnection(conn.name, conn.path ?? path);
       status.setQueryMetrics({
         busy: false,
         message: `Connected · ${conn.name}`,
@@ -176,13 +226,92 @@ export const useConnectionsStore = defineStore("connections", () => {
     }
   }
 
-  /** Open live session for a saved (or already listed) profile. */
+  async function connectPostgres(opts: {
+    name: string;
+    host: string;
+    port: number;
+    database: string;
+    user: string;
+    password?: string | null;
+    folderId?: string | null;
+    id?: string | null;
+  }) {
+    const status = useShellStatusStore();
+    const nav = useShellNavStore();
+    const name =
+      opts.name.trim() ||
+      `${opts.user}@${opts.host}/${opts.database}`;
+    status.setQueryMetrics({
+      busy: true,
+      message: `Connecting ${opts.host}:${opts.port}…`,
+    });
+    try {
+      const profile = await profilesConnectPostgres({
+        name,
+        host: opts.host,
+        port: opts.port,
+        database: opts.database,
+        user: opts.user,
+        password: opts.password ?? null,
+        folderId: opts.folderId ?? null,
+        id: opts.id ?? null,
+      });
+      if (opts.password) sessionPasswords.set(profile.id, opts.password);
+      const conn: LiveConnection = {
+        id: profile.id,
+        driver: "postgres",
+        name: profile.name,
+        host: profile.host ?? opts.host,
+        port: profile.port != null ? Number(profile.port) : opts.port,
+        database: profile.database_name ?? opts.database,
+        user: profile.username ?? opts.user,
+        folderId: profile.folder_id ?? opts.folderId ?? null,
+        connected: true,
+      };
+      upsert(conn);
+      nav.setExpanded(conn.id, true);
+      nav.selectConnection(conn.id);
+      status.setConnection(conn.name, endpointLabel(conn));
+      status.setQueryMetrics({
+        busy: false,
+        message: `Connected · ${conn.name}`,
+      });
+      return conn;
+    } catch (err) {
+      const msg = formatConnectionError(err);
+      status.setQueryMetrics({ busy: false, message: msg });
+      throw err;
+    }
+  }
+
   async function ensureConnected(id: string) {
     const conn = byId.get(id);
     if (!conn || conn.mock) return conn ?? null;
     if (conn.connected) return conn;
-    return connectSqlite(conn.path, {
+    if (conn.driver === "sqlite") {
+      return connectSqlite(conn.path ?? "", {
+        name: conn.name,
+        folderId: conn.folderId,
+        id: conn.id,
+      });
+    }
+    const password = sessionPasswords.get(id) ?? null;
+    if (!password) {
+      const status = useShellStatusStore();
+      status.setQueryMetrics({
+        message:
+          "Postgres password not in session — reconnect via New Connection (keyring later)",
+        busy: false,
+      });
+      throw new Error("postgres password required");
+    }
+    return connectPostgres({
       name: conn.name,
+      host: conn.host ?? "localhost",
+      port: conn.port ?? 5432,
+      database: conn.database ?? "postgres",
+      user: conn.user ?? "postgres",
+      password,
       folderId: conn.folderId,
       id: conn.id,
     });
@@ -202,7 +331,7 @@ export const useConnectionsStore = defineStore("connections", () => {
         remove(id);
       }
       if (nav.selectedConnectionId === id) {
-        status.setConnection(conn?.name ?? null, conn?.path ?? null);
+        status.setConnection(conn?.name ?? null, conn ? endpointLabel(conn) : null);
         status.setQueryMetrics({
           message: conn ? `Disconnected · ${conn.name}` : "No connection",
           busy: false,
@@ -211,7 +340,6 @@ export const useConnectionsStore = defineStore("connections", () => {
     }
   }
 
-  /** Remove from SERVERS + LocalDb (Flutter "Remove connection"). */
   async function removeConnection(id: string) {
     const status = useShellStatusStore();
     const nav = useShellNavStore();
@@ -233,7 +361,10 @@ export const useConnectionsStore = defineStore("connections", () => {
         const next = items.value[0] ?? null;
         if (next) nav.selectConnection(next.id);
         else nav.reset();
-        status.setConnection(next?.name ?? null, next?.path ?? null);
+        status.setConnection(
+          next?.name ?? null,
+          next ? endpointLabel(next) : null,
+        );
         status.setQueryMetrics({
           message: next ? `Connected · ${next.name}` : "No connection",
           busy: false,
@@ -251,11 +382,14 @@ export const useConnectionsStore = defineStore("connections", () => {
       try {
         conn = (await ensureConnected(id)) ?? conn;
       } catch {
+        // Still select so Overview/SQL are reachable; PG may need re-auth.
+        nav.selectConnection(id);
+        status.setConnection(conn.name, endpointLabel(conn));
         return;
       }
     }
     nav.selectConnection(id);
-    status.setConnection(conn.name, conn.mock ? "Demo (offline)" : conn.path);
+    status.setConnection(conn.name, endpointLabel(conn));
     status.setQueryMetrics({
       message: conn.mock
         ? "Demo catalog · UI core (no live DB)"
@@ -281,7 +415,6 @@ export const useConnectionsStore = defineStore("connections", () => {
     }
   }
 
-  /** Detach all connections from a folder (Flutter: folder delete keeps connections). */
   function detachFolder(folderId: string) {
     for (const c of items.value) {
       if (c.folderId === folderId) {
@@ -298,6 +431,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     hydrate,
     launchDemo,
     connectSqlite,
+    connectPostgres,
     ensureConnected,
     disconnect,
     removeConnection,

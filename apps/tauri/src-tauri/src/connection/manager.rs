@@ -231,6 +231,17 @@ impl ConnectionRegistry {
                     sqlite.clone_handle(),
                 )))
             }
+            DriverKind::Postgres => {
+                let pg = session
+                    .as_any()
+                    .downcast_ref::<PostgresSession>()
+                    .ok_or(ConnectionError::UnsupportedDriver {
+                        driver: DriverKind::Postgres,
+                    })?;
+                Ok(Arc::new(
+                    super::postgres_object_tree::PostgresObjectTree::new(pg.clone_handle()),
+                ))
+            }
             other => Err(ConnectionError::UnsupportedDriver { driver: other }),
         }
     }

@@ -114,6 +114,29 @@ export async function profilesConnectSqlite(opts: {
   });
 }
 
+/** Persist Postgres metadata (no password on disk) + open live session. */
+export async function profilesConnectPostgres(opts: {
+  name: string;
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password?: string | null;
+  folderId?: string | null;
+  id?: string | null;
+}): Promise<ConnectionProfile> {
+  return invoke<ConnectionProfile>("profiles_connect_postgres", {
+    name: opts.name,
+    host: opts.host,
+    port: opts.port,
+    database: opts.database,
+    user: opts.user,
+    password: opts.password ?? null,
+    folderId: opts.folderId ?? null,
+    id: opts.id ?? null,
+  });
+}
+
 export async function dbDisconnect(id: string): Promise<void> {
   await invoke("db_disconnect", { id });
 }

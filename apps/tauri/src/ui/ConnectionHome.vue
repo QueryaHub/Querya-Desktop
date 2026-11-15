@@ -63,6 +63,12 @@ const pagesLabel = computed(() => {
 async function loadOverview() {
   const c = conn.value;
   if (!c) return;
+  if (c.driver !== "sqlite") {
+    overview.value = null;
+    error.value = null;
+    loading.value = false;
+    return;
+  }
   if (c.mock) {
     overview.value = {
       version: "demo",
@@ -87,6 +93,21 @@ async function loadOverview() {
     loading.value = false;
   }
 }
+
+const isSqlite = computed(() => conn.value?.driver === "sqlite");
+const isPostgres = computed(() => conn.value?.driver === "postgres");
+const driverLabel = computed(() => {
+  const d = conn.value?.driver;
+  if (d === "sqlite") return "SQLite";
+  if (d === "postgres") return "PostgreSQL";
+  return d ?? "";
+});
+const endpointLabel = computed(() => {
+  const c = conn.value;
+  if (!c) return "";
+  if (c.driver === "sqlite") return c.path ?? "";
+  return `${c.host ?? "localhost"}:${c.port ?? 5432}/${c.database ?? ""}`;
+});
 
 watch(
   selectedConnectionId,
@@ -146,14 +167,13 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
         <div class="titles">
           <div class="title-row">
             <h1>{{ conn.name }}</h1>
-            <span class="driver-pill">{{
-              conn.driver === "sqlite" ? "SQLite" : conn.driver
-            }}</span>
+            <span class="driver-pill">{{ driverLabel }}</span>
             <span v-if="conn.mock" class="badge">demo</span>
           </div>
-          <p class="path">{{ conn.path }}</p>
+          <p class="path">{{ endpointLabel }}</p>
         </div>
         <QueryaButton
+          v-if="isSqlite"
           variant="secondary"
           size="md"
           :disabled="loading"
@@ -163,10 +183,53 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
         </QueryaButton>
       </header>
 
-      <p v-if="loading && !overview" class="status">Loading database overview…</p>
+      <template v-if="isPostgres">
+        <section class="chips" aria-label="Database info">
+          <div class="chip">
+            <span class="chip-ico" aria-hidden="true">⌂</span>
+            <div class="chip-body">
+              <span class="chip-l">Host</span>
+              <span class="chip-v"
+                >{{ conn.host }}:{{ conn.port ?? 5432 }}</span
+              >
+            </div>
+          </div>
+          <div class="chip">
+            <span class="chip-ico" aria-hidden="true">▤</span>
+            <div class="chip-body">
+              <span class="chip-l">Database</span>
+              <span class="chip-v">{{ conn.database || "—" }}</span>
+            </div>
+          </div>
+          <div class="chip">
+            <span class="chip-ico" aria-hidden="true">☺</span>
+            <div class="chip-body">
+              <span class="chip-l">User</span>
+              <span class="chip-v">{{ conn.user || "—" }}</span>
+            </div>
+          </div>
+          <div class="chip">
+            <span class="chip-ico" aria-hidden="true">▦</span>
+            <div class="chip-body">
+              <span class="chip-l">Schemas / tables</span>
+              <span class="chip-v"
+                >{{ tables.length }} tables · {{ views.length }} views</span
+              >
+            </div>
+          </div>
+        </section>
+      </template>
+
+      <p v-else-if="loading && !overview" class="status">
+        Loading database overview…
+      </p>
       <p v-else-if="error" class="status err">{{ error }}</p>
 
-      <section v-else class="chips" aria-label="Database info">
+      <section
+        v-else-if="isSqlite"
+        class="chips"
+        aria-label="Database info"
+      >
         <div class="chip">
           <span class="chip-ico" aria-hidden="true">ⓘ</span>
           <div class="chip-body">

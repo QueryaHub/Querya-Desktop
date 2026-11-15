@@ -54,6 +54,30 @@ impl ConnectionProfile {
         }
     }
 
+    pub fn new_postgres(
+        name: impl Into<String>,
+        host: impl Into<String>,
+        port: u16,
+        database: impl Into<String>,
+        user: impl Into<String>,
+    ) -> Self {
+        let now = now_rfc3339();
+        Self {
+            id: Uuid::new_v4().to_string(),
+            driver: "postgres".into(),
+            name: name.into(),
+            path: None,
+            host: Some(host.into()),
+            port: Some(i64::from(port)),
+            username: Some(user.into()),
+            database_name: Some(database.into()),
+            folder_id: None,
+            sort_order: 0,
+            created_at: now.clone(),
+            updated_at: now,
+        }
+    }
+
     pub fn touch(&mut self) {
         self.updated_at = now_rfc3339();
     }
