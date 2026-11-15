@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
+import QueryaButton from "./QueryaButton.vue";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{
@@ -66,8 +67,12 @@ function onKey(e: KeyboardEvent) {
       </label>
       <p v-if="error" class="err">{{ error }}</p>
       <footer>
-        <button type="button" class="btn" @click="emit('close')">Cancel</button>
-        <button type="button" class="btn primary" @click="submit">Create</button>
+        <QueryaButton variant="ghost" size="lg" @click="emit('close')">
+          Cancel
+        </QueryaButton>
+        <QueryaButton variant="primary" size="lg" @click="submit">
+          Create
+        </QueryaButton>
       </footer>
     </div>
   </div>
@@ -134,22 +139,4 @@ footer {
   margin-top: 16px;
 }
 
-.btn {
-  appearance: none;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 6px;
-  border: 1px solid var(--q-border);
-  background: var(--q-surface);
-  color: var(--q-foreground);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.btn.primary {
-  background: var(--q-primary);
-  border-color: transparent;
-  color: var(--q-primary-foreground);
-}
 </style>

@@ -14,6 +14,7 @@ import {
   type ShortcutItem,
 } from "../preferences/shortcutsCatalog";
 import InterfaceScaleSlider from "./InterfaceScaleSlider.vue";
+import QueryaButton from "./QueryaButton.vue";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ close: [] }>();
@@ -410,28 +411,28 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
               <p class="card-body">
                 Fine-tune workbench and syntax highlight colors with live preview.
               </p>
-              <button type="button" class="btn" disabled>
+              <QueryaButton variant="secondary" size="sm" disabled>
                 Edit theme colors…
-              </button>
+              </QueryaButton>
             </div>
             <div class="card">
               <p class="card-title">Theme Actions</p>
               <div class="btn-row">
-                <button type="button" class="btn" disabled>Import theme…</button>
-                <button type="button" class="btn" disabled>
+                <QueryaButton variant="secondary" size="sm" disabled>Import theme…</QueryaButton>
+                <QueryaButton variant="secondary" size="sm" disabled>
                   Install from URL…
-                </button>
-                <button type="button" class="btn" disabled>Refresh themes</button>
-                <button type="button" class="btn" disabled>
+                </QueryaButton>
+                <QueryaButton variant="secondary" size="sm" disabled>Refresh themes</QueryaButton>
+                <QueryaButton variant="secondary" size="sm" disabled>
                   Open themes folder
-                </button>
-                <button
-                  type="button"
-                  class="btn"
+                </QueryaButton>
+                <QueryaButton
+                  variant="secondary"
+                  size="sm"
                   @click="prefs.resetAppearance()"
                 >
                   Reset appearance
-                </button>
+                </QueryaButton>
               </div>
               <p class="field-hint">
                 Theme packs use VS Code JSON. Remote install requires HTTPS and an
@@ -569,12 +570,8 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
               Useful for development and offline environments.
             </p>
             <div class="btn-row">
-              <button type="button" class="btn" @click="onInstallExtStub">
-                Install from file…
-              </button>
-              <button type="button" class="btn" @click="onOpenExtFolderStub">
-                Open extensions folder
-              </button>
+              <QueryaButton variant="secondary" size="sm" @click="onInstallExtStub">Install from file…</QueryaButton>
+              <QueryaButton variant="secondary" size="sm" @click="onOpenExtFolderStub">Open extensions folder</QueryaButton>
             </div>
             <p v-if="extMsg" class="msg">{{ extMsg }}</p>
           </div>
@@ -615,15 +612,15 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
                 MCP host lands.
               </p>
               <div class="btn-row">
-                <button type="button" class="btn" disabled>
+                <QueryaButton variant="secondary" size="sm" disabled>
                   Copy Claude Desktop config
-                </button>
-                <button type="button" class="btn" disabled>
+                </QueryaButton>
+                <QueryaButton variant="secondary" size="sm" disabled>
                   Copy Cursor config
-                </button>
-                <button type="button" class="btn" disabled>
+                </QueryaButton>
+                <QueryaButton variant="secondary" size="sm" disabled>
                   Copy VS Code config
-                </button>
+                </QueryaButton>
               </div>
             </div>
           </div>
@@ -690,29 +687,29 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
               SQLite / OS keyring).
             </p>
             <div class="btn-row">
-              <button type="button" class="btn" disabled>
+              <QueryaButton variant="secondary" size="sm" disabled>
                 Open app data folder
-              </button>
-              <button type="button" class="btn" disabled>
+              </QueryaButton>
+              <QueryaButton variant="secondary" size="sm" disabled>
                 Open themes folder
-              </button>
-              <button type="button" class="btn" disabled>
+              </QueryaButton>
+              <QueryaButton variant="secondary" size="sm" disabled>
                 Open extensions folder
-              </button>
+              </QueryaButton>
             </div>
             <h2 class="sec-title" style="margin-top: 20px">
               Community &amp; Support
             </h2>
             <div class="btn-row">
               <a
-                class="btn link"
+                class="q-btn q-btn--ghost q-btn--sm"
                 href="https://github.com/QueryaHub/Querya-Desktop"
                 target="_blank"
                 rel="noreferrer"
                 >GitHub repository</a
               >
               <a
-                class="btn link"
+                class="q-btn q-btn--ghost q-btn--sm"
                 href="https://github.com/QueryaHub/Querya-Desktop/issues"
                 target="_blank"
                 rel="noreferrer"
@@ -727,9 +724,9 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
         <p class="hint foot-hint">
           Changes apply immediately and persist locally.
         </p>
-        <button type="button" class="btn close-btn" @click="emit('close')">
+        <QueryaButton variant="secondary" size="md" @click="emit('close')">
           Close
-        </button>
+        </QueryaButton>
       </footer>
     </div>
   </div>
@@ -1045,34 +1042,6 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
   gap: 8px;
 }
 
-.btn {
-  appearance: none;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 6px;
-  border: 1px solid var(--q-border);
-  background: var(--q-surface);
-  color: var(--q-foreground);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-}
-
-.btn:hover:not(:disabled) {
-  background: var(--q-accent);
-}
-
-.btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.btn.link {
-  color: var(--q-primary);
-}
 
 .msg {
   margin: 10px 0 0;
@@ -1209,9 +1178,4 @@ kbd {
   flex: 1;
 }
 
-.close-btn {
-  height: 34px;
-  min-width: 88px;
-  justify-content: center;
-}
 </style>

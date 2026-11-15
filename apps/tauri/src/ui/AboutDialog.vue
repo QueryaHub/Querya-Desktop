@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import QueryaButton from "./QueryaButton.vue";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ close: [] }>();
@@ -47,7 +48,9 @@ onUnmounted(() => window.removeEventListener("keydown", onKey));
       <p class="ver">Version {{ version }}</p>
       <p class="desc">A lightweight desktop SQL/NoSQL client.</p>
       <p class="meta">{{ stack }} · Fluid + Liquid Glass · MIT License</p>
-      <button type="button" class="ok" @click="emit('close')">OK</button>
+      <QueryaButton variant="primary" size="md" @click="emit('close')">
+        OK
+      </QueryaButton>
     </div>
   </div>
 </template>
@@ -104,18 +107,8 @@ h2 {
   margin-top: 4px;
 }
 
-.ok {
-  appearance: none;
+.card :deep(.q-btn) {
   margin-top: 12px;
-  height: 30px;
   min-width: 88px;
-  border: 0;
-  border-radius: var(--q-radius-control);
-  background: var(--q-primary);
-  color: var(--q-primary-foreground);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
 }
 </style>
