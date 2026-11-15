@@ -1,6 +1,7 @@
 use crate::connection::{
     ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager, ConnectionRegistry,
-    SchemaObject, SchemaObjectKind, SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
+    PostgresObjectDetail, SchemaObject, SchemaObjectKind, SqlObjectKind, SqlObjectNode,
+    SqliteOverview, TableSchema,
 };
 use crate::profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 use crate::secrets::SharedSecretStore;
@@ -271,6 +272,16 @@ pub fn db_describe_object(
     registry: State<'_, ConnectionRegistry>,
 ) -> Result<TableSchema, ConnectionError> {
     registry.describe_object(&id, &object_id)
+}
+
+/// Postgres function / sequence / index / trigger / type detail (or schema listing).
+#[tauri::command]
+pub fn db_postgres_object_detail(
+    id: ConnectionId,
+    object_id: String,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<PostgresObjectDetail, ConnectionError> {
+    registry.postgres_object_detail(&id, &object_id)
 }
 
 /// Shim: schema names via object tree roots.

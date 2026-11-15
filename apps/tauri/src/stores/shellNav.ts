@@ -1,20 +1,62 @@
 import { defineStore } from "pinia";
 import { computed, reactive, ref } from "vue";
+import type { SqlObjectKind } from "../api/connection";
 
 /** Flutter MainScreen workspace selection — chrome routing, not DB. */
-export type WorkspaceSurface = "empty" | "connectionHome" | "tableObject";
+export type WorkspaceSurface =
+  | "empty"
+  | "connectionHome"
+  | "tableObject"
+  | "pgObject";
 
 export type HomeStripTab = "overview" | "sql";
 export type ObjectStripTab = "data" | "relations";
 
+export type RelationKind = "table" | "view" | "materialized_view";
+
+export type PgDetailKind =
+  | "function"
+  | "sequence"
+  | "index"
+  | "trigger"
+  | "type"
+  | "folder";
+
 export type SelectedObject = {
   connectionId: string;
   name: string;
-  kind: "table" | "view" | "materialized_view";
-  /** Stable object id when known (`sqlite:table:main:users`). */
+  kind: RelationKind | PgDetailKind;
+  /** Stable object id when known (`postgres:function:shop:fn`). */
   objectId?: string;
   schema?: string | null;
 };
+
+const RELATION_KINDS = new Set<string>(["table", "view", "materialized_view"]);
+const PG_DETAIL_KINDS = new Set<string>([
+  "function",
+  "sequence",
+  "index",
+  "trigger",
+  "type",
+  "folder",
+]);
+const PG_SCHEMA_TOOL_FOLDERS = new Set(["Indexes", "Triggers", "Types"]);
+
+export function isRelationObjectKind(kind: string): kind is RelationKind {
+  return RELATION_KINDS.has(kind);
+}
+
+export function isPgDetailObjectKind(kind: string): kind is PgDetailKind {
+  return PG_DETAIL_KINDS.has(kind);
+}
+
+/** Folders that open a schema listing pane (Flutter schema tool rows). */
+export function isPgSchemaToolFolder(node: {
+  kind: SqlObjectKind;
+  name: string;
+}): boolean {
+  return node.kind === "folder" && PG_SCHEMA_TOOL_FOLDERS.has(node.name);
+}
 
 export const useShellNavStore = defineStore("shellNav", () => {
   const selectedConnectionId = ref<string | null>(null);
@@ -25,9 +67,11 @@ export const useShellNavStore = defineStore("shellNav", () => {
   const expanded = reactive<Record<string, true>>({});
 
   const surface = computed<WorkspaceSurface>(() => {
-    if (selectedObject.value) return "tableObject";
-    if (selectedConnectionId.value) return "connectionHome";
-    return "empty";
+    const obj = selectedObject.value;
+    if (!obj) {
+      return selectedConnectionId.value ? "connectionHome" : "empty";
+    }
+    return isPgDetailObjectKind(obj.kind) ? "pgObject" : "tableObject";
   });
 
   /** Snapshot of expanded ids for watchers (stable when membership unchanged). */

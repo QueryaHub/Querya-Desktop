@@ -216,6 +216,17 @@ impl ConnectionRegistry {
         }
     }
 
+    /// Postgres function / sequence / index / trigger / type detail (or schema listing).
+    pub fn postgres_object_detail(
+        &self,
+        id: &ConnectionId,
+        object_id: &str,
+    ) -> ConnectionResult<super::postgres_object_detail::PostgresObjectDetail> {
+        self.with_postgres(id, |s| {
+            super::postgres_object_detail::fetch_detail(s, object_id)
+        })
+    }
+
     /// Driver-agnostic object tree for a live connection (SQLite first).
     pub fn object_tree(
         &self,
