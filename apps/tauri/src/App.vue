@@ -14,7 +14,7 @@ import {
 
 const shell = useShellStore();
 const motion = provideQueryaMotion();
-const { level: motionLevel, springsOn } = motion;
+const { level: motionLevel, springsOn, manual: motionManual } = motion;
 const backend = ref<string>("…");
 const theme = ref<QueryaThemeMode>("system");
 const panelOpen = ref(false);
@@ -104,7 +104,15 @@ function setMotion(level: QueryaMotionLevel) {
       <button
         type="button"
         class="btn"
-        :class="{ active: motionLevel === 'full' }"
+        :class="{ active: !motionManual }"
+        @click="motion.followSystem()"
+      >
+        System
+      </button>
+      <button
+        type="button"
+        class="btn"
+        :class="{ active: motionManual && motionLevel === 'full' }"
         @click="setMotion('full')"
       >
         Full
@@ -112,7 +120,7 @@ function setMotion(level: QueryaMotionLevel) {
       <button
         type="button"
         class="btn"
-        :class="{ active: motionLevel === 'reduced' }"
+        :class="{ active: motionManual && motionLevel === 'reduced' }"
         @click="setMotion('reduced')"
       >
         Reduced
@@ -120,7 +128,7 @@ function setMotion(level: QueryaMotionLevel) {
       <button
         type="button"
         class="btn"
-        :class="{ active: motionLevel === 'off' }"
+        :class="{ active: motionManual && motionLevel === 'off' }"
         @click="setMotion('off')"
       >
         Off
