@@ -9,7 +9,7 @@ export type WorkspaceSurface =
   | "tableObject"
   | "pgObject";
 
-export type HomeStripTab = "overview" | "sql";
+export type HomeStripTab = "overview" | "sql" | "erd";
 export type ObjectStripTab = "data" | "relations";
 
 export type RelationKind = "table" | "view" | "materialized_view";
