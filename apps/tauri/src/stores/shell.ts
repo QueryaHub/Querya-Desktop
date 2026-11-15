@@ -1,16 +1,19 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 
+/** Flutter MainContentSplit / AppSettings defaults. */
 const SIDEBAR_KEY = "querya.sidebar.width";
 const SIDEBAR_OPEN_KEY = "querya.sidebar.open";
-const MIN_WIDTH = 180;
-const MAX_WIDTH = 420;
-const DEFAULT_WIDTH = 240;
+export const SIDEBAR_MIN = 180;
+export const SIDEBAR_MAX = 500;
+export const SIDEBAR_DEFAULT = 260;
 
 function readWidth(): number {
   const raw = Number(localStorage.getItem(SIDEBAR_KEY));
-  if (Number.isFinite(raw) && raw >= MIN_WIDTH && raw <= MAX_WIDTH) return raw;
-  return DEFAULT_WIDTH;
+  if (Number.isFinite(raw) && raw >= SIDEBAR_MIN && raw <= SIDEBAR_MAX) {
+    return raw;
+  }
+  return SIDEBAR_DEFAULT;
 }
 
 function readOpen(): boolean {
@@ -19,7 +22,7 @@ function readOpen(): boolean {
   return raw !== "0";
 }
 
-/** Shell chrome store — sidebar / ready flags for later connection tree. */
+/** Shell chrome — Flutter MainScreen sidebar + ready flag. */
 export const useShellStore = defineStore("shell", () => {
   const ready = ref(false);
   const sidebarOpen = ref(readOpen());
@@ -39,7 +42,7 @@ export const useShellStore = defineStore("shell", () => {
   }
 
   function setSidebarWidth(width: number) {
-    const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(width)));
+    const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, Math.round(width)));
     sidebarWidth.value = next;
     localStorage.setItem(SIDEBAR_KEY, String(next));
   }
@@ -52,7 +55,7 @@ export const useShellStore = defineStore("shell", () => {
     setSidebarOpen,
     toggleSidebar,
     setSidebarWidth,
-    minSidebarWidth: MIN_WIDTH,
-    maxSidebarWidth: MAX_WIDTH,
+    minSidebarWidth: SIDEBAR_MIN,
+    maxSidebarWidth: SIDEBAR_MAX,
   };
 });

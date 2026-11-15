@@ -183,8 +183,8 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: minmax(7rem, 1fr) auto minmax(7rem, 1fr);
   align-items: center;
-  height: 40px;
-  min-height: 40px;
+  height: var(--q-titlebar-h);
+  min-height: var(--q-titlebar-h);
   padding: 0 var(--q-space-1);
   border-radius: 0;
   border-left: 0;
