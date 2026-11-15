@@ -12,7 +12,10 @@ pub use connection::{
 };
 pub use profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 pub use secrets::{KeyringSecretStore, MemorySecretStore, SecretError, SecretStore, SharedSecretStore};
-pub use staging::{StagedCellStatus, StagedRowStatus, StagingBuffer, NULL_SENTINEL};
+pub use staging::{
+    generate_plan, MutationType, SqlDialect, StagedCellStatus, StagedRowStatus, StagingBuffer,
+    StagingColumnMeta, TableMutationPlan, TableMutationStatement, NULL_SENTINEL,
+};
 
 use commands::{
     db_connect_mysql, db_connect_postgres, db_connect_sqlite, db_describe_object, db_disconnect,
