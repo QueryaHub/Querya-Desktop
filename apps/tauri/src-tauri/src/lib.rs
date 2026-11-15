@@ -2,11 +2,14 @@ mod commands;
 mod connection;
 
 pub use connection::{
-    ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager, ConnectionRegistry,
-    DriverKind,
+    ColumnMeta, ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager,
+    ConnectionRegistry, DriverKind, SchemaObject, SchemaObjectKind, TableSchema,
 };
 
-use commands::{db_connect_sqlite, db_disconnect, db_is_connected};
+use commands::{
+    db_connect_sqlite, db_disconnect, db_is_connected, db_list_columns, db_list_schemas,
+    db_list_tables,
+};
 
 #[tauri::command]
 fn app_info() -> serde_json::Value {
@@ -41,6 +44,9 @@ pub fn run() {
             db_connect_sqlite,
             db_disconnect,
             db_is_connected,
+            db_list_schemas,
+            db_list_tables,
+            db_list_columns,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
