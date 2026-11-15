@@ -50,6 +50,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Unit / slice smoke (vitest)
+        run: pnpm test
+
       - name: Production build
         run: pnpm build
 
