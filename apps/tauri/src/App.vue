@@ -13,6 +13,7 @@ import {
 } from "./motion";
 import QueryaGlass from "./ui/QueryaGlass.vue";
 import TitleBar from "./ui/TitleBar.vue";
+import SidebarShell from "./ui/SidebarShell.vue";
 
 const shell = useShellStore();
 const motion = provideQueryaMotion();
@@ -62,10 +63,12 @@ function setMotion(level: QueryaMotionLevel) {
 <template>
   <div class="app-frame">
     <TitleBar />
-    <main class="workspace">
+    <div class="body">
+      <SidebarShell />
+      <main class="workspace">
       <div class="hero">
         <header class="brand">Querya</header>
-        <p class="tagline">Tauri 2 + Vue 3 — tokens + Fluid + custom title bar</p>
+        <p class="tagline">Tauri 2 + Vue 3 — shell chrome (title + sidebar)</p>
         <p class="meta" data-testid="backend-info">{{ backend }}</p>
         <p class="meta">
           springs: {{ springsOn ? "on" : "off" }} · level: {{ motionLevel }}
@@ -161,7 +164,8 @@ function setMotion(level: QueryaMotionLevel) {
           </p>
         </QueryaGlass>
       </div>
-    </main>
+      </main>
+    </div>
   </div>
 </template>
 
@@ -175,8 +179,16 @@ function setMotion(level: QueryaMotionLevel) {
   color: var(--q-foreground);
 }
 
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+}
+
 .workspace {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow: auto;
 }

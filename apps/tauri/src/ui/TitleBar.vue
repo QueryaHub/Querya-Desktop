@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { detectPlatform, type QueryaPlatform } from "./platform";
 import { useQueryaMotion } from "../motion";
+import { useShellStore } from "../stores/shell";
 
 const props = withDefaults(
   defineProps<{
@@ -12,6 +13,7 @@ const props = withDefaults(
 );
 
 const motion = useQueryaMotion();
+const shell = useShellStore();
 const platform = ref<QueryaPlatform>(detectPlatform());
 const maximized = ref(false);
 
@@ -113,9 +115,22 @@ onUnmounted(() => {
       />
     </div>
 
-    <div class="brand" data-tauri-drag-region>
-      <span class="mark" aria-hidden="true" />
-      <span class="title">{{ props.title }}</span>
+    <div class="brand-row">
+      <button
+        type="button"
+        class="sidebar-toggle"
+        data-no-drag
+        data-testid="sidebar-toggle"
+        :aria-pressed="shell.sidebarOpen"
+        :aria-label="shell.sidebarOpen ? 'Hide sidebar' : 'Show sidebar'"
+        @click="shell.toggleSidebar()"
+      >
+        ☰
+      </button>
+      <div class="brand" data-tauri-drag-region>
+        <span class="mark" aria-hidden="true" />
+        <span class="title">{{ props.title }}</span>
+      </div>
     </div>
 
     <div
@@ -167,6 +182,33 @@ onUnmounted(() => {
   user-select: none;
   transition-property: background-color, border-color, backdrop-filter;
   z-index: 20;
+}
+
+.brand-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--q-space-2);
+  min-width: 0;
+}
+
+.sidebar-toggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--q-muted-foreground);
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--q-radius-sm);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.sidebar-toggle:hover,
+.sidebar-toggle[aria-pressed="true"] {
+  background: var(--q-accent);
+  color: var(--q-foreground);
 }
 
 .brand {
