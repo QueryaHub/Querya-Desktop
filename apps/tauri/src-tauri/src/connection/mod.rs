@@ -18,3 +18,4 @@ pub use introspect::{ColumnMeta, SchemaObject, SchemaObjectKind, TableSchema};
 pub use manager::{ConnectionConfig, ConnectionManager, ConnectionRegistry};
 pub use object_tree::{ObjectTreeProvider, SqlObjectKind, SqlObjectNode};
 pub use query::QueryEvent;
+pub use sqlite_introspect::SqliteOverview;

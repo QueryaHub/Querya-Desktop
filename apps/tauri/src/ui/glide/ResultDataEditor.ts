@@ -8,10 +8,10 @@ import {
   DataEditor,
   GridCellKind,
   type GridCell,
-  type GridColumn,
   type Item,
   type Theme,
 } from "@glideapps/glide-data-grid";
+import { sizeGlideColumns } from "./columnWidths";
 
 export type ResultDataEditorProps = {
   columns: string[];
@@ -29,17 +29,14 @@ function cellText(value: unknown): string {
   return JSON.stringify(value);
 }
 
+const KEYBINDINGS = { search: true } as const;
+
 export function ResultDataEditor(props: ResultDataEditorProps): ReactElement {
   const { columns, rows, width, height, theme } = props;
 
-  const gridColumns: GridColumn[] = useMemo(
-    () =>
-      columns.map((title) => ({
-        id: title,
-        title,
-        width: Math.min(280, Math.max(96, title.length * 9 + 40)),
-      })),
-    [columns],
+  const gridColumns = useMemo(
+    () => sizeGlideColumns({ columns, rows, viewportWidth: width }),
+    [columns, rows, width],
   );
 
   const muted = theme.textMedium ?? theme.textLight ?? "#94a3b8";
@@ -71,6 +68,8 @@ export function ResultDataEditor(props: ResultDataEditorProps): ReactElement {
     smoothScrollX: true,
     smoothScrollY: true,
     getCellsForSelection: true,
-    keybindings: { search: true },
+    keybindings: KEYBINDINGS,
+    maxColumnWidth: 600,
+    minColumnWidth: 56,
   });
 }
