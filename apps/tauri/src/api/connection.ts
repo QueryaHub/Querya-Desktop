@@ -8,6 +8,26 @@ export type SchemaObject = {
   schema?: string | null;
 };
 
+export type SqlObjectKind =
+  | "schema"
+  | "table"
+  | "view"
+  | "column"
+  | "index"
+  | "trigger"
+  | "function"
+  | "procedure";
+
+/** Stable tree node from `db_list_children`. */
+export type SqlObjectNode = {
+  id: string;
+  name: string;
+  kind: SqlObjectKind;
+  schema?: string | null;
+  parent_id?: string | null;
+  expandable: boolean;
+};
+
 export type ColumnMeta = {
   name: string;
   data_type: string;
@@ -34,6 +54,23 @@ export async function dbDisconnect(id: string): Promise<void> {
 
 export async function dbIsConnected(id: string): Promise<boolean> {
   return invoke<boolean>("db_is_connected", { id });
+}
+
+export async function dbListChildren(
+  id: string,
+  parentId?: string | null,
+): Promise<SqlObjectNode[]> {
+  return invoke<SqlObjectNode[]>("db_list_children", {
+    id,
+    parentId: parentId ?? null,
+  });
+}
+
+export async function dbDescribeObject(
+  id: string,
+  objectId: string,
+): Promise<TableSchema> {
+  return invoke<TableSchema>("db_describe_object", { id, objectId });
 }
 
 export async function dbListSchemas(id: string): Promise<string[]> {
