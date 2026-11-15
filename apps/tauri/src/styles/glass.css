@@ -1,0 +1,71 @@
+/**
+ * Querya Liquid Glass materials.
+ * macOS-first visual language; Win/Linux keep the same tokens with a softer
+ * blur (or solid card) when backdrop-filter is missing / expensive.
+ */
+
+:root {
+  --q-glass-blur: 24px;
+  --q-glass-saturate: 1.35;
+  --q-glass-border: color-mix(in srgb, var(--q-foreground) 12%, transparent);
+  --q-glass-highlight: color-mix(in srgb, #ffffff 35%, transparent);
+  --q-glass-bg: color-mix(in srgb, var(--q-card) 62%, transparent);
+  --q-glass-bg-strong: color-mix(in srgb, var(--q-card) 82%, transparent);
+}
+
+:root[data-theme="dark"] {
+  --q-glass-border: color-mix(in srgb, #ffffff 14%, transparent);
+  --q-glass-highlight: color-mix(in srgb, #ffffff 18%, transparent);
+  --q-glass-bg: color-mix(in srgb, var(--q-card) 55%, transparent);
+  --q-glass-bg-strong: color-mix(in srgb, var(--q-card) 78%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --q-glass-border: color-mix(in srgb, #ffffff 14%, transparent);
+    --q-glass-highlight: color-mix(in srgb, #ffffff 18%, transparent);
+    --q-glass-bg: color-mix(in srgb, var(--q-card) 55%, transparent);
+    --q-glass-bg-strong: color-mix(in srgb, var(--q-card) 78%, transparent);
+  }
+}
+
+/* Softer blur off macOS — WebKitGTK / WebView2 pay more for heavy filters. */
+:root[data-platform="linux"],
+:root[data-platform="windows"] {
+  --q-glass-blur: 14px;
+  --q-glass-saturate: 1.15;
+}
+
+/* Motion Off / Reduced: drop expensive blur (Flutter Fluid F1–F3 lesson). */
+:root[data-motion="off"],
+:root[data-motion="reduced"] {
+  --q-glass-blur: 0px;
+  --q-glass-saturate: 1;
+  --q-glass-bg: var(--q-glass-bg-strong);
+}
+
+.q-glass {
+  background: var(--q-glass-bg);
+  border: 1px solid var(--q-glass-border);
+  border-radius: var(--q-radius-lg);
+  box-shadow:
+    var(--q-shadow-sm),
+    inset 0 1px 0 var(--q-glass-highlight);
+}
+
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .q-glass {
+    -webkit-backdrop-filter: blur(var(--q-glass-blur)) saturate(var(--q-glass-saturate));
+    backdrop-filter: blur(var(--q-glass-blur)) saturate(var(--q-glass-saturate));
+  }
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .q-glass {
+    background: var(--q-glass-bg-strong);
+  }
+}
+
+.q-glass--strong {
+  background: var(--q-glass-bg-strong);
+}
