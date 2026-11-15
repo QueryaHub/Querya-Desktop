@@ -5,16 +5,17 @@ mod secrets;
 
 pub use connection::{
     ColumnMeta, ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager,
-    ConnectionRegistry, DriverKind, ObjectTreeProvider, PostgresObjectDetail, QueryEvent,
-    SchemaObject, SchemaObjectKind, SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
+    ConnectionRegistry, DriverKind, ErdColumn, ErdRelation, ErdSchema, ErdTable,
+    ObjectTreeProvider, PostgresObjectDetail, QueryEvent, SchemaObject, SchemaObjectKind,
+    SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
 };
 pub use profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 pub use secrets::{KeyringSecretStore, MemorySecretStore, SecretError, SecretStore, SharedSecretStore};
 
 use commands::{
-    db_connect_postgres, db_connect_sqlite, db_describe_object, db_disconnect, db_execute_query,
-    db_is_connected, db_list_children, db_list_columns, db_list_schemas, db_list_tables,
-    db_postgres_object_detail, db_sqlite_overview, profiles_connect_postgres,
+    db_connect_postgres, db_connect_sqlite, db_describe_object, db_disconnect, db_erd_schema,
+    db_execute_query, db_is_connected, db_list_children, db_list_columns, db_list_schemas,
+    db_list_tables, db_postgres_object_detail, db_sqlite_overview, profiles_connect_postgres,
     profiles_connect_sqlite, profiles_delete, profiles_list, profiles_upsert,
 };
 
@@ -68,6 +69,7 @@ pub fn run() {
             db_describe_object,
             db_postgres_object_detail,
             db_sqlite_overview,
+            db_erd_schema,
             db_execute_query,
             profiles_list,
             profiles_upsert,

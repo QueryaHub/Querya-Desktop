@@ -12,6 +12,7 @@ import { useObjectTreeStore } from "../stores/objectTree";
 import QueryaButton from "./QueryaButton.vue";
 import SqlWorkspace from "./SqlWorkspace.vue";
 import { QueryaIcon } from "./icons";
+import ErdView from "./erd/ErdView.vue";
 
 const connections = useConnectionsStore();
 const nav = useShellNavStore();
@@ -163,6 +164,17 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
       >
         SQL
       </button>
+      <button
+        type="button"
+        role="tab"
+        class="tab"
+        :class="{ active: homeTab === 'erd' }"
+        :aria-selected="homeTab === 'erd'"
+        data-testid="home-tab-erd"
+        @click="nav.homeTab = 'erd'"
+      >
+        ER Diagram
+      </button>
     </div>
 
     <div
@@ -309,8 +321,15 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
       </section>
     </div>
 
-    <div v-else class="sql-park" data-testid="home-sql">
+    <div v-else-if="homeTab === 'sql'" class="sql-park" data-testid="home-sql">
       <SqlWorkspace />
+    </div>
+
+    <div v-else class="erd-park" data-testid="home-erd">
+      <ErdView
+        :connection-id="conn.id"
+        :mock="!!conn.mock"
+      />
     </div>
   </div>
 </template>
@@ -578,7 +597,8 @@ h1 {
   line-height: 1;
 }
 
-.sql-park {
+.sql-park,
+.erd-park {
   flex: 1;
   min-height: 0;
 }

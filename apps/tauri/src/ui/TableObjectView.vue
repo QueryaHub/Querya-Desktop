@@ -10,6 +10,7 @@ import { dbExecuteQuery } from "../api/query";
 import { formatConnectionError } from "../api/connection";
 import ResultGrid from "./ResultGrid.vue";
 import { QueryaIcon } from "./icons";
+import ErdView from "./erd/ErdView.vue";
 
 const nav = useShellNavStore();
 const connections = useConnectionsStore();
@@ -142,10 +143,14 @@ watch(
     </div>
 
     <div v-else class="relations" data-testid="object-relations">
-      <p class="empty">
-        Relations / ER for this table lands with the diagram epic. Chrome only
-        for now.
-      </p>
+      <ErdView
+        v-if="conn"
+        :connection-id="conn.id"
+        :focus="selectedObject.name"
+        :depth="1"
+        :mock="!!conn.mock"
+        :schema="selectedObject.schema"
+      />
     </div>
   </div>
 </template>
@@ -262,12 +267,8 @@ watch(
 
 .relations {
   flex: 1;
-  padding: 24px;
-}
-
-.empty {
-  margin: 16px 0;
-  font-size: 12px;
-  color: var(--q-muted-foreground);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 </style>
