@@ -8,13 +8,15 @@ export type PrefsState = {
   updateChannel: "stable" | "dev";
   confirmDestructive: boolean;
   editorFontSize: number;
+  /** null = no limit */
   pgTimeoutSec: number | null;
   mysqlTimeoutSec: number | null;
   sqliteTimeoutSec: number | null;
   historyMax: number;
   maxResultRows: number;
   mcpEnabled: boolean;
-  extensionsSideload: boolean;
+  uiScale: number;
+  animateThemeChanges: boolean;
 };
 
 const defaults: PrefsState = {
@@ -28,20 +30,29 @@ const defaults: PrefsState = {
   historyMax: 200,
   maxResultRows: 5000,
   mcpEnabled: false,
-  extensionsSideload: true,
+  uiScale: 100,
+  animateThemeChanges: true,
 };
 
 function load(): PrefsState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...defaults };
-    return { ...defaults, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw) as Partial<PrefsState>;
+    return { ...defaults, ...parsed };
   } catch {
     return { ...defaults };
   }
 }
 
-/** App preferences — Flutter PreferencesDialog shape, localStorage for now. */
+function applyUiScale(percent: number) {
+  document.documentElement.style.setProperty(
+    "--q-ui-scale",
+    String(percent / 100),
+  );
+}
+
+/** Flutter PreferencesDialog shape — localStorage until app settings land. */
 export const usePreferencesStore = defineStore("preferences", () => {
   const state = reactive<PrefsState>(load());
 
@@ -49,13 +60,19 @@ export const usePreferencesStore = defineStore("preferences", () => {
     state,
     () => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      applyUiScale(state.uiScale);
     },
-    { deep: true },
+    { deep: true, immediate: true },
   );
+
+  function resetAppearance() {
+    state.uiScale = defaults.uiScale;
+    state.animateThemeChanges = defaults.animateThemeChanges;
+  }
 
   function reset() {
     Object.assign(state, defaults);
   }
 
-  return { state, reset };
+  return { state, reset, resetAppearance };
 });
