@@ -27,16 +27,18 @@ const displayScale = computed(() => dragScale.value ?? clampScale(props.modelVal
 
 const pctLabel = computed(() => `${Math.round(displayScale.value)}%`);
 
-/** 0–100 for soft filled track (visual only). */
-const fillPct = computed(
-  () => ((displayScale.value - MIN) / (MAX - MIN)) * 100,
-);
-
 const sliderMin = computed(() => (activeFine.value ? MIN : 0));
 const sliderMax = computed(() => (activeFine.value ? MAX : LAST_PRESET));
 const sliderPosition = computed(() => {
   const scale = displayScale.value;
   return activeFine.value ? scale : nearestPresetIndex(scale);
+});
+
+/** 0–1 along the same axis as the thumb (presets = index, fine = %). */
+const fillRatio = computed(() => {
+  const span = sliderMax.value - sliderMin.value;
+  if (span <= 0) return 0;
+  return (sliderPosition.value - sliderMin.value) / span;
 });
 
 function clampScale(scale: number): number {
@@ -108,7 +110,7 @@ onUnmounted(() => {
       :max="sliderMax"
       step="1"
       :value="sliderPosition"
-      :style="{ '--scale-fill': `${fillPct}%` }"
+      :style="{ '--scale-fill': String(fillRatio) }"
       :aria-valuetext="pctLabel"
       aria-label="Interface scale"
       @pointerdown="beginDrag"
@@ -135,12 +137,16 @@ onUnmounted(() => {
   appearance: none;
   background: transparent;
   cursor: pointer;
+  /* Thumb is 16px: fill to thumb center, not raw % of the full track. */
+  --thumb: 16px;
+  --fill-at: calc(
+    (var(--thumb) / 2) + (100% - var(--thumb)) * var(--scale-fill, 0)
+  );
   --scale-track: linear-gradient(
     to right,
-    var(--q-primary) 0%,
-    var(--q-primary) var(--scale-fill, 20%),
-    color-mix(in srgb, var(--q-muted-foreground) 22%, transparent)
-      var(--scale-fill, 20%),
+    var(--q-primary) 0,
+    var(--q-primary) var(--fill-at),
+    color-mix(in srgb, var(--q-muted-foreground) 22%, transparent) var(--fill-at),
     color-mix(in srgb, var(--q-muted-foreground) 22%, transparent) 100%
   );
 }
