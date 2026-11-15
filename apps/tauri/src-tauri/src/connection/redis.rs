@@ -102,6 +102,167 @@ impl RedisSession {
                 .map_err(|e| ConnectionError::driver(DriverKind::Redis, e.to_string()))
         })
     }
+
+    pub fn key_type(&self, key: &str) -> ConnectionResult<String> {
+        self.with_connection(|c| {
+            redis::cmd("TYPE")
+                .arg(key)
+                .query::<String>(c)
+                .map_err(|e| ConnectionError::driver(DriverKind::Redis, e.to_string()))
+        })
+    }
+
+    pub fn ttl(&self, key: &str) -> ConnectionResult<i64> {
+        self.with_connection(|c| {
+            redis::cmd("TTL")
+                .arg(key)
+                .query::<i64>(c)
+                .map_err(|e| ConnectionError::driver(DriverKind::Redis, e.to_string()))
+        })
+    }
+
+    /// Flutter `typesAndTtls` subset — TYPE (+ TTL) for a key page.
+    pub fn types_and_ttls(&self, keys: &[String]) -> ConnectionResult<Vec<RedisKeyMeta>> {
+        self.with_connection(|c| {
+            let mut out = Vec::with_capacity(keys.len());
+            for key in keys {
+                let key_type: String = redis::cmd("TYPE")
+                    .arg(key)
+                    .query(c)
+                    .map_err(|e| ConnectionError::driver(DriverKind::Redis, e.to_string()))?;
+                let ttl: i64 = redis::cmd("TTL")
+                    .arg(key)
+                    .query(c)
+                    .map_err(|e| ConnectionError::driver(DriverKind::Redis, e.to_string()))?;
+                out.push(RedisKeyMeta {
+                    key: key.clone(),
+                    key_type,
+                    ttl,
+                });
+            }
+            Ok(out)
+        })
+    }
+
+    /// Load key contents by TYPE (Flutter `RedisKeyEditor._load` parity).
+    pub fn read_key(&self, key: &str) -> ConnectionResult<RedisKeyView> {
+        let key_type = self.key_type(key)?;
+        let ttl = self.ttl(key)?;
+        match key_type.as_str() {
+            "none" => Ok(RedisKeyView {
+                key: key.to_owned(),
+                key_type,
+                ttl,
+                string_value: None,
+                hash_fields: vec![],
+                list_values: vec![],
+                set_members: vec![],
+                zset_members: vec![],
+            }),
+            "string" => {
+                let string_value = self.get(key)?;
+                Ok(RedisKeyView {
+                    key: key.to_owned(),
+                    key_type,
+                    ttl,
+                    string_value,
+                    hash_fields: vec![],
+                    list_values: vec![],
+                    set_members: vec![],
+                    zset_members: vec![],
+                })
+            }
+            "hash" => self.with_connection(|c| {
+                let map: std::collections::HashMap<String, String> = redis::cmd("HGETALL")
+                    .arg(key)
+                    .query(c)
+                    .map_err(|e| ConnectionError::driver(DriverKind::Redis, e.to_string()))?;
+                let mut hash_fields: Vec<RedisHashField> = map
+                    .into_iter()
+                    .map(|(field, value)| RedisHashField { field, value })
+                    .collect();
+                hash_fields.sort_by(|a, b| a.field.cmp(&b.field));
+                Ok(RedisKeyView {
+                    key: key.to_owned(),
+                    key_type,
+                    ttl,
+                    string_value: None,
+                    hash_fields,
+                    list_values: vec![],
+                    set_members: vec![],
+                    zset_members: vec![],
+                })
+            }),
+            "list" => self.with_connection(|c| {
+                let list_values: Vec<String> = redis::cmd("LRANGE")
+                    .arg(key)
+                    .arg(0)
+                    .arg(199)
+                    .query(c)
+                    .map_err(|e| ConnectionError::driver(DriverKind::Redis, e.to_string()))?;
+                Ok(RedisKeyView {
+                    key: key.to_owned(),
+                    key_type,
+                    ttl,
+                    string_value: None,
+                    hash_fields: vec![],
+                    list_values,
+                    set_members: vec![],
+                    zset_members: vec![],
+                })
+            }),
+            "set" => self.with_connection(|c| {
+                let mut set_members: Vec<String> = redis::cmd("SMEMBERS")
+                    .arg(key)
+                    .query(c)
+                    .map_err(|e| ConnectionError::driver(DriverKind::Redis, e.to_string()))?;
+                set_members.sort();
+                Ok(RedisKeyView {
+                    key: key.to_owned(),
+                    key_type,
+                    ttl,
+                    string_value: None,
+                    hash_fields: vec![],
+                    list_values: vec![],
+                    set_members,
+                    zset_members: vec![],
+                })
+            }),
+            "zset" => self.with_connection(|c| {
+                let raw: Vec<(String, f64)> = redis::cmd("ZRANGE")
+                    .arg(key)
+                    .arg(0)
+                    .arg(199)
+                    .arg("WITHSCORES")
+                    .query(c)
+                    .map_err(|e| ConnectionError::driver(DriverKind::Redis, e.to_string()))?;
+                let zset_members = raw
+                    .into_iter()
+                    .map(|(member, score)| RedisZsetMember { member, score })
+                    .collect();
+                Ok(RedisKeyView {
+                    key: key.to_owned(),
+                    key_type,
+                    ttl,
+                    string_value: None,
+                    hash_fields: vec![],
+                    list_values: vec![],
+                    set_members: vec![],
+                    zset_members,
+                })
+            }),
+            other => Ok(RedisKeyView {
+                key: key.to_owned(),
+                key_type: other.to_owned(),
+                ttl,
+                string_value: None,
+                hash_fields: vec![],
+                list_values: vec![],
+                set_members: vec![],
+                zset_members: vec![],
+            }),
+        }
+    }
 }
 
 impl ConnectionSession for RedisSession {
@@ -142,6 +303,42 @@ pub struct RedisConnectParams {
 pub struct RedisScanPage {
     pub next_cursor: u64,
     pub keys: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RedisKeyMeta {
+    pub key: String,
+    pub key_type: String,
+    pub ttl: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RedisHashField {
+    pub field: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RedisZsetMember {
+    pub member: String,
+    pub score: f64,
+}
+
+/// Typed key payload for the browser (Flutter `RedisKeyEditor` load).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RedisKeyView {
+    pub key: String,
+    pub key_type: String,
+    pub ttl: i64,
+    pub string_value: Option<String>,
+    pub hash_fields: Vec<RedisHashField>,
+    pub list_values: Vec<String>,
+    pub set_members: Vec<String>,
+    pub zset_members: Vec<RedisZsetMember>,
 }
 
 /// Open a Redis TCP session and smoke with PING.
@@ -307,6 +504,32 @@ mod tests {
                 .map_err(|e| ConnectionError::driver(DriverKind::Redis, e.to_string()))?;
             Ok(())
         });
+
+        let hash_key = format!("querya:test:hash:{}", uuid::Uuid::new_v4());
+        session
+            .with_connection(|c| {
+                let _: () = redis::cmd("HSET")
+                    .arg(&hash_key)
+                    .arg("name")
+                    .arg("Ada")
+                    .arg("role")
+                    .arg("admin")
+                    .query(c)
+                    .map_err(|e| ConnectionError::driver(DriverKind::Redis, e.to_string()))?;
+                Ok(())
+            })
+            .unwrap();
+        let view = session.read_key(&hash_key).unwrap();
+        assert_eq!(view.key_type, "hash");
+        assert!(view.hash_fields.iter().any(|f| f.field == "name" && f.value == "Ada"));
+        let _ = session.with_connection(|c| {
+            let _: () = redis::cmd("DEL")
+                .arg(&hash_key)
+                .query(c)
+                .map_err(|e| ConnectionError::driver(DriverKind::Redis, e.to_string()))?;
+            Ok(())
+        });
+
         session.disconnect().unwrap();
     }
 }

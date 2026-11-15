@@ -33,5 +33,5 @@ pub use manager::{ConnectionConfig, ConnectionManager, ConnectionRegistry};
 pub use object_tree::{ObjectTreeProvider, SqlObjectKind, SqlObjectNode};
 pub use postgres_object_detail::PostgresObjectDetail;
 pub use query::QueryEvent;
-pub use redis::RedisScanPage;
+pub use redis::{RedisKeyMeta, RedisKeyView, RedisScanPage};
 pub use sqlite_introspect::SqliteOverview;

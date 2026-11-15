@@ -6,6 +6,33 @@ export type RedisScanPage = {
   keys: string[];
 };
 
+export type RedisKeyMeta = {
+  key: string;
+  keyType: string;
+  ttl: number;
+};
+
+export type RedisHashField = {
+  field: string;
+  value: string;
+};
+
+export type RedisZsetMember = {
+  member: string;
+  score: number;
+};
+
+export type RedisKeyView = {
+  key: string;
+  keyType: string;
+  ttl: number;
+  stringValue: string | null;
+  hashFields: RedisHashField[];
+  listValues: string[];
+  setMembers: string[];
+  zsetMembers: RedisZsetMember[];
+};
+
 export async function dbConnectRedis(opts: {
   host: string;
   port: number;
@@ -77,4 +104,18 @@ export async function redisSet(
   value: string,
 ): Promise<void> {
   await invoke("redis_set", { id, key, value });
+}
+
+export async function redisKeyMetas(
+  id: string,
+  keys: string[],
+): Promise<RedisKeyMeta[]> {
+  return invoke<RedisKeyMeta[]>("redis_key_metas", { id, keys });
+}
+
+export async function redisReadKey(
+  id: string,
+  key: string,
+): Promise<RedisKeyView> {
+  return invoke<RedisKeyView>("redis_read_key", { id, key });
 }

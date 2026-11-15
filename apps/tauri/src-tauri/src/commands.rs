@@ -1,7 +1,7 @@
 use crate::connection::{
     ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager, ConnectionRegistry,
-    ErdSchema, PostgresObjectDetail, RedisScanPage, SchemaObject, SchemaObjectKind, SqlObjectKind,
-    SqlObjectNode, SqliteOverview, TableSchema,
+    ErdSchema, PostgresObjectDetail, RedisKeyMeta, RedisKeyView, RedisScanPage, SchemaObject,
+    SchemaObjectKind, SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
 };
 use crate::profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 use crate::secrets::SharedSecretStore;
@@ -152,6 +152,24 @@ pub fn redis_set(
     registry: State<'_, ConnectionRegistry>,
 ) -> Result<(), ConnectionError> {
     registry.with_redis(&id, |s| s.set(&key, &value))
+}
+
+#[tauri::command]
+pub fn redis_key_metas(
+    id: ConnectionId,
+    keys: Vec<String>,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<Vec<RedisKeyMeta>, ConnectionError> {
+    registry.with_redis(&id, |s| s.types_and_ttls(&keys))
+}
+
+#[tauri::command]
+pub fn redis_read_key(
+    id: ConnectionId,
+    key: String,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<RedisKeyView, ConnectionError> {
+    registry.with_redis(&id, |s| s.read_key(&key))
 }
 
 #[tauri::command]
