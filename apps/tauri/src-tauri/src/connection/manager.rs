@@ -203,13 +203,16 @@ impl ConnectionRegistry {
         limit: Option<usize>,
         emit: impl FnMut(QueryEvent) -> ConnectionResult<()>,
     ) -> ConnectionResult<()> {
-        match self.driver_of(id) {
-            Some(DriverKind::Sqlite) => self.execute_sqlite_query(id, sql, limit, emit),
-            Some(DriverKind::Postgres) => {
+        let driver = self
+            .driver_of(id)
+            .ok_or_else(|| ConnectionError::NotFound { id: id.clone() })?;
+        super::sql_guard::assert_single_statement(sql, driver)?;
+        match driver {
+            DriverKind::Sqlite => self.execute_sqlite_query(id, sql, limit, emit),
+            DriverKind::Postgres => {
                 self.with_postgres(id, |s| s.execute_streaming(sql, limit, emit))
             }
-            Some(other) => Err(ConnectionError::UnsupportedDriver { driver: other }),
-            None => Err(ConnectionError::NotFound { id: id.clone() }),
+            other => Err(ConnectionError::UnsupportedDriver { driver: other }),
         }
     }
 
@@ -405,6 +408,35 @@ mod tests {
             })
             .unwrap_err();
         assert!(matches!(err, ConnectionError::InvalidConfig { .. }));
+    }
+
+    #[test]
+    fn execute_query_rejects_multi_statement() {
+        let path = std::env::temp_dir().join(format!(
+            "querya_reg_guard_{}.db",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = rusqlite::Connection::open(&path).unwrap();
+        let reg = ConnectionRegistry::with_builtin_drivers();
+        let id = reg
+            .connect(ConnectionConfig::Sqlite {
+                path: path.to_string_lossy().into(),
+                id: None,
+            })
+            .unwrap();
+        let err = reg
+            .execute_query(&id, "SELECT 1; SELECT 2", None, |_| Ok(()))
+            .unwrap_err();
+        match err {
+            ConnectionError::SqlGuard { rule, .. } => {
+                assert_eq!(rule, "single_statement");
+            }
+            other => panic!("expected SqlGuard, got {other:?}"),
+        }
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
