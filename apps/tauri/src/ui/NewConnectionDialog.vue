@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
-import { open } from "@tauri-apps/plugin-dialog";
+// Must not be named `open` — it would shadow the `open` prop/model in the
+// template and make `v-if="open"` always truthy (Save connected, dialog stuck).
+import { open as pickSqliteFile } from "@tauri-apps/plugin-dialog";
 
 export type BuiltInDriverId =
   | "postgresql"
@@ -64,11 +66,15 @@ const CATEGORY_ITEMS: { id: Category; label: string }[] = [
   { id: "nosql", label: "NoSQL" },
 ];
 
-const props = defineProps<{ open: boolean }>();
+/** Flutter: dialog owns dismiss via Navigator.pop — we mirror with v-model. */
+const open = defineModel<boolean>("open", { required: true });
 const emit = defineEmits<{
-  close: [];
   connectSqlite: [payload: SqliteConnectPayload];
 }>();
+
+function dismiss() {
+  open.value = false;
+}
 
 type Step = "pick" | "sqlite" | "stub";
 
@@ -120,15 +126,12 @@ function reset() {
   stubDriver.value = null;
 }
 
-watch(
-  () => props.open,
-  async (v) => {
-    if (!v) return;
-    reset();
-    await nextTick();
-    searchEl.value?.focus();
-  },
-);
+watch(open, async (v) => {
+  if (!v) return;
+  reset();
+  await nextTick();
+  searchEl.value?.focus();
+});
 
 watch([category, search], () => {
   if (
@@ -172,7 +175,7 @@ function goBack() {
 
 async function browseSqlite() {
   try {
-    const selectedPath = await open({
+    const selectedPath = await pickSqliteFile({
       multiple: false,
       directory: false,
       title: "Select SQLite database",
@@ -205,17 +208,17 @@ function submitSqlite() {
     error.value = "Database file path is required.";
     return;
   }
-  // Close before connect so the scrim never outlives a successful Save.
-  emit("close");
+  // Flutter sqlite form: Navigator.pop after accept — dismiss first, then save.
+  dismiss();
   emit("connectSqlite", { driver: "sqlite", name: n, path: p });
 }
 
 function onKey(e: KeyboardEvent) {
-  if (!props.open) return;
+  if (!open.value) return;
   if (e.key === "Escape") {
     e.preventDefault();
     if (step.value !== "pick") goBack();
-    else emit("close");
+    else dismiss();
   } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
     e.preventDefault();
     if (step.value === "pick" && canNext.value) goNext();
@@ -223,23 +226,22 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
-watch(
-  () => props.open,
-  (v) => {
-    if (v) window.addEventListener("keydown", onKey, true);
-    else window.removeEventListener("keydown", onKey, true);
-  },
-);
+watch(open, (v) => {
+  if (v) window.addEventListener("keydown", onKey, true);
+  else window.removeEventListener("keydown", onKey, true);
+});
 
 onUnmounted(() => window.removeEventListener("keydown", onKey, true));
 </script>
 
 <template>
+  <!-- Teleport outside #app zoom so backdrop-filter (bokeh) can sample the UI. -->
+  <Teleport to="body">
   <div
     v-if="open"
     class="overlay q-modal-scrim"
     data-testid="new-connection-dialog"
-    @click.self="emit('close')"
+    @click.self="dismiss"
   >
     <!-- Step 1: Select your database (Flutter parity) -->
     <div
@@ -346,7 +348,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
       </div>
 
       <footer>
-        <button type="button" class="btn ghost" @click="emit('close')">
+        <button type="button" class="btn ghost" @click="dismiss">
           Cancel
         </button>
         <button
@@ -407,7 +409,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
 
       <footer>
         <button type="button" class="btn ghost" @click="goBack">Back</button>
-        <button type="button" class="btn ghost" @click="emit('close')">
+        <button type="button" class="btn ghost" @click="dismiss">
           Cancel
         </button>
         <button
@@ -453,12 +455,13 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
       </div>
       <footer>
         <button type="button" class="btn ghost" @click="goBack">Back</button>
-        <button type="button" class="btn primary" @click="emit('close')">
+        <button type="button" class="btn primary" @click="dismiss">
           Close
         </button>
       </footer>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <style scoped>
