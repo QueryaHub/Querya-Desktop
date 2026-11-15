@@ -98,7 +98,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
 <template>
   <div
     v-if="open"
-    class="overlay"
+    class="overlay q-modal-scrim"
     data-testid="quick-switcher"
     @click.self="emit('close')"
   >
@@ -143,7 +143,6 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
   display: grid;
   place-items: start center;
   padding-top: 12vh;
-  background: color-mix(in srgb, #000 40%, transparent);
 }
 
 .panel {

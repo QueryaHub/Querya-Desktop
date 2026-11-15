@@ -258,7 +258,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
 <template>
   <div
     v-if="open"
-    class="overlay"
+    class="overlay q-modal-scrim"
     data-testid="preferences-dialog"
     @click.self="emit('close')"
   >
@@ -743,7 +743,6 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
   display: grid;
   place-items: center;
   padding: 4vh 5vw;
-  background: color-mix(in srgb, #000 45%, transparent);
 }
 
 .dialog {

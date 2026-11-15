@@ -37,7 +37,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey));
 <template>
   <div
     v-if="open"
-    class="overlay"
+    class="overlay q-modal-scrim"
     data-testid="about-dialog"
     @click.self="emit('close')"
   >
@@ -59,7 +59,6 @@ onUnmounted(() => window.removeEventListener("keydown", onKey));
   z-index: 2200;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, #000 45%, transparent);
   padding: 24px;
 }
 

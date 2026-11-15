@@ -205,8 +205,9 @@ function submitSqlite() {
     error.value = "Database file path is required.";
     return;
   }
-  emit("connectSqlite", { driver: "sqlite", name: n, path: p });
+  // Close before connect so the scrim never outlives a successful Save.
   emit("close");
+  emit("connectSqlite", { driver: "sqlite", name: n, path: p });
 }
 
 function onKey(e: KeyboardEvent) {
@@ -236,7 +237,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
 <template>
   <div
     v-if="open"
-    class="overlay"
+    class="overlay q-modal-scrim"
     data-testid="new-connection-dialog"
     @click.self="emit('close')"
   >
@@ -468,7 +469,6 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
   display: grid;
   place-items: center;
   padding: 4vh 4vw;
-  background: color-mix(in srgb, #000 45%, transparent);
 }
 
 .dialog {
