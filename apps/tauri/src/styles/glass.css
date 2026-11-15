@@ -75,13 +75,14 @@
  * + dim tint. Tint only fades; blur stays fixed so enter/exit stay cheap (#1341).
  */
 :root {
-  --q-modal-scrim-blur: 8px;
+  --q-modal-scrim-blur: 12px;
   --q-modal-scrim-tint: color-mix(in srgb, #000 32%, transparent);
 }
 
 :root[data-platform="linux"],
 :root[data-platform="windows"] {
-  --q-modal-scrim-blur: 6px;
+  /* WebKitGTK/WebView2: a bit softer than macOS, still clearly frosted. */
+  --q-modal-scrim-blur: 10px;
 }
 
 :root[data-motion="off"],

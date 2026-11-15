@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open as pickSqliteFile } from "@tauri-apps/plugin-dialog";
 import { storeToRefs } from "pinia";
 import { useShellStore } from "./stores/shell";
 import { useShellStatusStore } from "./stores/shellStatus";
@@ -53,7 +53,7 @@ const showTable = computed(() => surface.value === "tableObject");
 
 async function onOpenSqlite() {
   try {
-    const selected = await open({
+    const selected = await pickSqliteFile({
       multiple: false,
       directory: false,
       title: "Open SQLite database",
@@ -74,8 +74,6 @@ function onNewConnection() {
 }
 
 async function onConnectSqliteFromDialog(payload: SqliteConnectPayload) {
-  // Close first — connect is async and must not leave the modal stuck open.
-  newConnectionOpen.value = false;
   try {
     await connections.connectSqlite(payload.path, { name: payload.name });
   } catch {
@@ -206,38 +204,41 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="app-frame" data-testid="main-screen">
-    <TitleBar
-      @open-sqlite="onOpenSqlite"
-      @open-preferences="onOpenPreferences"
-      @open-palette="onOpenPalette"
-      @open-quick-switcher="onOpenQuickSwitcher"
-      @open-tour="onOpenTour"
-      @open-about="onOpenAbout"
-      @check-updates="onCheckUpdates"
-    />
-    <QueryaDivider />
-    <div class="body">
-      <ConnectionsPanel
-        @new-connection="onNewConnection"
-        @new-folder="onNewFolder"
+  <!-- Dialogs sit outside `.app-frame` so UI zoom cannot kill scrim blur. -->
+  <div class="shell" data-testid="main-screen">
+    <div class="app-frame">
+      <TitleBar
+        @open-sqlite="onOpenSqlite"
+        @open-preferences="onOpenPreferences"
+        @open-palette="onOpenPalette"
+        @open-quick-switcher="onOpenQuickSwitcher"
+        @open-tour="onOpenTour"
+        @open-about="onOpenAbout"
+        @check-updates="onCheckUpdates"
       />
-      <main class="workspace">
-        <div class="workspace-body">
-          <WorkspaceEmptyHero
-            v-if="showEmpty"
-            @new-connection="onNewConnection"
-            @open-sqlite="onOpenSqlite"
-            @launch-demo="onLaunchDemo"
-            @open-tour="onOpenTour"
-            @open-recent="onOpenRecent"
-          />
-          <ConnectionHome v-else-if="showHome" />
-          <TableObjectView v-else-if="showTable" />
-        </div>
-      </main>
+      <QueryaDivider />
+      <div class="body">
+        <ConnectionsPanel
+          @new-connection="onNewConnection"
+          @new-folder="onNewFolder"
+        />
+        <main class="workspace">
+          <div class="workspace-body">
+            <WorkspaceEmptyHero
+              v-if="showEmpty"
+              @new-connection="onNewConnection"
+              @open-sqlite="onOpenSqlite"
+              @launch-demo="onLaunchDemo"
+              @open-tour="onOpenTour"
+              @open-recent="onOpenRecent"
+            />
+            <ConnectionHome v-else-if="showHome" />
+            <TableObjectView v-else-if="showTable" />
+          </div>
+        </main>
+      </div>
+      <StatusBar @open-preferences="onOpenPreferences" />
     </div>
-    <StatusBar @open-preferences="onOpenPreferences" />
 
     <PreferencesDialog :open="prefsOpen" @close="prefsOpen = false" />
     <CommandPalette
@@ -259,14 +260,18 @@ onUnmounted(() => {
       @create="onCreateFolder"
     />
     <NewConnectionDialog
-      :open="newConnectionOpen"
-      @close="newConnectionOpen = false"
+      v-model:open="newConnectionOpen"
       @connect-sqlite="onConnectSqliteFromDialog"
     />
   </div>
 </template>
 
 <style scoped>
+.shell {
+  height: 100%;
+  min-height: 100%;
+}
+
 .app-frame {
   height: 100%;
   min-height: 100%;
@@ -274,6 +279,9 @@ onUnmounted(() => {
   flex-direction: column;
   background: var(--q-canvas);
   color: var(--q-foreground);
+  /* Flutter ui_scale — keep off modal ancestors (backdrop-filter / bokeh). */
+  zoom: var(--q-ui-scale);
+  transition: zoom var(--q-motion-slow) var(--q-motion-ease);
 }
 
 .body {
