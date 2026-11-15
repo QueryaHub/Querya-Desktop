@@ -49,6 +49,17 @@ export type RedisConnectPayload = {
   password: string;
 };
 
+export type MongoConnectPayload = {
+  driver: "mongodb";
+  name: string;
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+  authSource: string;
+};
+
 type Category = "all" | "sql" | "nosql";
 
 type DriverChoice = {
@@ -105,13 +116,21 @@ const emit = defineEmits<{
   connectPostgres: [payload: PostgresConnectPayload];
   connectMysql: [payload: MysqlConnectPayload];
   connectRedis: [payload: RedisConnectPayload];
+  connectMongo: [payload: MongoConnectPayload];
 }>();
 
 function dismiss() {
   open.value = false;
 }
 
-type Step = "pick" | "sqlite" | "postgres" | "mysql" | "redis" | "stub";
+type Step =
+  | "pick"
+  | "sqlite"
+  | "postgres"
+  | "mysql"
+  | "redis"
+  | "mongo"
+  | "stub";
 
 const step = ref<Step>("pick");
 const category = ref<Category>("all");
@@ -128,6 +147,7 @@ const port = ref("5432");
 const database = ref("querya");
 const user = ref("querya");
 const password = ref("querya");
+const authSource = ref("admin");
 const error = ref<string | null>(null);
 const stubDriver = ref<DriverChoice | null>(null);
 
@@ -174,6 +194,18 @@ const canSaveRedis = computed(() => {
   return (
     name.value.trim().length > 0 &&
     host.value.trim().length > 0 &&
+    Number.isFinite(p) &&
+    p > 0 &&
+    p <= 65535
+  );
+});
+
+const canSaveMongo = computed(() => {
+  const p = Number(port.value);
+  return (
+    name.value.trim().length > 0 &&
+    host.value.trim().length > 0 &&
+    database.value.trim().length > 0 &&
     Number.isFinite(p) &&
     p > 0 &&
     p <= 65535
@@ -259,6 +291,18 @@ function goNext() {
     database.value = "0";
     user.value = "";
     password.value = "";
+    void nextTick(() => nameEl.value?.focus());
+    return;
+  }
+  if (choice.id === "mongodb") {
+    step.value = "mongo";
+    if (!name.value.trim()) name.value = "mongo";
+    host.value = host.value.trim() || "127.0.0.1";
+    port.value = "27017";
+    database.value = "querya";
+    user.value = "querya";
+    password.value = "querya";
+    authSource.value = "admin";
     void nextTick(() => nameEl.value?.focus());
     return;
   }
@@ -365,6 +409,33 @@ function submitRedis() {
   });
 }
 
+function submitMongo() {
+  error.value = null;
+  const n = name.value.trim();
+  const h = host.value.trim();
+  const db = database.value.trim();
+  const p = Number(port.value);
+  if (!n) {
+    error.value = "Connection name is required.";
+    return;
+  }
+  if (!h || !db || !Number.isFinite(p) || p <= 0 || p > 65535) {
+    error.value = "Host, port and database are required.";
+    return;
+  }
+  dismiss();
+  emit("connectMongo", {
+    driver: "mongodb",
+    name: n,
+    host: h,
+    port: p,
+    database: db,
+    username: user.value.trim(),
+    password: password.value,
+    authSource: authSource.value.trim() || "admin",
+  });
+}
+
 function submitMysql() {
   error.value = null;
   const n = name.value.trim();
@@ -407,6 +478,7 @@ function onKey(e: KeyboardEvent) {
       submitPostgres();
     else if (step.value === "mysql" && canSaveMysql.value) submitMysql();
     else if (step.value === "redis" && canSaveRedis.value) submitRedis();
+    else if (step.value === "mongo" && canSaveMongo.value) submitMongo();
   }
 }
 
@@ -825,7 +897,78 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
       </footer>
     </div>
 
-    <!-- Step 2e: stub for drivers without Tauri adapter yet -->
+    <!-- Step 2e: MongoDB -->
+    <div
+      v-else-if="step === 'mongo'"
+      class="dialog form"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ncd-mongo-title"
+    >
+      <header class="hdr form-hdr">
+        <h2 id="ncd-mongo-title">New MongoDB Connection</h2>
+        <p class="sub">Connect to MongoDB (list collections + find).</p>
+      </header>
+      <div class="body form-body">
+        <label>
+          Name
+          <input ref="nameEl" v-model="name" type="text" autocomplete="off" />
+        </label>
+        <label>
+          Host
+          <input v-model="host" type="text" autocomplete="off" />
+        </label>
+        <label>
+          Port
+          <input v-model="port" type="number" min="1" max="65535" />
+        </label>
+        <label>
+          Database
+          <input v-model="database" type="text" autocomplete="off" />
+        </label>
+        <label>
+          Username
+          <input
+            v-model="user"
+            type="text"
+            autocomplete="username"
+            placeholder="optional"
+          />
+        </label>
+        <label>
+          Password
+          <input
+            v-model="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="optional"
+          />
+        </label>
+        <label>
+          Auth source
+          <input v-model="authSource" type="text" autocomplete="off" />
+        </label>
+        <p v-if="error" class="err">{{ error }}</p>
+      </div>
+      <footer>
+        <QueryaButton variant="ghost" size="lg" @click="goBack">
+          Back
+        </QueryaButton>
+        <QueryaButton variant="ghost" size="lg" @click="dismiss">
+          Cancel
+        </QueryaButton>
+        <QueryaButton
+          variant="primary"
+          size="lg"
+          :disabled="!canSaveMongo"
+          @click="submitMongo"
+        >
+          Save
+        </QueryaButton>
+      </footer>
+    </div>
+
+    <!-- Step 2f: stub for drivers without Tauri adapter yet -->
     <div
       v-else-if="step === 'stub'"
       class="dialog form"

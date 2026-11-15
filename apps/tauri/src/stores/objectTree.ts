@@ -113,12 +113,20 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
     return useConnectionsStore().byId.get(id)?.driver === "redis";
   }
 
+  function isMongo(id: string): boolean {
+    return useConnectionsStore().byId.get(id)?.driver === "mongo";
+  }
+
+  function isNosqlBrowser(id: string): boolean {
+    return isRedis(id) || isMongo(id);
+  }
+
   async function fetchChildren(
     connId: string,
     parentId: string | null,
   ): Promise<SqlObjectNode[]> {
     if (isMock(connId)) return demoListChildren(parentId);
-    if (isRedis(connId)) return [];
+    if (isNosqlBrowser(connId)) return [];
     return dbListChildren(connId, parentId);
   }
 
@@ -144,8 +152,8 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
     st.error = null;
     try {
       await useConnectionsStore().ensureConnected(connId);
-      // Redis uses RedisBrowserView — no SQL object tree.
-      if (isRedis(connId)) {
+      // Redis/Mongo use dedicated browser panes — no SQL object tree.
+      if (isNosqlBrowser(connId)) {
         st.roots = [];
         st.loaded = true;
         return;

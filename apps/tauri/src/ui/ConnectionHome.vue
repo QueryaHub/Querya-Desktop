@@ -12,6 +12,7 @@ import { useObjectTreeStore } from "../stores/objectTree";
 import QueryaButton from "./QueryaButton.vue";
 import SqlWorkspace from "./SqlWorkspace.vue";
 import RedisBrowserView from "./RedisBrowserView.vue";
+import MongoBrowserView from "./MongoBrowserView.vue";
 import { QueryaIcon } from "./icons";
 import ErdView from "./erd/ErdView.vue";
 
@@ -101,6 +102,8 @@ async function loadOverview() {
 
 const isSqlite = computed(() => conn.value?.driver === "sqlite");
 const isRedis = computed(() => conn.value?.driver === "redis");
+const isMongo = computed(() => conn.value?.driver === "mongo");
+const isNosqlBrowser = computed(() => isRedis.value || isMongo.value);
 const isServerSql = computed(
   () =>
     conn.value?.driver === "postgres" || conn.value?.driver === "mysql",
@@ -111,6 +114,7 @@ const driverLabel = computed(() => {
   if (d === "postgres") return "PostgreSQL";
   if (d === "mysql") return "MySQL";
   if (d === "redis") return "Redis";
+  if (d === "mongo") return "MongoDB";
   return d ?? "";
 });
 const endpointLabel = computed(() => {
@@ -119,7 +123,13 @@ const endpointLabel = computed(() => {
   if (c.driver === "sqlite") return c.path ?? "";
   const port =
     c.port ??
-    (c.driver === "mysql" ? 3306 : c.driver === "redis" ? 6379 : 5432);
+    (c.driver === "mysql"
+      ? 3306
+      : c.driver === "redis"
+        ? 6379
+        : c.driver === "mongo"
+          ? 27017
+          : 5432);
   return `${c.host ?? "localhost"}:${port}/${c.database ?? (c.driver === "redis" ? "0" : "")}`;
 });
 
@@ -167,6 +177,21 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
     </div>
 
     <div
+      v-else-if="isMongo"
+      class="redis-host"
+      data-testid="mongo-workspace"
+    >
+      <header class="redis-head">
+        <h1>{{ conn.name }}</h1>
+        <span class="driver-pill">MongoDB</span>
+        <p class="path">{{ endpointLabel }}</p>
+      </header>
+      <div class="redis-body">
+        <MongoBrowserView />
+      </div>
+    </div>
+
+    <div
       v-else
       class="strip"
       role="tablist"
@@ -208,7 +233,7 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
     </div>
 
     <div
-      v-if="!isRedis && homeTab === 'overview'"
+      v-if="!isNosqlBrowser && homeTab === 'overview'"
       class="overview"
       data-testid="home-overview"
     >
@@ -354,7 +379,7 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
     </div>
 
     <div
-      v-else-if="!isRedis && homeTab === 'sql'"
+      v-else-if="!isNosqlBrowser && homeTab === 'sql'"
       class="sql-park"
       data-testid="home-sql"
     >
@@ -362,7 +387,7 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
     </div>
 
     <div
-      v-else-if="!isRedis"
+      v-else-if="!isNosqlBrowser"
       class="erd-park"
       data-testid="home-erd"
     >

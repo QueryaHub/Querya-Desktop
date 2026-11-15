@@ -11,6 +11,7 @@ import {
   profilesUpsert,
   type ConnectionProfile,
 } from "../api/connection";
+import { profilesConnectMongo } from "../api/mongo";
 import { profilesConnectRedis } from "../api/redis";
 import { DEMO_CONNECTION } from "../mock/demoCatalog";
 import { useFoldersStore } from "./folders";
@@ -19,7 +20,7 @@ import { useShellStatusStore } from "./shellStatus";
 
 export type LiveConnection = {
   id: string;
-  driver: "sqlite" | "postgres" | "mysql" | "redis";
+  driver: "sqlite" | "postgres" | "mysql" | "redis" | "mongo";
   name: string;
   /** SQLite file path. */
   path?: string;
@@ -49,7 +50,13 @@ function endpointLabel(conn: LiveConnection): string {
   const host = conn.host ?? "localhost";
   const port =
     conn.port ??
-    (conn.driver === "mysql" ? 3306 : conn.driver === "redis" ? 6379 : 5432);
+    (conn.driver === "mysql"
+      ? 3306
+      : conn.driver === "redis"
+        ? 6379
+        : conn.driver === "mongo"
+          ? 27017
+          : 5432);
   const db = conn.database ?? (conn.driver === "redis" ? "0" : "");
   return `${host}:${port}/${db}`;
 }
@@ -100,6 +107,21 @@ function fromProfile(p: ConnectionProfile, connected = false): LiveConnection | 
       connected,
     };
   }
+  if (p.driver === "mongo" || p.driver === "mongodb") {
+    const host = p.host?.trim();
+    if (!host) return null;
+    return {
+      id: p.id,
+      driver: "mongo",
+      name: p.name,
+      host,
+      port: p.port != null ? Number(p.port) : 27017,
+      database: p.database_name?.trim() || "querya",
+      user: p.username?.trim() || undefined,
+      folderId: p.folder_id ?? null,
+      connected,
+    };
+  }
   return null;
 }
 
@@ -129,6 +151,21 @@ function toProfile(conn: LiveConnection): ConnectionProfile {
       port: conn.port ?? 6379,
       username: conn.user ?? null,
       database_name: conn.database ?? "0",
+      folder_id: conn.folderId ?? null,
+      sort_order: 0,
+      created_at: now,
+      updated_at: now,
+    };
+  }
+  if (conn.driver === "mongo") {
+    return {
+      id: conn.id,
+      driver: "mongo",
+      name: conn.name,
+      host: conn.host ?? null,
+      port: conn.port ?? 27017,
+      username: conn.user ?? null,
+      database_name: conn.database ?? "querya",
       folder_id: conn.folderId ?? null,
       sort_order: 0,
       created_at: now,
@@ -344,6 +381,66 @@ export const useConnectionsStore = defineStore("connections", () => {
     }
   }
 
+  async function connectMongo(opts: {
+    name: string;
+    host: string;
+    port: number;
+    database: string;
+    username?: string | null;
+    password?: string | null;
+    authSource?: string | null;
+    folderId?: string | null;
+    id?: string | null;
+  }) {
+    const status = useShellStatusStore();
+    const nav = useShellNavStore();
+    const name =
+      opts.name.trim() ||
+      `${opts.host}:${opts.port}/${opts.database}`;
+    status.setQueryMetrics({
+      busy: true,
+      message: `Connecting Mongo ${opts.host}:${opts.port}…`,
+    });
+    try {
+      const profile = await profilesConnectMongo({
+        name,
+        host: opts.host,
+        port: opts.port,
+        database: opts.database,
+        username: opts.username ?? null,
+        password: opts.password ?? null,
+        authSource: opts.authSource ?? null,
+        folderId: opts.folderId ?? null,
+        id: opts.id ?? null,
+      });
+      if (opts.password) sessionPasswords.set(profile.id, opts.password);
+      const conn: LiveConnection = {
+        id: profile.id,
+        driver: "mongo",
+        name: profile.name,
+        host: profile.host ?? opts.host,
+        port: profile.port != null ? Number(profile.port) : opts.port,
+        database: profile.database_name ?? opts.database,
+        user: profile.username ?? opts.username ?? undefined,
+        folderId: profile.folder_id ?? opts.folderId ?? null,
+        connected: true,
+      };
+      upsert(conn);
+      nav.setExpanded(conn.id, true);
+      nav.selectConnection(conn.id);
+      status.setConnection(conn.name, endpointLabel(conn));
+      status.setQueryMetrics({
+        busy: false,
+        message: `Connected · ${conn.name}`,
+      });
+      return conn;
+    } catch (err) {
+      const msg = formatConnectionError(err);
+      status.setQueryMetrics({ busy: false, message: msg });
+      throw err;
+    }
+  }
+
   async function connectServerDriver(
     driver: "postgres" | "mysql",
     opts: {
@@ -438,6 +535,19 @@ export const useConnectionsStore = defineStore("connections", () => {
         database: conn.database ?? "0",
         username: conn.user ?? null,
         password,
+        folderId: conn.folderId,
+        id: conn.id,
+      });
+    }
+    if (conn.driver === "mongo") {
+      return connectMongo({
+        name: conn.name,
+        host: conn.host ?? "localhost",
+        port: conn.port ?? 27017,
+        database: conn.database ?? "querya",
+        username: conn.user ?? null,
+        password,
+        authSource: "admin",
         folderId: conn.folderId,
         id: conn.id,
       });
@@ -574,6 +684,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     connectPostgres,
     connectMysql,
     connectRedis,
+    connectMongo,
     ensureConnected,
     disconnect,
     removeConnection,
