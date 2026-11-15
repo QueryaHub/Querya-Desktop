@@ -19,13 +19,33 @@ function withAlpha(hexOrCss: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+function parseRgb(hexOrCss: string): [number, number, number] | null {
+  const m = /^#([0-9a-f]{6})$/i.exec(hexOrCss.trim());
+  if (!m) return null;
+  const n = parseInt(m[1]!, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Opaque blend of `overlay` onto `base` (Glide needs solid `bgCell`). */
+function mixOnto(base: string, overlay: string, alpha: number): string {
+  const b = parseRgb(base);
+  const o = parseRgb(overlay);
+  if (!b || !o) return base;
+  const mix = (x: number, y: number) => Math.round(x * (1 - alpha) + y * alpha);
+  const r = mix(b[0], o[0]);
+  const g = mix(b[1], o[1]);
+  const bl = mix(b[2], o[2]);
+  return `#${((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1)}`;
+}
+
 /**
  * Glide theme from Querya workbench tokens — Flutter darkDefault parity
  * (near-black canvas, cyan accent) and lightDefault when `data-theme=light`.
  */
 export function buildQueryaGlideTheme(): Partial<Theme> {
   const fg = cssVar("--q-foreground", "#f8fafc");
-  const muted = cssVar("--q-muted-foreground", "#94a3b8");
+  const mutedFg = cssVar("--q-muted-foreground", "#94a3b8");
+  const muted = cssVar("--q-muted", "#18181b");
   const surface = cssVar("--q-editor-bg", cssVar("--q-surface", "#0c0c0c"));
   const canvas = cssVar("--q-canvas", "#000000");
   const border = cssVar("--q-border", "#27272a");
@@ -40,22 +60,28 @@ export function buildQueryaGlideTheme(): Partial<Theme> {
     "--q-font-sans",
     '"Segoe UI", "SF Pro Text", system-ui, sans-serif',
   );
+  // Flutter: scheme.muted @ 0.12 on odd rows. When muted ≈ cell surface
+  // (dark zinc), blend muted-foreground so the chessboard stays readable.
+  const stripeSrc =
+    muted.toLowerCase() === surface.toLowerCase() ? mutedFg : muted;
+  const bgCellStriped = mixOnto(surface, stripeSrc, 0.12);
 
   return {
     accentColor: primary,
     accentFg: primaryFg,
     accentLight: withAlpha(primary, 0.16),
     textDark: fg,
-    textMedium: muted,
-    textLight: muted,
+    textMedium: mutedFg,
+    textLight: mutedFg,
     textBubble: fg,
-    bgIconHeader: muted,
+    bgIconHeader: mutedFg,
     fgIconHeader: fg,
-    textHeader: muted,
-    textGroupHeader: muted,
+    textHeader: mutedFg,
+    textGroupHeader: mutedFg,
     textHeaderSelected: primaryFg,
     bgCell: surface,
-    bgCellMedium: canvas,
+    /** Odd-row zebra fill (consumed by `getRowThemeOverride`). */
+    bgCellMedium: bgCellStriped,
     bgHeader: canvas,
     bgHeaderHasFocus: accent,
     bgHeaderHovered: accent,
