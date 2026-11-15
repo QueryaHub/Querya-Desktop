@@ -1,5 +1,6 @@
 use super::error::{ConnectionError, ConnectionResult};
 use super::id::{ConnectionId, DriverKind};
+use super::mongo::MongoSession;
 use super::mysql::MysqlSession;
 use super::postgres::PostgresSession;
 use super::query::QueryEvent;
@@ -55,6 +56,19 @@ pub enum ConnectionConfig {
         #[serde(default)]
         id: Option<String>,
     },
+    Mongo {
+        host: String,
+        port: u16,
+        database: String,
+        #[serde(default)]
+        username: Option<String>,
+        #[serde(default)]
+        password: Option<String>,
+        #[serde(default)]
+        auth_source: Option<String>,
+        #[serde(default)]
+        id: Option<String>,
+    },
 }
 
 impl ConnectionConfig {
@@ -64,6 +78,7 @@ impl ConnectionConfig {
             Self::Postgres { .. } => DriverKind::Postgres,
             Self::Mysql { .. } => DriverKind::Mysql,
             Self::Redis { .. } => DriverKind::Redis,
+            Self::Mongo { .. } => DriverKind::Mongo,
         }
     }
 }
@@ -105,7 +120,7 @@ impl ConnectionRegistry {
         Self::with_builtin_drivers()
     }
 
-    /// Registry with SQLite + Postgres + MySQL + Redis openers.
+    /// Registry with SQLite + Postgres + MySQL + Redis + Mongo openers.
     pub fn with_builtin_drivers() -> Self {
         Self::with_opener(|config| match config {
             ConnectionConfig::Sqlite { path, id } => {
@@ -167,6 +182,26 @@ impl ConnectionRegistry {
                     password,
                     username,
                     db,
+                    id: id.filter(|s| !s.trim().is_empty()).map(ConnectionId::from),
+                })?;
+                Ok(Arc::new(session) as SessionArc)
+            }
+            ConnectionConfig::Mongo {
+                host,
+                port,
+                database,
+                username,
+                password,
+                auth_source,
+                id,
+            } => {
+                let session = super::mongo::open_mongo(super::mongo::MongoConnectParams {
+                    host,
+                    port,
+                    database,
+                    username,
+                    password,
+                    auth_source,
                     id: id.filter(|s| !s.trim().is_empty()).map(ConnectionId::from),
                 })?;
                 Ok(Arc::new(session) as SessionArc)
@@ -272,6 +307,21 @@ impl ConnectionRegistry {
         f(redis)
     }
 
+    pub fn with_mongo<T>(
+        &self,
+        id: &ConnectionId,
+        f: impl FnOnce(&MongoSession) -> ConnectionResult<T>,
+    ) -> ConnectionResult<T> {
+        let session = self.session_arc(id)?;
+        let mongo = session
+            .as_any()
+            .downcast_ref::<MongoSession>()
+            .ok_or(ConnectionError::UnsupportedDriver {
+                driver: session.driver(),
+            })?;
+        f(mongo)
+    }
+
     /// Driver-aware query stream (SQLite + Postgres + MySQL).
     ///
     /// `confirmed` must be true for DROP / TRUNCATE / unconditional DELETE|UPDATE
@@ -288,7 +338,7 @@ impl ConnectionRegistry {
         let driver = self
             .driver_of(id)
             .ok_or_else(|| ConnectionError::NotFound { id: id.clone() })?;
-        if matches!(driver, DriverKind::Redis) {
+        if matches!(driver, DriverKind::Redis | DriverKind::Mongo) {
             return Err(ConnectionError::UnsupportedDriver { driver });
         }
         super::sql_guard::assert_query_allowed(sql, driver, confirmed)?;
@@ -298,7 +348,9 @@ impl ConnectionRegistry {
                 self.with_postgres(id, |s| s.execute_streaming(sql, limit, emit))
             }
             DriverKind::Mysql => self.with_mysql(id, |s| s.execute_streaming(sql, limit, emit)),
-            DriverKind::Redis => Err(ConnectionError::UnsupportedDriver { driver }),
+            DriverKind::Redis | DriverKind::Mongo => {
+                Err(ConnectionError::UnsupportedDriver { driver })
+            }
         }
     }
 
@@ -356,6 +408,9 @@ impl ConnectionRegistry {
             DriverKind::Redis => Err(ConnectionError::UnsupportedDriver {
                 driver: DriverKind::Redis,
             }),
+            DriverKind::Mongo => Err(ConnectionError::UnsupportedDriver {
+                driver: DriverKind::Mongo,
+            }),
         }
     }
 
@@ -402,6 +457,9 @@ impl ConnectionRegistry {
             }),
             DriverKind::Redis => Err(ConnectionError::UnsupportedDriver {
                 driver: DriverKind::Redis,
+            }),
+            DriverKind::Mongo => Err(ConnectionError::UnsupportedDriver {
+                driver: DriverKind::Mongo,
             }),
         }
     }

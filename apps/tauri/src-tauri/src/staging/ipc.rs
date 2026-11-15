@@ -91,6 +91,9 @@ pub fn apply_staging_request(
         DriverKind::Redis => Err(ConnectionError::UnsupportedDriver {
             driver: DriverKind::Redis,
         }),
+        DriverKind::Mongo => Err(ConnectionError::UnsupportedDriver {
+            driver: DriverKind::Mongo,
+        }),
     }?;
 
     Ok(result)

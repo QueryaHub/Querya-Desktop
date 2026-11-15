@@ -41,7 +41,7 @@ impl From<&str> for ConnectionId {
     }
 }
 
-/// Driver family wired (or stubbed) in this crate. Mongo lands with its epic.
+/// Driver family wired (or stubbed) in this crate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DriverKind {
@@ -49,6 +49,7 @@ pub enum DriverKind {
     Postgres,
     Mysql,
     Redis,
+    Mongo,
 }
 
 impl DriverKind {
@@ -58,6 +59,7 @@ impl DriverKind {
             Self::Postgres => "postgres",
             Self::Mysql => "mysql",
             Self::Redis => "redis",
+            Self::Mongo => "mongo",
         }
     }
 }

@@ -127,6 +127,31 @@ impl ConnectionProfile {
         }
     }
 
+    /// MongoDB profile — `database_name` is the default database.
+    pub fn new_mongo(
+        name: impl Into<String>,
+        host: impl Into<String>,
+        port: u16,
+        database: impl Into<String>,
+        username: Option<String>,
+    ) -> Self {
+        let now = now_rfc3339();
+        Self {
+            id: Uuid::new_v4().to_string(),
+            driver: "mongo".into(),
+            name: name.into(),
+            path: None,
+            host: Some(host.into()),
+            port: Some(i64::from(port)),
+            username,
+            database_name: Some(database.into()),
+            folder_id: None,
+            sort_order: 0,
+            created_at: now.clone(),
+            updated_at: now,
+        }
+    }
+
     pub fn touch(&mut self) {
         self.updated_at = now_rfc3339();
     }

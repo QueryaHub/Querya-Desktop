@@ -6,7 +6,7 @@ mod staging;
 
 pub use connection::{
     ColumnMeta, ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager,
-    ConnectionRegistry, DriverKind, ErdColumn, ErdRelation, ErdSchema, ErdTable,
+    ConnectionRegistry, DriverKind, ErdColumn, ErdRelation, ErdSchema, ErdTable, MongoFindResult,
     ObjectTreeProvider, PostgresObjectDetail, QueryEvent, RedisKeyMeta, RedisKeyView, RedisScanPage,
     SchemaObject, SchemaObjectKind, SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
 };
@@ -20,12 +20,14 @@ pub use staging::{
 };
 
 use commands::{
-    db_apply_staging, db_connect_mysql, db_connect_postgres, db_connect_redis, db_connect_sqlite,
-    db_describe_object, db_disconnect, db_erd_schema, db_execute_query, db_is_connected,
-    db_list_children, db_list_columns, db_list_schemas, db_list_tables, db_postgres_object_detail,
-    db_sqlite_overview, profiles_connect_mysql, profiles_connect_postgres, profiles_connect_redis,
-    profiles_connect_sqlite, profiles_delete, profiles_list, profiles_upsert, redis_get,
-    redis_key_metas, redis_ping, redis_read_key, redis_scan, redis_set,
+    db_apply_staging, db_connect_mongo, db_connect_mysql, db_connect_postgres, db_connect_redis,
+    db_connect_sqlite, db_describe_object, db_disconnect, db_erd_schema, db_execute_query,
+    db_is_connected, db_list_children, db_list_columns, db_list_schemas, db_list_tables,
+    db_postgres_object_detail, db_sqlite_overview, mongo_find, mongo_list_collections,
+    mongo_list_databases, mongo_ping, profiles_connect_mongo, profiles_connect_mysql,
+    profiles_connect_postgres, profiles_connect_redis, profiles_connect_sqlite, profiles_delete,
+    profiles_list, profiles_upsert, redis_get, redis_key_metas, redis_ping, redis_read_key,
+    redis_scan, redis_set,
 };
 
 #[tauri::command]
@@ -97,6 +99,7 @@ pub fn run() {
             db_connect_postgres,
             db_connect_mysql,
             db_connect_redis,
+            db_connect_mongo,
             db_disconnect,
             db_is_connected,
             db_list_schemas,
@@ -115,6 +118,10 @@ pub fn run() {
             redis_set,
             redis_key_metas,
             redis_read_key,
+            mongo_ping,
+            mongo_list_databases,
+            mongo_list_collections,
+            mongo_find,
             profiles_list,
             profiles_upsert,
             profiles_delete,
@@ -122,6 +129,7 @@ pub fn run() {
             profiles_connect_postgres,
             profiles_connect_mysql,
             profiles_connect_redis,
+            profiles_connect_mongo,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
