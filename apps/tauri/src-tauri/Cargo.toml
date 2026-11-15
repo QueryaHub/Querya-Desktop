@@ -31,6 +31,7 @@ sqlx = { version = "0.8", default-features = false, features = [
 futures-util = "0.3"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native-sync-persistent"] }
+sqlparser = "0.64"
 
 [profile.release]
 codegen-units = 1

@@ -11,6 +11,7 @@ pub(crate) mod postgres_query;
 mod query;
 mod runtime;
 mod smoke_slice;
+mod sql_guard;
 mod sqlite;
 mod sqlite_introspect;
 mod sqlite_object_tree;
