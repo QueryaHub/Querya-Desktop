@@ -9,6 +9,7 @@ import { useConnectionsStore } from "./stores/connections";
 import { useShellNavStore } from "./stores/shellNav";
 import { initTheme } from "./theme/queryaTheme";
 import { provideQueryaMotion } from "./motion";
+import { buildCoreCommands, type AppCommand } from "./commands/registry";
 import TitleBar from "./ui/TitleBar.vue";
 import ConnectionsPanel from "./ui/ConnectionsPanel.vue";
 import StatusBar from "./ui/StatusBar.vue";
@@ -17,13 +18,23 @@ import QueryaDivider from "./ui/QueryaDivider.vue";
 import ConnectionHome from "./ui/ConnectionHome.vue";
 import TableObjectView from "./ui/TableObjectView.vue";
 import PreferencesDialog from "./ui/PreferencesDialog.vue";
+import CommandPalette from "./ui/CommandPalette.vue";
+import QuickSwitcher from "./ui/QuickSwitcher.vue";
+import WelcomeTourDialog from "./ui/WelcomeTourDialog.vue";
+import AboutDialog from "./ui/AboutDialog.vue";
 
 const shell = useShellStore();
 const status = useShellStatusStore();
 const connections = useConnectionsStore();
 const nav = useShellNavStore();
 const { surface } = storeToRefs(nav);
+
 const prefsOpen = ref(false);
+const paletteOpen = ref(false);
+const switcherOpen = ref(false);
+const tourOpen = ref(false);
+const aboutOpen = ref(false);
+
 provideQueryaMotion();
 
 const showEmpty = computed(() => surface.value === "empty");
@@ -67,27 +78,76 @@ function onLaunchDemo() {
 }
 
 function onOpenTour() {
-  status.setQueryMetrics({ message: "Tour stub", busy: false });
+  tourOpen.value = true;
 }
 
 function onOpenPreferences() {
   prefsOpen.value = true;
 }
 
+function onOpenPalette() {
+  paletteOpen.value = true;
+}
+
+function onOpenQuickSwitcher() {
+  switcherOpen.value = true;
+}
+
+function onOpenAbout() {
+  aboutOpen.value = true;
+}
+
+function onCheckUpdates() {
+  status.setQueryMetrics({
+    message: "Updater stub — check for updates lands with packaging epic",
+    busy: false,
+  });
+}
+
+function onGoHome() {
+  if (nav.selectedConnectionId) nav.clearObject();
+  else nav.reset();
+}
+
+function onOpenRecent(id: string) {
+  connections.select(id);
+}
+
+const commands = computed<AppCommand[]>(() =>
+  buildCoreCommands({
+    openPreferences: onOpenPreferences,
+    toggleSidebar: () => shell.toggleSidebar(),
+    openTour: onOpenTour,
+    openAbout: onOpenAbout,
+    openPalette: onOpenPalette,
+    openQuickSwitcher: onOpenQuickSwitcher,
+    launchDemo: onLaunchDemo,
+    openSqlite: () => void onOpenSqlite(),
+    newConnection: onNewConnection,
+    checkUpdates: onCheckUpdates,
+    goHome: onGoHome,
+  }),
+);
+
 function onKeydown(e: KeyboardEvent) {
   const mod = e.metaKey || e.ctrlKey;
   if (!mod) return;
-  if (e.key.toLowerCase() === "b") {
+  const key = e.key.toLowerCase();
+  if (key === "b") {
     e.preventDefault();
     shell.toggleSidebar();
-  }
-  if (e.key === ",") {
+  } else if (e.key === ",") {
     e.preventDefault();
     onOpenPreferences();
-  }
-  if (e.key.toLowerCase() === "n") {
+  } else if (key === "n") {
     e.preventDefault();
     onNewConnection();
+  } else if (key === "p") {
+    e.preventDefault();
+    onOpenPalette();
+  } else if (key === "k") {
+    e.preventDefault();
+    onOpenQuickSwitcher();
   }
 }
 
@@ -121,6 +181,11 @@ onUnmounted(() => {
     <TitleBar
       @open-sqlite="onOpenSqlite"
       @open-preferences="onOpenPreferences"
+      @open-palette="onOpenPalette"
+      @open-quick-switcher="onOpenQuickSwitcher"
+      @open-tour="onOpenTour"
+      @open-about="onOpenAbout"
+      @check-updates="onCheckUpdates"
     />
     <QueryaDivider />
     <div class="body">
@@ -136,6 +201,7 @@ onUnmounted(() => {
             @open-sqlite="onOpenSqlite"
             @launch-demo="onLaunchDemo"
             @open-tour="onOpenTour"
+            @open-recent="onOpenRecent"
           />
           <ConnectionHome v-else-if="showHome" />
           <TableObjectView v-else-if="showTable" />
@@ -143,7 +209,21 @@ onUnmounted(() => {
       </main>
     </div>
     <StatusBar @open-preferences="onOpenPreferences" />
+
     <PreferencesDialog :open="prefsOpen" @close="prefsOpen = false" />
+    <CommandPalette
+      :open="paletteOpen"
+      :commands="commands"
+      @close="paletteOpen = false"
+    />
+    <QuickSwitcher :open="switcherOpen" @close="switcherOpen = false" />
+    <WelcomeTourDialog
+      :open="tourOpen"
+      @close="tourOpen = false"
+      @launch-demo="onLaunchDemo"
+      @open-preferences="onOpenPreferences"
+    />
+    <AboutDialog :open="aboutOpen" @close="aboutOpen = false" />
   </div>
 </template>
 
