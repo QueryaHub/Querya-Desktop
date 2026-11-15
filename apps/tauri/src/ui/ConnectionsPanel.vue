@@ -157,7 +157,12 @@ function onFolderExpand(id: string, e: MouseEvent) {
 }
 
 function onRelationClick(connectionId: string, node: TreeUiNode) {
-  if (node.kind !== "table" && node.kind !== "view") return;
+  if (
+    node.kind !== "table" &&
+    node.kind !== "view" &&
+    node.kind !== "materialized_view"
+  )
+    return;
   connections.select(connectionId);
   nav.selectObject({
     connectionId,

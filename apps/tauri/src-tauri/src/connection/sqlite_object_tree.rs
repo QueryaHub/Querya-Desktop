@@ -31,7 +31,10 @@ impl ObjectTreeProvider for SqliteObjectTree {
                 ParsedObjectId::Relation { schema, name, .. } => {
                     self.list_columns(&schema, &name, id)
                 }
-                ParsedObjectId::Column { .. } => Ok(vec![]),
+                ParsedObjectId::Column { .. }
+                | ParsedObjectId::Folder { .. }
+                | ParsedObjectId::Named { .. }
+                | ParsedObjectId::RelationChild { .. } => Ok(vec![]),
             },
         }
     }
@@ -39,9 +42,9 @@ impl ObjectTreeProvider for SqliteObjectTree {
     fn describe(&self, object_id: &str) -> ConnectionResult<TableSchema> {
         match parse_object_id(object_id)? {
             ParsedObjectId::Relation { name, .. } => self.session.list_columns(&name),
-            ParsedObjectId::Schema { .. } | ParsedObjectId::Column { .. } => Err(
-                ConnectionError::invalid_config("describe requires a table or view id"),
-            ),
+            _ => Err(ConnectionError::invalid_config(
+                "describe requires a table or view id",
+            )),
         }
     }
 }

@@ -19,7 +19,7 @@ const input = ref<HTMLInputElement | null>(null);
 type Hit = {
   connectionId: string;
   name: string;
-  kind: "table" | "view";
+  kind: "table" | "view" | "materialized_view";
   connectionName: string;
 };
 
@@ -38,7 +38,7 @@ const hits = computed(() => {
       out.push({
         connectionId: c.id,
         name: o.name,
-        kind: o.kind as "table" | "view",
+        kind: o.kind as "table" | "view" | "materialized_view",
         connectionName: c.name,
       });
     }

@@ -119,51 +119,79 @@ fn pg_cell(row: &PgRow, i: usize) -> serde_json::Value {
         return serde_json::Value::Null;
     }
 
+    // sqlx matches Decode by exact Postgres type — INT4≠i64, FLOAT4≠f64, etc.
     let type_info = raw.type_info();
     let type_name = type_info.name();
-
-    // Typed attempts — first match wins.
-    if type_name == "BOOL" {
-        if let Ok(v) = row.try_get::<bool, _>(i) {
-            return serde_json::Value::Bool(v);
+    match type_name {
+        "BOOL" => {
+            if let Ok(v) = row.try_get::<bool, _>(i) {
+                return serde_json::Value::Bool(v);
+            }
         }
-    }
-    if matches!(type_name, "INT2" | "INT4" | "INT8") {
-        if let Ok(v) = row.try_get::<i64, _>(i) {
-            return serde_json::json!(v);
+        "INT2" => {
+            if let Ok(v) = row.try_get::<i16, _>(i) {
+                return serde_json::json!(v);
+            }
         }
-    }
-    if matches!(type_name, "FLOAT4" | "FLOAT8") {
-        if let Ok(v) = row.try_get::<f64, _>(i) {
-            return serde_json::Number::from_f64(v)
-                .map(serde_json::Value::Number)
-                .unwrap_or(serde_json::Value::Null);
+        "INT4" | "OID" => {
+            if let Ok(v) = row.try_get::<i32, _>(i) {
+                return serde_json::json!(v);
+            }
         }
-    }
-    if matches!(type_name, "JSON" | "JSONB") {
-        if let Ok(v) = row.try_get::<serde_json::Value, _>(i) {
-            return v;
+        "INT8" => {
+            if let Ok(v) = row.try_get::<i64, _>(i) {
+                return serde_json::json!(v);
+            }
         }
-    }
-    if type_name == "TIMESTAMPTZ" {
-        if let Ok(v) = row.try_get::<DateTime<Utc>, _>(i) {
-            return serde_json::Value::String(v.to_rfc3339());
+        "FLOAT4" => {
+            if let Ok(v) = row.try_get::<f32, _>(i) {
+                return f64_json(f64::from(v));
+            }
         }
-    }
-    if type_name == "TIMESTAMP" {
-        if let Ok(v) = row.try_get::<NaiveDateTime, _>(i) {
-            return serde_json::Value::String(v.format("%Y-%m-%dT%H:%M:%S%.f").to_string());
+        "FLOAT8" => {
+            if let Ok(v) = row.try_get::<f64, _>(i) {
+                return f64_json(v);
+            }
         }
-    }
-    if type_name == "DATE" {
-        if let Ok(v) = row.try_get::<NaiveDate, _>(i) {
-            return serde_json::Value::String(v.to_string());
+        "NUMERIC" => {
+            if let Ok(v) = row.try_get::<rust_decimal::Decimal, _>(i) {
+                // Keep full precision as string (JSON number can't hold all NUMERIC).
+                return serde_json::Value::String(v.normalize().to_string());
+            }
         }
-    }
-    if type_name == "BYTEA" {
-        if let Ok(v) = row.try_get::<Vec<u8>, _>(i) {
-            return serde_json::Value::String(bytes_to_hex(&v));
+        "JSON" | "JSONB" => {
+            if let Ok(v) = row.try_get::<serde_json::Value, _>(i) {
+                return v;
+            }
         }
+        "TIMESTAMPTZ" => {
+            if let Ok(v) = row.try_get::<DateTime<Utc>, _>(i) {
+                return serde_json::Value::String(v.to_rfc3339());
+            }
+        }
+        "TIMESTAMP" => {
+            if let Ok(v) = row.try_get::<NaiveDateTime, _>(i) {
+                return serde_json::Value::String(
+                    v.format("%Y-%m-%dT%H:%M:%S%.f").to_string(),
+                );
+            }
+        }
+        "DATE" => {
+            if let Ok(v) = row.try_get::<NaiveDate, _>(i) {
+                return serde_json::Value::String(v.to_string());
+            }
+        }
+        "BYTEA" => {
+            if let Ok(v) = row.try_get::<Vec<u8>, _>(i) {
+                return serde_json::Value::String(bytes_to_hex(&v));
+            }
+        }
+        "UUID" => {
+            if let Ok(v) = row.try_get::<uuid::Uuid, _>(i) {
+                return serde_json::Value::String(v.to_string());
+            }
+        }
+        _ => {}
     }
 
     if let Ok(v) = row.try_get::<String, _>(i) {
@@ -173,6 +201,12 @@ fn pg_cell(row: &PgRow, i: usize) -> serde_json::Value {
         return serde_json::Value::String(bytes_to_hex(&v));
     }
     serde_json::Value::String(format!("<{type_name}>"))
+}
+
+fn f64_json(v: f64) -> serde_json::Value {
+    serde_json::Number::from_f64(v)
+        .map(serde_json::Value::Number)
+        .unwrap_or(serde_json::Value::Null)
 }
 
 fn bytes_to_hex(bytes: &[u8]) -> String {
@@ -260,6 +294,59 @@ mod tests {
             })
             .sum();
         assert_eq!(rows, 5);
+
+        // INT4 must decode to numbers — not the `<INT4>` fallback placeholder.
+        let first_id = events.iter().find_map(|e| match e {
+            QueryEvent::Rows { rows, .. } => rows.first().and_then(|r| r.first()),
+            _ => None,
+        });
+        match first_id {
+            Some(serde_json::Value::Number(n)) => assert!(n.as_i64().is_some()),
+            other => panic!("expected numeric id, got {other:?}"),
+        }
+
+        session.disconnect().unwrap();
+    }
+
+    #[test]
+    fn live_postgres_decodes_numeric_not_placeholder() {
+        let Some(params) = live_params() else {
+            return;
+        };
+        let session = match open_postgres(params) {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        let mut events = Vec::new();
+        session
+            .execute_streaming(
+                "SELECT id, total, discount FROM shop.orders ORDER BY id LIMIT 3",
+                Some(3),
+                |ev| {
+                    events.push(ev);
+                    Ok(())
+                },
+            )
+            .expect("stream");
+        let row = events.iter().find_map(|e| match e {
+            QueryEvent::Rows { rows, .. } => rows.first().cloned(),
+            _ => None,
+        });
+        let Some(cells) = row else {
+            panic!("no rows");
+        };
+        assert!(
+            matches!(cells[0], serde_json::Value::Number(_)),
+            "id INT4: {cells:?}"
+        );
+        assert!(
+            matches!(&cells[1], serde_json::Value::String(s) if !s.starts_with('<')),
+            "total NUMERIC: {cells:?}"
+        );
+        assert!(
+            !matches!(&cells[1], serde_json::Value::String(s) if s == "<NUMERIC>"),
+            "total must not be type placeholder: {cells:?}"
+        );
         session.disconnect().unwrap();
     }
 

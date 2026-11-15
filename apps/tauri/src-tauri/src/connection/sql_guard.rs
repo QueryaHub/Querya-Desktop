@@ -18,6 +18,15 @@ pub enum SqlGuardRule {
     Parse,
 }
 
+impl serde::Serialize for SqlGuardRule {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
 impl SqlGuardRule {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -89,7 +98,7 @@ mod tests {
     fn block_rule(sql: &str, driver: DriverKind, rule: SqlGuardRule) {
         let err = assert_single_statement(sql, driver).expect_err("expected block");
         match err {
-            ConnectionError::SqlGuard { rule: r, .. } => assert_eq!(r, rule.as_str()),
+            ConnectionError::SqlGuard { rule: r, .. } => assert_eq!(r, rule),
             other => panic!("expected SqlGuard, got {other:?}"),
         }
     }

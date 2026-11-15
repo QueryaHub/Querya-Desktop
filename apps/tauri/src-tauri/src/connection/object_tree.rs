@@ -1,4 +1,4 @@
-//! Driver-agnostic SQL object tree (schemas → tables/views → columns).
+//! Driver-agnostic SQL object tree (schemas → folders → objects → columns).
 
 use super::error::{ConnectionError, ConnectionResult};
 use super::id::DriverKind;
@@ -10,39 +10,111 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum SqlObjectKind {
     Schema,
+    /// Virtual group under a schema (Tables, Functions, Indexes, …).
+    Folder,
     Table,
     View,
+    MaterializedView,
     Column,
     Index,
     Trigger,
     Function,
     Procedure,
+    Sequence,
+    /// User-defined type (enum / composite / domain / range).
+    #[serde(rename = "type")]
+    Type,
+}
+
+/// Schema-level folder keys (Flutter `connections_panel_pg_tree` parity).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SchemaFolderKind {
+    Tables,
+    Views,
+    MaterializedViews,
+    Functions,
+    Sequences,
+    Indexes,
+    Triggers,
+    Types,
+}
+
+impl SchemaFolderKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Tables => "tables",
+            Self::Views => "views",
+            Self::MaterializedViews => "materialized_views",
+            Self::Functions => "functions",
+            Self::Sequences => "sequences",
+            Self::Indexes => "indexes",
+            Self::Triggers => "triggers",
+            Self::Types => "types",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Tables => "Tables",
+            Self::Views => "Views",
+            Self::MaterializedViews => "Materialized views",
+            Self::Functions => "Functions",
+            Self::Sequences => "Sequences",
+            Self::Indexes => "Indexes",
+            Self::Triggers => "Triggers",
+            Self::Types => "Types",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|folder| folder.as_str() == s)
+    }
+
+    pub const ALL: [Self; 8] = [
+        Self::Tables,
+        Self::Views,
+        Self::MaterializedViews,
+        Self::Functions,
+        Self::Sequences,
+        Self::Indexes,
+        Self::Triggers,
+        Self::Types,
+    ];
 }
 
 impl SqlObjectKind {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Schema => "schema",
+            Self::Folder => "folder",
             Self::Table => "table",
             Self::View => "view",
+            Self::MaterializedView => "materialized_view",
             Self::Column => "column",
             Self::Index => "index",
             Self::Trigger => "trigger",
             Self::Function => "function",
             Self::Procedure => "procedure",
+            Self::Sequence => "sequence",
+            Self::Type => "type",
         }
     }
 
     fn parse(s: &str) -> Option<Self> {
         match s {
             "schema" => Some(Self::Schema),
+            "folder" => Some(Self::Folder),
             "table" => Some(Self::Table),
             "view" => Some(Self::View),
+            "materialized_view" => Some(Self::MaterializedView),
             "column" => Some(Self::Column),
             "index" => Some(Self::Index),
             "trigger" => Some(Self::Trigger),
             "function" => Some(Self::Function),
             "procedure" => Some(Self::Procedure),
+            "sequence" => Some(Self::Sequence),
+            "type" => Some(Self::Type),
             _ => None,
         }
     }
@@ -50,12 +122,19 @@ impl SqlObjectKind {
     pub fn is_expandable(self) -> bool {
         matches!(
             self,
-            Self::Schema | Self::Table | Self::View | Self::Index | Self::Function | Self::Procedure
+            Self::Schema
+                | Self::Folder
+                | Self::Table
+                | Self::View
+                | Self::MaterializedView
         )
     }
 
     pub fn is_relation(self) -> bool {
-        matches!(self, Self::Table | Self::View)
+        matches!(
+            self,
+            Self::Table | Self::View | Self::MaterializedView
+        )
     }
 }
 
@@ -127,6 +206,15 @@ pub fn schema_id(driver: DriverKind, schema: &str) -> String {
     format!("{}:schema:{}", driver.as_str(), enc_segment(schema))
 }
 
+pub fn folder_id(driver: DriverKind, schema: &str, folder: SchemaFolderKind) -> String {
+    format!(
+        "{}:folder:{}:{}",
+        driver.as_str(),
+        enc_segment(schema),
+        folder.as_str()
+    )
+}
+
 pub fn relation_id(driver: DriverKind, kind: SqlObjectKind, schema: &str, name: &str) -> String {
     debug_assert!(kind.is_relation());
     format!(
@@ -148,12 +236,51 @@ pub fn column_id(driver: DriverKind, schema: &str, table: &str, column: &str) ->
     )
 }
 
+/// Schema-scoped object (function / sequence / type / …).
+pub fn named_object_id(
+    driver: DriverKind,
+    kind: SqlObjectKind,
+    schema: &str,
+    name: &str,
+) -> String {
+    format!(
+        "{}:{}:{}:{}",
+        driver.as_str(),
+        kind.as_str(),
+        enc_segment(schema),
+        enc_segment(name)
+    )
+}
+
+/// Index or trigger scoped to a relation: `driver:kind:schema:table:name`.
+pub fn relation_child_id(
+    driver: DriverKind,
+    kind: SqlObjectKind,
+    schema: &str,
+    table: &str,
+    name: &str,
+) -> String {
+    format!(
+        "{}:{}:{}:{}:{}",
+        driver.as_str(),
+        kind.as_str(),
+        enc_segment(schema),
+        enc_segment(table),
+        enc_segment(name)
+    )
+}
+
 /// Parsed object id.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParsedObjectId {
     Schema {
         driver: DriverKind,
         schema: String,
+    },
+    Folder {
+        driver: DriverKind,
+        schema: String,
+        folder: SchemaFolderKind,
     },
     Relation {
         driver: DriverKind,
@@ -167,10 +294,34 @@ pub enum ParsedObjectId {
         table: String,
         column: String,
     },
+    /// Function / sequence / type / procedure under a schema.
+    Named {
+        driver: DriverKind,
+        kind: SqlObjectKind,
+        schema: String,
+        name: String,
+    },
+    /// Index / trigger under a relation.
+    RelationChild {
+        driver: DriverKind,
+        kind: SqlObjectKind,
+        schema: String,
+        table: String,
+        name: String,
+    },
 }
 
 fn bad_id(msg: impl Into<String>) -> ConnectionError {
     ConnectionError::invalid_config(msg)
+}
+
+fn parse_driver(s: &str) -> ConnectionResult<DriverKind> {
+    match s {
+        "sqlite" => Ok(DriverKind::Sqlite),
+        "postgres" => Ok(DriverKind::Postgres),
+        "mysql" => Ok(DriverKind::Mysql),
+        other => Err(bad_id(format!("unknown driver in object id: {other}"))),
+    }
 }
 
 pub fn parse_object_id(id: &str) -> ConnectionResult<ParsedObjectId> {
@@ -178,12 +329,7 @@ pub fn parse_object_id(id: &str) -> ConnectionResult<ParsedObjectId> {
     if parts.len() < 3 {
         return Err(bad_id(format!("invalid object id: {id}")));
     }
-    let driver = match parts[0] {
-        "sqlite" => DriverKind::Sqlite,
-        "postgres" => DriverKind::Postgres,
-        "mysql" => DriverKind::Mysql,
-        other => return Err(bad_id(format!("unknown driver in object id: {other}"))),
-    };
+    let driver = parse_driver(parts[0])?;
     let kind = SqlObjectKind::parse(parts[1])
         .ok_or_else(|| bad_id(format!("unknown object kind in id: {id}")))?;
 
@@ -192,7 +338,18 @@ pub fn parse_object_id(id: &str) -> ConnectionResult<ParsedObjectId> {
             driver,
             schema: dec_segment(parts[2]),
         }),
-        SqlObjectKind::Table | SqlObjectKind::View if parts.len() == 4 => {
+        SqlObjectKind::Folder if parts.len() == 4 => {
+            let folder = SchemaFolderKind::parse(parts[3])
+                .ok_or_else(|| bad_id(format!("unknown folder kind in id: {id}")))?;
+            Ok(ParsedObjectId::Folder {
+                driver,
+                schema: dec_segment(parts[2]),
+                folder,
+            })
+        }
+        SqlObjectKind::Table | SqlObjectKind::View | SqlObjectKind::MaterializedView
+            if parts.len() == 4 =>
+        {
             Ok(ParsedObjectId::Relation {
                 driver,
                 kind,
@@ -206,15 +363,29 @@ pub fn parse_object_id(id: &str) -> ConnectionResult<ParsedObjectId> {
             table: dec_segment(parts[3]),
             column: dec_segment(parts[4]),
         }),
-        SqlObjectKind::Schema => Err(bad_id(format!("invalid schema id: {id}"))),
-        SqlObjectKind::Table | SqlObjectKind::View => {
-            Err(bad_id(format!("invalid relation id: {id}")))
+        SqlObjectKind::Function
+        | SqlObjectKind::Procedure
+        | SqlObjectKind::Sequence
+        | SqlObjectKind::Type
+            if parts.len() == 4 =>
+        {
+            Ok(ParsedObjectId::Named {
+                driver,
+                kind,
+                schema: dec_segment(parts[2]),
+                name: dec_segment(parts[3]),
+            })
         }
-        SqlObjectKind::Column => Err(bad_id(format!("invalid column id: {id}"))),
-        other => Err(bad_id(format!(
-            "object kind {:?} not supported in ids yet",
-            other
-        ))),
+        SqlObjectKind::Index | SqlObjectKind::Trigger if parts.len() == 5 => {
+            Ok(ParsedObjectId::RelationChild {
+                driver,
+                kind,
+                schema: dec_segment(parts[2]),
+                table: dec_segment(parts[3]),
+                name: dec_segment(parts[4]),
+            })
+        }
+        _ => Err(bad_id(format!("invalid object id: {id}"))),
     }
 }
 
@@ -249,6 +420,33 @@ mod tests {
                 assert_eq!(schema, "main");
                 assert_eq!(table, "users");
                 assert_eq!(column, "id");
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn folder_and_function_ids_round_trip() {
+        let fid = folder_id(DriverKind::Postgres, "shop", SchemaFolderKind::Functions);
+        assert_eq!(fid, "postgres:folder:shop:functions");
+        match parse_object_id(&fid).unwrap() {
+            ParsedObjectId::Folder { folder, schema, .. } => {
+                assert_eq!(schema, "shop");
+                assert_eq!(folder, SchemaFolderKind::Functions);
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+
+        let fn_id = named_object_id(
+            DriverKind::Postgres,
+            SqlObjectKind::Function,
+            "shop",
+            "total_orders",
+        );
+        match parse_object_id(&fn_id).unwrap() {
+            ParsedObjectId::Named { kind, name, .. } => {
+                assert_eq!(kind, SqlObjectKind::Function);
+                assert_eq!(name, "total_orders");
             }
             other => panic!("unexpected {other:?}"),
         }
