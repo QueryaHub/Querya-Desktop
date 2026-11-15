@@ -1,5 +1,6 @@
 use super::error::{ConnectionError, ConnectionResult};
 use super::id::{ConnectionId, DriverKind};
+use super::postgres::PostgresSession;
 use super::query::QueryEvent;
 use super::sqlite::SqliteSession;
 use serde::{Deserialize, Serialize};
@@ -19,12 +20,16 @@ pub enum ConnectionConfig {
         #[serde(default)]
         id: Option<String>,
     },
-    /// Stub until the Postgres adapter epic wires connect.
     Postgres {
         host: String,
         port: u16,
         database: String,
         user: String,
+        /// Session-only secret — never written to ProfileStore (keyring: #1878).
+        #[serde(default)]
+        password: Option<String>,
+        #[serde(default)]
+        id: Option<String>,
     },
     /// Stub until the MySQL adapter epic wires connect.
     Mysql {
@@ -32,6 +37,10 @@ pub enum ConnectionConfig {
         port: u16,
         database: String,
         user: String,
+        #[serde(default)]
+        password: Option<String>,
+        #[serde(default)]
+        id: Option<String>,
     },
 }
 
@@ -82,7 +91,7 @@ impl ConnectionRegistry {
         Self::with_builtin_drivers()
     }
 
-    /// Registry with SQLite opener wired (PG/MySQL return UnsupportedDriver).
+    /// Registry with SQLite + Postgres openers (MySQL still UnsupportedDriver).
     pub fn with_builtin_drivers() -> Self {
         Self::with_opener(|config| match config {
             ConnectionConfig::Sqlite { path, id } => {
@@ -92,6 +101,24 @@ impl ConnectionRegistry {
                     }
                     _ => super::sqlite::open_sqlite(path),
                 }?;
+                Ok(Arc::new(session) as SessionArc)
+            }
+            ConnectionConfig::Postgres {
+                host,
+                port,
+                database,
+                user,
+                password,
+                id,
+            } => {
+                let session = super::postgres::open_postgres(super::postgres::PostgresConnectParams {
+                    host,
+                    port,
+                    database,
+                    user,
+                    password,
+                    id: id.filter(|s| !s.trim().is_empty()).map(ConnectionId::from),
+                })?;
                 Ok(Arc::new(session) as SessionArc)
             }
             other => Err(ConnectionError::UnsupportedDriver {
@@ -151,6 +178,39 @@ impl ConnectionRegistry {
         emit: impl FnMut(QueryEvent) -> ConnectionResult<()>,
     ) -> ConnectionResult<()> {
         self.with_sqlite(id, |s| s.execute_streaming(sql, limit, emit))
+    }
+
+    pub fn with_postgres<T>(
+        &self,
+        id: &ConnectionId,
+        f: impl FnOnce(&PostgresSession) -> ConnectionResult<T>,
+    ) -> ConnectionResult<T> {
+        let session = self.session_arc(id)?;
+        let pg = session
+            .as_any()
+            .downcast_ref::<PostgresSession>()
+            .ok_or(ConnectionError::UnsupportedDriver {
+                driver: session.driver(),
+            })?;
+        f(pg)
+    }
+
+    /// Driver-aware query stream (SQLite + Postgres).
+    pub fn execute_query(
+        &self,
+        id: &ConnectionId,
+        sql: &str,
+        limit: Option<usize>,
+        emit: impl FnMut(QueryEvent) -> ConnectionResult<()>,
+    ) -> ConnectionResult<()> {
+        match self.driver_of(id) {
+            Some(DriverKind::Sqlite) => self.execute_sqlite_query(id, sql, limit, emit),
+            Some(DriverKind::Postgres) => {
+                self.with_postgres(id, |s| s.execute_streaming(sql, limit, emit))
+            }
+            Some(other) => Err(ConnectionError::UnsupportedDriver { driver: other }),
+            None => Err(ConnectionError::NotFound { id: id.clone() }),
+        }
     }
 
     /// Driver-agnostic object tree for a live connection (SQLite first).
@@ -300,22 +360,40 @@ mod tests {
     }
 
     #[test]
-    fn registry_postgres_is_unsupported_for_now() {
+    fn registry_mysql_is_unsupported_for_now() {
         let reg = ConnectionRegistry::with_builtin_drivers();
         let err = reg
-            .connect(ConnectionConfig::Postgres {
+            .connect(ConnectionConfig::Mysql {
                 host: "localhost".into(),
-                port: 5432,
+                port: 3306,
                 database: "db".into(),
                 user: "u".into(),
+                password: None,
+                id: None,
             })
             .unwrap_err();
         assert!(matches!(
             err,
             ConnectionError::UnsupportedDriver {
-                driver: DriverKind::Postgres
+                driver: DriverKind::Mysql
             }
         ));
+    }
+
+    #[test]
+    fn registry_postgres_rejects_empty_host() {
+        let reg = ConnectionRegistry::with_builtin_drivers();
+        let err = reg
+            .connect(ConnectionConfig::Postgres {
+                host: "  ".into(),
+                port: 5432,
+                database: "querya".into(),
+                user: "querya".into(),
+                password: Some("querya".into()),
+                id: None,
+            })
+            .unwrap_err();
+        assert!(matches!(err, ConnectionError::InvalidConfig { .. }));
     }
 
     #[test]

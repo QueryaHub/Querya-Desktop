@@ -67,6 +67,24 @@ export async function dbConnectSqlite(
   return invoke<string>("db_connect_sqlite", { path, id: id ?? null });
 }
 
+export async function dbConnectPostgres(opts: {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password?: string | null;
+  id?: string | null;
+}): Promise<string> {
+  return invoke<string>("db_connect_postgres", {
+    host: opts.host,
+    port: opts.port,
+    database: opts.database,
+    user: opts.user,
+    password: opts.password ?? null,
+    id: opts.id ?? null,
+  });
+}
+
 export async function profilesList(): Promise<ConnectionProfile[]> {
   return invoke<ConnectionProfile[]>("profiles_list");
 }

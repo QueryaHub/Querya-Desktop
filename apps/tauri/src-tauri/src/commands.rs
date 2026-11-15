@@ -16,6 +16,26 @@ pub fn db_connect_sqlite(
 }
 
 #[tauri::command]
+pub fn db_connect_postgres(
+    host: String,
+    port: u16,
+    database: String,
+    user: String,
+    password: Option<String>,
+    id: Option<String>,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<ConnectionId, ConnectionError> {
+    registry.connect(ConnectionConfig::Postgres {
+        host,
+        port,
+        database,
+        user,
+        password,
+        id,
+    })
+}
+
+#[tauri::command]
 pub fn profiles_list(
     store: State<'_, ProfileStore>,
 ) -> Result<Vec<ConnectionProfile>, ProfileStoreError> {
@@ -208,7 +228,7 @@ pub fn db_execute_query(
     registry: State<'_, ConnectionRegistry>,
 ) -> Result<(), ConnectionError> {
     let limit = limit.map(|n| n as usize);
-    registry.execute_sqlite_query(&id, &sql, limit, |ev| {
+    registry.execute_query(&id, &sql, limit, |ev| {
         on_event
             .send(ev)
             .map_err(|e| ConnectionError::io(format!("query channel closed: {e}")))
