@@ -1,7 +1,7 @@
 import type { SqlObjectKind } from "../../api/connection";
 import type { QueryaIconName } from "./registry";
 
-/** Folder display names from Postgres/SQLite object trees. */
+/** Folder display names → Flutter QueryaIcons group glyphs. */
 const FOLDER_ICONS: Record<string, QueryaIconName> = {
   Tables: "tableGroup",
   Views: "viewGroup",
@@ -48,6 +48,7 @@ export function iconForObjectNode(
   }
 }
 
+/** @deprecated Prefer QueryaDriverIcon — kept for tests of Material fallbacks. */
 export function iconForDriver(
   driver: string,
   opts?: { mock?: boolean },
@@ -55,15 +56,16 @@ export function iconForDriver(
   if (opts?.mock) return "demo";
   switch (driver) {
     case "postgres":
+    case "postgresql":
       return "database";
     case "sqlite":
-      return "hardDrive";
+      return "sqlite";
     case "mysql":
       return "tableGroup";
     case "redis":
-      return "server";
+      return "redis";
     case "mongodb":
-      return "boxes";
+      return "mongo";
     default:
       return "extension";
   }

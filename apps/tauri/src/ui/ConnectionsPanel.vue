@@ -13,7 +13,7 @@ import { useQueryaMotion } from "../motion";
 import SplitHandle from "./SplitHandle.vue";
 import QueryaContextMenu, { type CtxItem } from "./QueryaContextMenu.vue";
 import SqlObjectTreeNodes from "./SqlObjectTreeNodes.vue";
-import { QueryaIcon, iconForDriver } from "./icons";
+import { QueryaIcon, QueryaDriverIcon } from "./icons";
 
 const emit = defineEmits<{
   newConnection: [];
@@ -349,9 +349,10 @@ onUnmounted(() => {
                     @click="onConnClick(c.id)"
                     @dblclick="onConnExpand(c.id, $event)"
                   >
-                    <QueryaIcon
+                    <QueryaDriverIcon
                       class="glyph"
-                      :name="iconForDriver(c.driver, { mock: c.mock })"
+                      :driver="c.driver"
+                      :mock="!!c.mock"
                       :size="14"
                     />
                     <span class="conn-name">{{ c.name }}</span>
@@ -448,9 +449,10 @@ onUnmounted(() => {
                 @click="onConnClick(c.id)"
                 @dblclick="onConnExpand(c.id, $event)"
               >
-                <QueryaIcon
+                <QueryaDriverIcon
                   class="glyph"
-                  :name="iconForDriver(c.driver, { mock: c.mock })"
+                  :driver="c.driver"
+                  :mock="!!c.mock"
                   :size="14"
                 />
                 <span class="conn-name">{{ c.name }}</span>

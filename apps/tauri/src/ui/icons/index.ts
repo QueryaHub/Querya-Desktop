@@ -1,3 +1,8 @@
 export { default as QueryaIcon } from "./QueryaIcon.vue";
-export { QUERYA_ICONS, type QueryaIconName } from "./registry";
+export { default as QueryaDriverIcon } from "./QueryaDriverIcon.vue";
+export {
+  QUERYA_ICONS,
+  connectionAsset,
+  type QueryaIconName,
+} from "./registry";
 export { iconForDriver, iconForObjectNode } from "./objectKind";

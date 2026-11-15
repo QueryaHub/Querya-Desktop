@@ -34,7 +34,7 @@ type Category = {
   id: CategoryId;
   label: string;
   description: string;
-  /** Flutter prefs rail — Lucide via QueryaIcon. */
+  /** Flutter prefs rail — Material Symbols via QueryaIcon. */
   icon: QueryaIconName;
   keywords: string;
 };
