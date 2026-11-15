@@ -29,12 +29,19 @@ sqlx = { version = "0.8", default-features = false, features = [
   "chrono",
   "rust_decimal",
   "uuid",
+  "ipnetwork",
+  "mac_address",
+  "bit-vec",
 ] }
 futures-util = "0.3"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native-sync-persistent"] }
 sqlparser = "0.64"
 rust_decimal = { version = "1", features = ["serde"] }
+# Pin to sqlx 0.8's dependency versions so Decode impls match.
+ipnetwork = "0.20"
+mac_address = "1.1"
+bit-vec = "0.6.3"
 
 [profile.release]
 codegen-units = 1
