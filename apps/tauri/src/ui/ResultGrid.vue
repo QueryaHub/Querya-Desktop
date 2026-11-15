@@ -3,8 +3,13 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { storeToRefs } from "pinia";
+import type { Theme } from "@glideapps/glide-data-grid";
 import { useQueryResultStore } from "../stores/queryResult";
 import { ResultDataEditor } from "./glide/ResultDataEditor";
+import {
+  buildQueryaGlideTheme,
+  subscribeThemeChanges,
+} from "./glide/queryaGlideTheme";
 import "@glideapps/glide-data-grid/dist/index.css";
 
 const query = useQueryResultStore();
@@ -14,6 +19,8 @@ const host = ref<HTMLDivElement | null>(null);
 const size = ref({ width: 640, height: 320 });
 let root: Root | null = null;
 let ro: ResizeObserver | null = null;
+let unsubTheme: (() => void) | null = null;
+let glideTheme: Partial<Theme> = buildQueryaGlideTheme();
 
 function render() {
   if (!root || !host.value) return;
@@ -23,8 +30,14 @@ function render() {
       rows: rows.value,
       width: Math.max(100, size.value.width),
       height: Math.max(100, size.value.height),
+      theme: glideTheme,
     }),
   );
+}
+
+function refreshTheme() {
+  glideTheme = buildQueryaGlideTheme();
+  render();
 }
 
 onMounted(() => {
@@ -40,12 +53,15 @@ onMounted(() => {
     render();
   });
   ro.observe(host.value);
-  render();
+  unsubTheme = subscribeThemeChanges(refreshTheme);
+  refreshTheme();
 });
 
 watch([columns, rows], () => render(), { deep: true });
 
 onBeforeUnmount(() => {
+  unsubTheme?.();
+  unsubTheme = null;
   ro?.disconnect();
   ro = null;
   root?.unmount();
@@ -68,6 +84,7 @@ onBeforeUnmount(() => {
   height: 100%;
   min-height: 120px;
   overflow: hidden;
-  background: var(--q-surface);
+  background: var(--q-editor-bg);
+  color: var(--q-foreground);
 }
 </style>
