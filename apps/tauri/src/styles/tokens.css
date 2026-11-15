@@ -1,0 +1,120 @@
+/**
+ * Querya design tokens (CSS variables).
+ * Ported from Flutter QueryaUiColors / QueryaColors — no shadcn.
+ *
+ * Usage: `color: var(--q-foreground); background: var(--q-background);`
+ * Theme: set `data-theme="light"|"dark"` on <html>, or leave unset for
+ * prefers-color-scheme.
+ */
+
+:root {
+  /* Radius / elevation / type (shared) */
+  --q-radius-sm: 4px;
+  --q-radius-md: 8px;
+  --q-radius-lg: 12px;
+  --q-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.08);
+  --q-shadow-md: 0 4px 16px rgb(0 0 0 / 0.12);
+  --q-font-sans: "Segoe UI", "SF Pro Text", system-ui, sans-serif;
+  --q-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  --q-text-xs: 0.75rem;
+  --q-text-sm: 0.875rem;
+  --q-text-md: 1rem;
+  --q-text-lg: 1.25rem;
+  --q-text-xl: 1.75rem;
+  --q-text-hero: clamp(2.5rem, 6vw, 4rem);
+  --q-space-1: 0.25rem;
+  --q-space-2: 0.5rem;
+  --q-space-3: 0.75rem;
+  --q-space-4: 1rem;
+  --q-space-6: 1.5rem;
+  --q-space-8: 2rem;
+}
+
+/* Light — QueryaTheme.lightDefault / QueryaUiColors */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --q-background: #fafafa;
+  --q-foreground: #0f172a;
+  --q-card: #ffffff;
+  --q-card-foreground: #0f172a;
+  --q-popover: #ffffff;
+  --q-popover-foreground: #0f172a;
+  --q-primary: #0e7490;
+  --q-primary-foreground: #ffffff;
+  --q-secondary: #f4f4f5;
+  --q-secondary-foreground: #0f172a;
+  --q-muted: #f4f4f5;
+  --q-muted-foreground: #64748b;
+  --q-accent: #e4e4e7;
+  --q-accent-foreground: #0f172a;
+  --q-destructive: #dc2626;
+  --q-destructive-foreground: #f8fafc;
+  --q-border: #e4e4e7;
+  --q-input: #e4e4e7;
+  --q-ring: #0e7490;
+  --q-chart-1: #2662d9;
+  --q-chart-2: #2eb88a;
+  --q-chart-3: #e88c30;
+  --q-chart-4: #af57db;
+  --q-chart-5: #e23670;
+}
+
+/* Dark — QueryaTheme.darkDefault / QueryaColors */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --q-background: #000000;
+    --q-foreground: #f8fafc;
+    --q-card: #0c0c0c;
+    --q-card-foreground: #f8fafc;
+    --q-popover: #0c0c0c;
+    --q-popover-foreground: #f8fafc;
+    --q-primary: #22d3ee;
+    --q-primary-foreground: #0a0a0a;
+    --q-secondary: #18181b;
+    --q-secondary-foreground: #f8fafc;
+    --q-muted: #18181b;
+    --q-muted-foreground: #94a3b8;
+    --q-accent: #27272a;
+    --q-accent-foreground: #f8fafc;
+    --q-destructive: #ef4444;
+    --q-destructive-foreground: #f8fafc;
+    --q-border: #27272a;
+    --q-input: #27272a;
+    --q-ring: #22d3ee;
+    --q-chart-1: #2662d9;
+    --q-chart-2: #2eb88a;
+    --q-chart-3: #e88c30;
+    --q-chart-4: #af57db;
+    --q-chart-5: #e23670;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --q-background: #000000;
+  --q-foreground: #f8fafc;
+  --q-card: #0c0c0c;
+  --q-card-foreground: #f8fafc;
+  --q-popover: #0c0c0c;
+  --q-popover-foreground: #f8fafc;
+  --q-primary: #22d3ee;
+  --q-primary-foreground: #0a0a0a;
+  --q-secondary: #18181b;
+  --q-secondary-foreground: #f8fafc;
+  --q-muted: #18181b;
+  --q-muted-foreground: #94a3b8;
+  --q-accent: #27272a;
+  --q-accent-foreground: #f8fafc;
+  --q-destructive: #ef4444;
+  --q-destructive-foreground: #f8fafc;
+  --q-border: #27272a;
+  --q-input: #27272a;
+  --q-ring: #22d3ee;
+  --q-chart-1: #2662d9;
+  --q-chart-2: #2eb88a;
+  --q-chart-3: #e88c30;
+  --q-chart-4: #af57db;
+  --q-chart-5: #e23670;
+}
