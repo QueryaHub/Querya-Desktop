@@ -12,6 +12,7 @@ import {
   type QueryaMotionLevel,
 } from "./motion";
 import QueryaGlass from "./ui/QueryaGlass.vue";
+import TitleBar from "./ui/TitleBar.vue";
 
 const shell = useShellStore();
 const motion = provideQueryaMotion();
@@ -59,104 +60,128 @@ function setMotion(level: QueryaMotionLevel) {
 </script>
 
 <template>
-  <div class="shell">
-    <header class="brand">Querya</header>
-    <p class="tagline">Tauri 2 + Vue 3 — tokens + Fluid Motion</p>
-    <p class="meta" data-testid="backend-info">{{ backend }}</p>
-    <p class="meta">
-      springs: {{ springsOn ? "on" : "off" }} · level: {{ motionLevel }}
-    </p>
+  <div class="app-frame">
+    <TitleBar />
+    <main class="workspace">
+      <div class="hero">
+        <header class="brand">Querya</header>
+        <p class="tagline">Tauri 2 + Vue 3 — tokens + Fluid + custom title bar</p>
+        <p class="meta" data-testid="backend-info">{{ backend }}</p>
+        <p class="meta">
+          springs: {{ springsOn ? "on" : "off" }} · level: {{ motionLevel }}
+        </p>
 
-    <div class="swatches" aria-label="Querya token swatches">
-      <div v-for="s in swatches" :key="s.name" class="swatch">
-        <span class="chip" :style="{ background: `var(${s.varName})` }" />
-        <span class="label">{{ s.name }}</span>
+        <div class="swatches" aria-label="Querya token swatches">
+          <div v-for="s in swatches" :key="s.name" class="swatch">
+            <span class="chip" :style="{ background: `var(${s.varName})` }" />
+            <span class="label">{{ s.name }}</span>
+          </div>
+        </div>
+
+        <div class="theme-row" role="group" aria-label="Theme">
+          <button
+            type="button"
+            class="btn"
+            :class="{ active: theme === 'system' }"
+            @click="setTheme('system')"
+          >
+            System
+          </button>
+          <button
+            type="button"
+            class="btn"
+            :class="{ active: theme === 'light' }"
+            @click="setTheme('light')"
+          >
+            Light
+          </button>
+          <button
+            type="button"
+            class="btn"
+            :class="{ active: theme === 'dark' }"
+            @click="setTheme('dark')"
+          >
+            Dark
+          </button>
+        </div>
+
+        <div class="theme-row" role="group" aria-label="Motion">
+          <button
+            type="button"
+            class="btn"
+            :class="{ active: !motionManual }"
+            @click="motion.followSystem()"
+          >
+            System
+          </button>
+          <button
+            type="button"
+            class="btn"
+            :class="{ active: motionManual && motionLevel === 'full' }"
+            @click="setMotion('full')"
+          >
+            Full
+          </button>
+          <button
+            type="button"
+            class="btn"
+            :class="{ active: motionManual && motionLevel === 'reduced' }"
+            @click="setMotion('reduced')"
+          >
+            Reduced
+          </button>
+          <button
+            type="button"
+            class="btn"
+            :class="{ active: motionManual && motionLevel === 'off' }"
+            @click="setMotion('off')"
+          >
+            Off
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="btn demo-toggle"
+          @click="panelOpen = !panelOpen"
+        >
+          Toggle demo panel
+        </button>
+        <div
+          class="demo-panel"
+          :class="{ open: panelOpen }"
+          :style="panelStyle"
+          data-testid="motion-demo-panel"
+        />
+
+        <QueryaGlass class="glass-demo" data-testid="glass-demo">
+          <p class="glass-title">Liquid Glass</p>
+          <p class="glass-copy">
+            Drag the title bar · minimize / maximize / close on the chrome
+          </p>
+        </QueryaGlass>
       </div>
-    </div>
-
-    <div class="theme-row" role="group" aria-label="Theme">
-      <button
-        type="button"
-        class="btn"
-        :class="{ active: theme === 'system' }"
-        @click="setTheme('system')"
-      >
-        System
-      </button>
-      <button
-        type="button"
-        class="btn"
-        :class="{ active: theme === 'light' }"
-        @click="setTheme('light')"
-      >
-        Light
-      </button>
-      <button
-        type="button"
-        class="btn"
-        :class="{ active: theme === 'dark' }"
-        @click="setTheme('dark')"
-      >
-        Dark
-      </button>
-    </div>
-
-    <div class="theme-row" role="group" aria-label="Motion">
-      <button
-        type="button"
-        class="btn"
-        :class="{ active: !motionManual }"
-        @click="motion.followSystem()"
-      >
-        System
-      </button>
-      <button
-        type="button"
-        class="btn"
-        :class="{ active: motionManual && motionLevel === 'full' }"
-        @click="setMotion('full')"
-      >
-        Full
-      </button>
-      <button
-        type="button"
-        class="btn"
-        :class="{ active: motionManual && motionLevel === 'reduced' }"
-        @click="setMotion('reduced')"
-      >
-        Reduced
-      </button>
-      <button
-        type="button"
-        class="btn"
-        :class="{ active: motionManual && motionLevel === 'off' }"
-        @click="setMotion('off')"
-      >
-        Off
-      </button>
-    </div>
-
-    <button type="button" class="btn demo-toggle" @click="panelOpen = !panelOpen">
-      Toggle demo panel
-    </button>
-    <div
-      class="demo-panel"
-      :class="{ open: panelOpen }"
-      :style="panelStyle"
-      data-testid="motion-demo-panel"
-    />
-
-    <QueryaGlass class="glass-demo" data-testid="glass-demo">
-      <p class="glass-title">Liquid Glass</p>
-      <p class="glass-copy">
-        backdrop-filter material · softer on Win/Linux · solid when blur is off
-      </p>
-    </QueryaGlass>
+    </main>
   </div>
 </template>
 
 <style scoped>
-.shell {
+.app-frame {
+  height: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--q-background);
+  color: var(--q-foreground);
+}
+
+.workspace {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.hero {
   min-height: 100%;
   display: grid;
   place-content: center;
