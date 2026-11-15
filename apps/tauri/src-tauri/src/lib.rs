@@ -1,9 +1,12 @@
+mod commands;
 mod connection;
 
 pub use connection::{
     ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager, ConnectionRegistry,
     DriverKind,
 };
+
+use commands::{db_connect_sqlite, db_disconnect, db_is_connected};
 
 #[tauri::command]
 fn app_info() -> serde_json::Value {
@@ -30,8 +33,15 @@ fn host_platform() -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(ConnectionRegistry::new())
-        .invoke_handler(tauri::generate_handler![app_info, host_platform])
+        .invoke_handler(tauri::generate_handler![
+            app_info,
+            host_platform,
+            db_connect_sqlite,
+            db_disconnect,
+            db_is_connected,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
