@@ -57,16 +57,31 @@ pub trait ConnectionManager: Send + Sync {
 type SessionBox = Box<dyn ConnectionSession>;
 
 /// In-memory registry used by Tauri commands. Drivers register factories later.
-#[derive(Default)]
 pub struct ConnectionRegistry {
     sessions: Mutex<HashMap<ConnectionId, SessionBox>>,
     /// Optional opener for tests / driver wiring. Returns a live session.
     opener: Option<Arc<dyn Fn(ConnectionConfig) -> ConnectionResult<SessionBox> + Send + Sync>>,
 }
 
+impl Default for ConnectionRegistry {
+    fn default() -> Self {
+        Self::with_builtin_drivers()
+    }
+}
+
 impl ConnectionRegistry {
     pub fn new() -> Self {
-        Self::default()
+        Self::with_builtin_drivers()
+    }
+
+    /// Registry with SQLite opener wired (PG/MySQL return UnsupportedDriver).
+    pub fn with_builtin_drivers() -> Self {
+        Self::with_opener(|config| match config {
+            ConnectionConfig::Sqlite { path } => super::sqlite::open_sqlite(path),
+            other => Err(ConnectionError::UnsupportedDriver {
+                driver: other.driver_kind(),
+            }),
+        })
     }
 
     pub fn with_opener<F>(opener: F) -> Self
@@ -173,17 +188,21 @@ mod tests {
     }
 
     #[test]
-    fn registry_without_opener_is_unsupported() {
-        let reg = ConnectionRegistry::new();
+    fn registry_postgres_is_unsupported_for_now() {
+        let reg = ConnectionRegistry::with_builtin_drivers();
         let err = reg
-            .connect(ConnectionConfig::Sqlite {
-                path: "a.db".into(),
+            .connect(ConnectionConfig::Postgres {
+                host: "localhost".into(),
+                port: 5432,
+                database: "db".into(),
+                user: "u".into(),
+                password: None,
             })
             .unwrap_err();
         assert!(matches!(
             err,
             ConnectionError::UnsupportedDriver {
-                driver: DriverKind::Sqlite
+                driver: DriverKind::Postgres
             }
         ));
     }
