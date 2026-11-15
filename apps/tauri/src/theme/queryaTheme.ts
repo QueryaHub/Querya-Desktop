@@ -5,7 +5,8 @@ const STORAGE_KEY = "querya.theme";
 export function readStoredTheme(): QueryaThemeMode {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw === "light" || raw === "dark" || raw === "system") return raw;
-  return "system";
+  // Flutter QueryaTheme.darkDefault — first launch is dark, not OS light.
+  return "dark";
 }
 
 export function applyTheme(mode: QueryaThemeMode): void {

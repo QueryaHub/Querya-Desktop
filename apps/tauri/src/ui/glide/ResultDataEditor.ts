@@ -10,6 +10,7 @@ import {
   type GridCell,
   type GridColumn,
   type Item,
+  type Theme,
 } from "@glideapps/glide-data-grid";
 
 export type ResultDataEditorProps = {
@@ -17,6 +18,8 @@ export type ResultDataEditorProps = {
   rows: unknown[][];
   width: number;
   height: number;
+  /** Querya workbench → Glide theme (dark/light). */
+  theme: Partial<Theme>;
 };
 
 function cellText(value: unknown): string {
@@ -27,7 +30,7 @@ function cellText(value: unknown): string {
 }
 
 export function ResultDataEditor(props: ResultDataEditorProps): ReactElement {
-  const { columns, rows, width, height } = props;
+  const { columns, rows, width, height, theme } = props;
 
   const gridColumns: GridColumn[] = useMemo(
     () =>
@@ -39,6 +42,8 @@ export function ResultDataEditor(props: ResultDataEditorProps): ReactElement {
     [columns],
   );
 
+  const muted = theme.textMedium ?? theme.textLight ?? "#94a3b8";
+
   const getCellContent = useCallback(
     ([col, row]: Item): GridCell => {
       const raw = rows[row]?.[col];
@@ -49,12 +54,10 @@ export function ResultDataEditor(props: ResultDataEditorProps): ReactElement {
         displayData: isNull ? "NULL" : cellText(raw),
         allowOverlay: true,
         readonly: true,
-        themeOverride: isNull
-          ? { textDark: "var(--q-muted-foreground)" }
-          : undefined,
+        themeOverride: isNull ? { textDark: muted } : undefined,
       };
     },
-    [rows],
+    [rows, muted],
   );
 
   return createElement(DataEditor, {
@@ -63,6 +66,7 @@ export function ResultDataEditor(props: ResultDataEditorProps): ReactElement {
     getCellContent,
     width,
     height,
+    theme,
     rowMarkers: "number",
     smoothScrollX: true,
     smoothScrollY: true,
