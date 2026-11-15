@@ -1,0 +1,28 @@
+@import "./tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  min-height: 100%;
+  height: 100%;
+}
+
+body {
+  font-family: var(--q-font-sans);
+  font-size: var(--q-text-md);
+  line-height: 1.45;
+  font-weight: 400;
+  color: var(--q-foreground);
+  background: var(--q-background);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
