@@ -46,10 +46,13 @@ const ctx = ref<{ open: boolean; x: number; y: number; target: CtxTarget }>({
 const filteredConnections = computed(() => {
   const q = filter.value.trim().toLowerCase();
   if (!q) return items.value;
-  return items.value.filter(
-    (c) =>
-      c.name.toLowerCase().includes(q) || c.path.toLowerCase().includes(q),
-  );
+  return items.value.filter((c) => {
+    if (c.name.toLowerCase().includes(q)) return true;
+    if (c.path?.toLowerCase().includes(q)) return true;
+    if (c.host?.toLowerCase().includes(q)) return true;
+    if (c.database?.toLowerCase().includes(q)) return true;
+    return false;
+  });
 });
 
 const rootConnections = computed(() =>
@@ -209,6 +212,7 @@ function filteredRootsFor(connId: string) {
 
 function driverGlyph(c: LiveConnection): string {
   if (c.mock) return "◈";
+  if (c.driver === "postgres") return "◇";
   return "▤";
 }
 

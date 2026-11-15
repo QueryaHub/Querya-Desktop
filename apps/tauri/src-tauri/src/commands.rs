@@ -123,6 +123,81 @@ pub fn profiles_connect_sqlite(
     Ok(profile)
 }
 
+/// Save Postgres profile metadata (no password) and open a live session.
+#[tauri::command]
+pub fn profiles_connect_postgres(
+    name: String,
+    host: String,
+    port: u16,
+    database: String,
+    user: String,
+    password: Option<String>,
+    folder_id: Option<String>,
+    id: Option<String>,
+    store: State<'_, ProfileStore>,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<ConnectionProfile, ConnectionError> {
+    let display_name = {
+        let t = name.trim();
+        if t.is_empty() {
+            format!("{user}@{host}/{database}")
+        } else {
+            t.to_owned()
+        }
+    };
+
+    let mut profile = match id.filter(|s| !s.trim().is_empty()) {
+        Some(existing_id) => store
+            .get(&existing_id)
+            .map_err(|e| ConnectionError::io(e.to_string()))?
+            .map(|mut p| {
+                p.name = display_name.clone();
+                p.host = Some(host.clone());
+                p.port = Some(i64::from(port));
+                p.database_name = Some(database.clone());
+                p.username = Some(user.clone());
+                p.folder_id = folder_id.clone();
+                p.driver = "postgres".into();
+                p.path = None;
+                p
+            })
+            .unwrap_or_else(|| {
+                let mut p = ConnectionProfile::new_postgres(
+                    display_name.clone(),
+                    host.clone(),
+                    port,
+                    database.clone(),
+                    user.clone(),
+                );
+                p.id = existing_id;
+                p.folder_id = folder_id.clone();
+                p
+            }),
+        None => {
+            let mut p =
+                ConnectionProfile::new_postgres(display_name, host.clone(), port, database.clone(), user.clone());
+            p.folder_id = folder_id;
+            p
+        }
+    };
+    profile.touch();
+    store
+        .upsert(&profile)
+        .map_err(|e| ConnectionError::io(e.to_string()))?;
+
+    if !registry.is_connected(&ConnectionId::from(profile.id.as_str())) {
+        registry.connect(ConnectionConfig::Postgres {
+            host,
+            port,
+            database,
+            user,
+            password,
+            id: Some(profile.id.clone()),
+        })?;
+    }
+    Ok(profile)
+}
+
 #[tauri::command]
 pub fn db_disconnect(
     id: ConnectionId,

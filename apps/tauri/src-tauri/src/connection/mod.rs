@@ -6,6 +6,7 @@ mod introspect;
 mod manager;
 mod object_tree;
 mod postgres;
+mod postgres_object_tree;
 pub(crate) mod postgres_query;
 mod query;
 mod runtime;

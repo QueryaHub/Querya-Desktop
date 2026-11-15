@@ -49,7 +49,11 @@ async function loadTableData() {
   query.running = true;
   status.setQueryMetrics({ message: `Loading ${obj.name}…`, busy: true });
   try {
-    const sql = `SELECT * FROM "${obj.name.replace(/"/g, '""')}" LIMIT 200`;
+    const ident = (s: string) => `"${s.replace(/"/g, '""')}"`;
+    const sql =
+      c.driver === "postgres" && obj.schema
+        ? `SELECT * FROM ${ident(obj.schema)}.${ident(obj.name)} LIMIT 200`
+        : `SELECT * FROM ${ident(obj.name)} LIMIT 200`;
     await dbExecuteQuery(c.id, sql, (ev) => query.feedEvent(ev));
     status.setQueryMetrics({
       message: `${query.rowCount} rows · ${query.columns.length} cols`,

@@ -26,6 +26,7 @@ import WelcomeTourDialog from "./ui/WelcomeTourDialog.vue";
 import AboutDialog from "./ui/AboutDialog.vue";
 import NewFolderDialog from "./ui/NewFolderDialog.vue";
 import NewConnectionDialog, {
+  type PostgresConnectPayload,
   type SqliteConnectPayload,
 } from "./ui/NewConnectionDialog.vue";
 
@@ -76,6 +77,21 @@ function onNewConnection() {
 async function onConnectSqliteFromDialog(payload: SqliteConnectPayload) {
   try {
     await connections.connectSqlite(payload.path, { name: payload.name });
+  } catch {
+    // status already set in store
+  }
+}
+
+async function onConnectPostgresFromDialog(payload: PostgresConnectPayload) {
+  try {
+    await connections.connectPostgres({
+      name: payload.name,
+      host: payload.host,
+      port: payload.port,
+      database: payload.database,
+      user: payload.user,
+      password: payload.password,
+    });
   } catch {
     // status already set in store
   }
@@ -263,6 +279,7 @@ onUnmounted(() => {
     <NewConnectionDialog
       v-model:open="newConnectionOpen"
       @connect-sqlite="onConnectSqliteFromDialog"
+      @connect-postgres="onConnectPostgresFromDialog"
     />
   </div>
 </template>

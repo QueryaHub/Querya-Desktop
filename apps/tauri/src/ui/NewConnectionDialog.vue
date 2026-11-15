@@ -18,6 +18,16 @@ export type SqliteConnectPayload = {
   path: string;
 };
 
+export type PostgresConnectPayload = {
+  driver: "postgresql";
+  name: string;
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password: string;
+};
+
 type Category = "all" | "sql" | "nosql";
 
 type DriverChoice = {
@@ -71,13 +81,14 @@ const CATEGORY_ITEMS: { id: Category; label: string }[] = [
 const open = defineModel<boolean>("open", { required: true });
 const emit = defineEmits<{
   connectSqlite: [payload: SqliteConnectPayload];
+  connectPostgres: [payload: PostgresConnectPayload];
 }>();
 
 function dismiss() {
   open.value = false;
 }
 
-type Step = "pick" | "sqlite" | "stub";
+type Step = "pick" | "sqlite" | "postgres" | "stub";
 
 const step = ref<Step>("pick");
 const category = ref<Category>("all");
@@ -89,6 +100,11 @@ const nameEl = ref<HTMLInputElement | null>(null);
 const name = ref("");
 const path = ref("");
 const readOnly = ref(false);
+const host = ref("localhost");
+const port = ref("5432");
+const database = ref("querya");
+const user = ref("querya");
+const password = ref("querya");
 const error = ref<string | null>(null);
 const stubDriver = ref<DriverChoice | null>(null);
 
@@ -115,6 +131,19 @@ const canSaveSqlite = computed(
   () => name.value.trim().length > 0 && path.value.trim().length > 0,
 );
 
+const canSavePostgres = computed(() => {
+  const p = Number(port.value);
+  return (
+    name.value.trim().length > 0 &&
+    host.value.trim().length > 0 &&
+    database.value.trim().length > 0 &&
+    user.value.trim().length > 0 &&
+    Number.isFinite(p) &&
+    p > 0 &&
+    p <= 65535
+  );
+});
+
 function reset() {
   step.value = "pick";
   category.value = "all";
@@ -123,6 +152,11 @@ function reset() {
   name.value = "";
   path.value = "";
   readOnly.value = false;
+  host.value = "localhost";
+  port.value = "5432";
+  database.value = "querya";
+  user.value = "querya";
+  password.value = "querya";
   error.value = null;
   stubDriver.value = null;
 }
@@ -161,6 +195,12 @@ function goNext() {
   error.value = null;
   if (choice.id === "sqlite") {
     step.value = "sqlite";
+    void nextTick(() => nameEl.value?.focus());
+    return;
+  }
+  if (choice.id === "postgresql") {
+    step.value = "postgres";
+    if (!name.value.trim()) name.value = "querya";
     void nextTick(() => nameEl.value?.focus());
     return;
   }
@@ -214,6 +254,33 @@ function submitSqlite() {
   emit("connectSqlite", { driver: "sqlite", name: n, path: p });
 }
 
+function submitPostgres() {
+  error.value = null;
+  const n = name.value.trim();
+  const h = host.value.trim();
+  const db = database.value.trim();
+  const u = user.value.trim();
+  const p = Number(port.value);
+  if (!n) {
+    error.value = "Connection name is required.";
+    return;
+  }
+  if (!h || !db || !u || !Number.isFinite(p) || p <= 0) {
+    error.value = "Host, port, database, and user are required.";
+    return;
+  }
+  dismiss();
+  emit("connectPostgres", {
+    driver: "postgresql",
+    name: n,
+    host: h,
+    port: p,
+    database: db,
+    user: u,
+    password: password.value,
+  });
+}
+
 function onKey(e: KeyboardEvent) {
   if (!open.value) return;
   if (e.key === "Escape") {
@@ -224,6 +291,8 @@ function onKey(e: KeyboardEvent) {
     e.preventDefault();
     if (step.value === "pick" && canNext.value) goNext();
     else if (step.value === "sqlite" && canSaveSqlite.value) submitSqlite();
+    else if (step.value === "postgres" && canSavePostgres.value)
+      submitPostgres();
   }
 }
 
@@ -426,7 +495,81 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
       </footer>
     </div>
 
-    <!-- Step 2b: stub for drivers without Tauri adapter yet -->
+    <!-- Step 2b: PostgreSQL form -->
+    <div
+      v-else-if="step === 'postgres'"
+      class="dialog form"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ncd-pg-title"
+    >
+      <header class="hdr form-hdr">
+        <h2 id="ncd-pg-title">New PostgreSQL Connection</h2>
+        <p class="sub">Connect to a PostgreSQL server.</p>
+      </header>
+
+      <div class="body">
+        <label class="field">
+          <span>Connection name</span>
+          <input
+            ref="nameEl"
+            v-model="name"
+            type="text"
+            placeholder="e.g. Local Postgres"
+            maxlength="120"
+          />
+        </label>
+        <div class="row2">
+          <label class="field grow">
+            <span>Host</span>
+            <input v-model="host" type="text" spellcheck="false" />
+          </label>
+          <label class="field port">
+            <span>Port</span>
+            <input v-model="port" type="number" min="1" max="65535" />
+          </label>
+        </div>
+        <label class="field">
+          <span>Database</span>
+          <input v-model="database" type="text" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span>User</span>
+          <input v-model="user" type="text" spellcheck="false" autocomplete="username" />
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input
+            v-model="password"
+            type="password"
+            autocomplete="current-password"
+          />
+        </label>
+        <p class="hint-inline">
+          Password stays in-session only until OS keyring lands.
+        </p>
+        <p v-if="error" class="err">{{ error }}</p>
+      </div>
+
+      <footer>
+        <QueryaButton variant="ghost" size="lg" @click="goBack">
+          Back
+        </QueryaButton>
+        <QueryaButton variant="ghost" size="lg" @click="dismiss">
+          Cancel
+        </QueryaButton>
+        <QueryaButton
+          variant="primary"
+          size="lg"
+          :disabled="!canSavePostgres"
+          @click="submitPostgres"
+        >
+          Save
+        </QueryaButton>
+      </footer>
+    </div>
+
+    <!-- Step 2c: stub for drivers without Tauri adapter yet -->
     <div
       v-else
       class="dialog form"
@@ -719,6 +862,30 @@ h2 {
   gap: 8px;
   font-size: 12px;
   font-weight: 600;
+}
+
+.row2 {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.row2 .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.row2 .port {
+  width: 96px;
+  flex: 0 0 auto;
+}
+
+.hint-inline {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--q-muted-foreground);
 }
 
 .field input {
