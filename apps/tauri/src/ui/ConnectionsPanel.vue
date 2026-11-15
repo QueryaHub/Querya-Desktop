@@ -5,6 +5,7 @@ import { useShellStore } from "../stores/shell";
 import { useConnectionsStore } from "../stores/connections";
 import { useQueryaMotion } from "../motion";
 import SplitHandle from "./SplitHandle.vue";
+import SqliteObjectTree from "./SqliteObjectTree.vue";
 
 const emit = defineEmits<{
   openSqlite: [];
@@ -115,6 +116,7 @@ onUnmounted(() => {
             Open a SQLite file to start the vertical slice.
           </p>
         </template>
+        <SqliteObjectTree />
         <div class="actions">
           <button
             type="button"
