@@ -88,6 +88,7 @@ const ctxItems = computed<CtxItem[]>(() => {
     ];
     return [
       { id: "disconnect", label: "Disconnect" },
+      { id: "remove", label: "Remove connection" },
       {
         id: "move",
         label: "Move to folder",
@@ -187,6 +188,9 @@ function onCtxSelect(id: string) {
     foldersStore.remove(t.folderId);
   } else if (id === "disconnect" && t.type === "connection") {
     void connections.disconnect(t.connectionId);
+    tree.drop(t.connectionId);
+  } else if (id === "remove" && t.type === "connection") {
+    void connections.removeConnection(t.connectionId);
     tree.drop(t.connectionId);
   } else if (id === "move-root" && t.type === "connection") {
     connections.moveToFolder(t.connectionId, null);
@@ -315,7 +319,7 @@ onUnmounted(() => {
                     class="conn-x"
                     :aria-label="`Remove ${c.name}`"
                     @click.stop="
-                      connections.disconnect(c.id);
+                      connections.removeConnection(c.id);
                       tree.drop(c.id);
                     "
                   >
@@ -414,7 +418,7 @@ onUnmounted(() => {
                 class="conn-x"
                 :aria-label="`Remove ${c.name}`"
                 @click.stop="
-                  connections.disconnect(c.id);
+                  connections.removeConnection(c.id);
                   tree.drop(c.id);
                 "
               >

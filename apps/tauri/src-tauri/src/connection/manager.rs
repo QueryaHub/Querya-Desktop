@@ -15,6 +15,9 @@ pub enum ConnectionConfig {
     Sqlite {
         /// Absolute or relative path to a `.db` / `.sqlite` file.
         path: String,
+        /// Stable profile id — when set, the live session reuses this id.
+        #[serde(default)]
+        id: Option<String>,
     },
     /// Stub until the Postgres adapter epic wires connect.
     Postgres {
@@ -82,8 +85,13 @@ impl ConnectionRegistry {
     /// Registry with SQLite opener wired (PG/MySQL return UnsupportedDriver).
     pub fn with_builtin_drivers() -> Self {
         Self::with_opener(|config| match config {
-            ConnectionConfig::Sqlite { path } => {
-                let session = super::sqlite::open_sqlite(path)?;
+            ConnectionConfig::Sqlite { path, id } => {
+                let session = match id {
+                    Some(id) if !id.trim().is_empty() => {
+                        super::sqlite::open_sqlite_with_id(path, ConnectionId::from(id))
+                    }
+                    _ => super::sqlite::open_sqlite(path),
+                }?;
                 Ok(Arc::new(session) as SessionArc)
             }
             other => Err(ConnectionError::UnsupportedDriver {
@@ -258,6 +266,7 @@ mod tests {
         let id = reg
             .connect(ConnectionConfig::Sqlite {
                 path: "/tmp/x.db".into(),
+                id: None,
             })
             .unwrap();
         assert_eq!(id.as_str(), "s1");
@@ -267,6 +276,27 @@ mod tests {
         assert!(!reg.is_connected(&id));
         let err = reg.disconnect(&id).unwrap_err();
         assert!(matches!(err, ConnectionError::NotFound { .. }));
+    }
+
+    #[test]
+    fn registry_connect_reuses_stable_id() {
+        let reg = ConnectionRegistry::with_opener(|cfg| match cfg {
+            ConnectionConfig::Sqlite {
+                id: Some(id), ..
+            } => Ok(Arc::new(FakeSession {
+                id: ConnectionId::from(id),
+                driver: DriverKind::Sqlite,
+            }) as SessionArc),
+            _ => panic!("expected sqlite with id"),
+        });
+        let id = reg
+            .connect(ConnectionConfig::Sqlite {
+                path: "/tmp/x.db".into(),
+                id: Some("profile-stable".into()),
+            })
+            .unwrap();
+        assert_eq!(id.as_str(), "profile-stable");
+        reg.disconnect(&id).unwrap();
     }
 
     #[test]
@@ -306,6 +336,7 @@ mod tests {
         let id = reg
             .connect(ConnectionConfig::Sqlite {
                 path: path.to_string_lossy().into(),
+                id: None,
             })
             .unwrap();
         let mut events = Vec::new();
