@@ -12,6 +12,8 @@
   "app": {
     "windows": [
       {
+        "label": "main",
+        "create": false,
         "title": "Querya",
         "width": 1280,
         "height": 800,
@@ -19,7 +21,13 @@
         "minHeight": 600,
         "decorations": false,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 16,
+          "y": 13
+        }
       }
     ],
     "security": {

@@ -39,6 +39,29 @@ fn host_platform() -> String {
     }
 }
 
+/// Build the main window from `tauri.conf.json`, applying OS chrome rules.
+///
+/// - **macOS:** native traffic lights via `titleBarStyle: Overlay` + `hiddenTitle`
+///   (decorations stay on). Custom HTML title bar sits under the system controls.
+/// - **Windows / Linux:** undecorated; frontend draws Fluent-style caption buttons.
+fn open_main_window(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::WebviewWindowBuilder;
+
+    let mut cfg = app
+        .config()
+        .app
+        .windows
+        .first()
+        .cloned()
+        .ok_or_else(|| tauri::Error::WindowNotFound)?;
+
+    // Overlay + hiddenTitle + trafficLightPosition stay in tauri.conf.json (macOS).
+    cfg.decorations = cfg!(target_os = "macos");
+
+    WebviewWindowBuilder::from_config(app.handle(), &cfg)?.build()?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -52,6 +75,9 @@ pub fn run() {
                 std::io::Error::other(format!("open profile store: {e}"))
             })?;
             app.manage(store);
+            open_main_window(app).map_err(|e| {
+                std::io::Error::other(format!("open main window: {e}"))
+            })?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

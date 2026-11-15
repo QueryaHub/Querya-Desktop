@@ -77,6 +77,13 @@ cargo check --locked
 cargo test --locked
 ```
 
+## Window chrome
+
+- **Windows / Linux:** undecorated; HTML title bar draws Fluent-style SVG caption buttons (min / max-restore / close).
+- **macOS:** `decorations: true` + `titleBarStyle: Overlay` / `hiddenTitle` / `trafficLightPosition` so **system traffic lights** sit in the custom bar. Frontend reserves `--q-mac-traffic-inset` (no fake CSS lights; same idea as Flutter `useNativeWindowChrome`).
+
+Main window: `"create": false` in `tauri.conf.json`, opened from Rust (`open_main_window`) so macOS can enable decorations without affecting Win/Linux.
+
 ## Layout
 
 ```
