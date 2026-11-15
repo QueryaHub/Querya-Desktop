@@ -8,10 +8,22 @@
  */
 
 :root {
-  /* Radius / elevation / type (shared) */
+  /* Radius / elevation / type — Flutter QueryaControlMetrics + chrome */
+  --q-radius-control: 6px;
   --q-radius-sm: 4px;
   --q-radius-md: 8px;
   --q-radius-lg: 12px;
+  --q-radius-surface: 14px;
+  --q-control-h-sm: 28px;
+  --q-control-h-md: 32px;
+  --q-control-h-lg: 36px;
+  --q-titlebar-h: 40px;
+  --q-statusbar-h: 26px;
+  --q-split-handle: 6px;
+  --q-sidebar-min: 180px;
+  --q-sidebar-max: 500px;
+  --q-sidebar-default: 260px;
+  --q-hairline-alpha: 0.22;
   --q-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.08);
   --q-shadow-md: 0 4px 16px rgb(0 0 0 / 0.12);
   --q-font-sans: "Segoe UI", "SF Pro Text", system-ui, sans-serif;
@@ -58,6 +70,13 @@
   --q-chart-3: #e88c30;
   --q-chart-4: #af57db;
   --q-chart-5: #e23670;
+  /* Workbench — QueryaWorkbenchTheme.lightDefault */
+  --q-canvas: #fafafa;
+  --q-surface: #ffffff;
+  --q-sidebar-bg: #f4f4f5;
+  --q-editor-bg: #ffffff;
+  --q-success: #16a34a;
+  --q-warning: #d97706;
 }
 
 /* Dark — QueryaTheme.darkDefault / QueryaColors */
@@ -88,6 +107,12 @@
     --q-chart-3: #e88c30;
     --q-chart-4: #af57db;
     --q-chart-5: #e23670;
+    --q-canvas: #000000;
+    --q-surface: #0c0c0c;
+    --q-sidebar-bg: #000000;
+    --q-editor-bg: #0c0c0c;
+    --q-success: #4caf50;
+    --q-warning: #e88c30;
   }
 }
 
@@ -117,4 +142,10 @@
   --q-chart-3: #e88c30;
   --q-chart-4: #af57db;
   --q-chart-5: #e23670;
+  --q-canvas: #000000;
+  --q-surface: #0c0c0c;
+  --q-sidebar-bg: #000000;
+  --q-editor-bg: #0c0c0c;
+  --q-success: #4caf50;
+  --q-warning: #e88c30;
 }
