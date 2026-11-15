@@ -48,10 +48,19 @@ export function windowControlsSide(platform: QueryaPlatform): WindowControlsSide
   return platform === "macos" ? "left" : "right";
 }
 
+/**
+ * macOS uses system traffic lights (`titleBarStyle: Overlay`).
+ * Win/Linux draw custom caption buttons in the HTML title bar.
+ */
+export function usesNativeTrafficLights(platform: QueryaPlatform): boolean {
+  return platform === "macos";
+}
+
 export function applyPlatformDataset(platform: QueryaPlatform): void {
   const root = document.documentElement;
   root.dataset.platform = platform;
   root.dataset.windowControls = windowControlsSide(platform);
+  root.dataset.nativeTrafficLights = String(usesNativeTrafficLights(platform));
 }
 
 /** Resolve OS via Rust, fall back to UA when not in Tauri. */
