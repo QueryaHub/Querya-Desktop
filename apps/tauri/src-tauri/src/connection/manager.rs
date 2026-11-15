@@ -432,7 +432,7 @@ mod tests {
             .unwrap_err();
         match err {
             ConnectionError::SqlGuard { rule, .. } => {
-                assert_eq!(rule, "single_statement");
+                assert_eq!(rule.as_str(), "single_statement");
             }
             other => panic!("expected SqlGuard, got {other:?}"),
         }

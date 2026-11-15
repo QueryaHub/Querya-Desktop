@@ -10,7 +10,7 @@ export type ObjectStripTab = "data" | "relations";
 export type SelectedObject = {
   connectionId: string;
   name: string;
-  kind: "table" | "view";
+  kind: "table" | "view" | "materialized_view";
   /** Stable object id when known (`sqlite:table:main:users`). */
   objectId?: string;
   schema?: string | null;

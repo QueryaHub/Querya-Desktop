@@ -74,13 +74,22 @@ export function filterTree(nodes: TreeUiNode[], q: string): TreeUiNode[] {
   return out;
 }
 
+function isRelationKind(
+  kind: TreeUiNode["kind"],
+): kind is "table" | "view" | "materialized_view" {
+  return kind === "table" || kind === "view" || kind === "materialized_view";
+}
+
+/** Collect tables/views under schemas (and Postgres folder groups). */
 function relationsOf(roots: TreeUiNode[]): TreeUiNode[] {
   const out: TreeUiNode[] = [];
-  for (const root of roots) {
-    for (const child of root.children ?? []) {
-      if (child.kind === "table" || child.kind === "view") out.push(child);
+  function walk(nodes: TreeUiNode[]) {
+    for (const n of nodes) {
+      if (isRelationKind(n.kind)) out.push(n);
+      if (n.children) walk(n.children);
     }
   }
+  walk(roots);
   return out;
 }
 

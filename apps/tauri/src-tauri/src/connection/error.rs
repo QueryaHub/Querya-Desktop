@@ -13,8 +13,11 @@ pub enum ConnectionError {
     UnsupportedDriver { driver: DriverKind },
     Io { message: String },
     Driver { driver: DriverKind, message: String },
-    /// sqlparser / product SQL guard refusal (`rule` is a stable id).
-    SqlGuard { rule: String, message: String },
+    /// sqlparser / product SQL guard refusal (typed `rule` for UI branching).
+    SqlGuard {
+        rule: super::sql_guard::SqlGuardRule,
+        message: String,
+    },
 }
 
 impl ConnectionError {
@@ -42,7 +45,7 @@ impl ConnectionError {
         message: impl Into<String>,
     ) -> Self {
         Self::SqlGuard {
-            rule: rule.as_str().to_owned(),
+            rule,
             message: message.into(),
         }
     }
@@ -63,7 +66,7 @@ impl fmt::Display for ConnectionError {
                 write!(f, "{driver} error: {message}")
             }
             Self::SqlGuard { rule, message } => {
-                write!(f, "sql guard ({rule}): {message}")
+                write!(f, "sql guard ({}): {message}", rule.as_str())
             }
         }
     }

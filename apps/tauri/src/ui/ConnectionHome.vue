@@ -27,7 +27,9 @@ const tables = computed(() =>
   tree.relations.filter((o) => o.kind === "table"),
 );
 const views = computed(() =>
-  tree.relations.filter((o) => o.kind === "view"),
+  tree.relations.filter(
+    (o) => o.kind === "view" || o.kind === "materialized_view",
+  ),
 );
 
 const overview = ref<SqliteOverview | null>(null);
@@ -119,7 +121,12 @@ watch(
 
 function openRelation(o: { id: string; name: string; kind: string; schema?: string | null }) {
   if (!conn.value) return;
-  if (o.kind !== "table" && o.kind !== "view") return;
+  if (
+    o.kind !== "table" &&
+    o.kind !== "view" &&
+    o.kind !== "materialized_view"
+  )
+    return;
   nav.selectObject({
     connectionId: conn.value.id,
     name: o.name,

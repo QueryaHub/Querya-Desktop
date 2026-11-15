@@ -18,8 +18,22 @@ function kindGlyph(kind: TreeUiNode["kind"]): string {
   switch (kind) {
     case "schema":
       return "▣";
+    case "folder":
+      return "▸";
     case "view":
+    case "materialized_view":
       return "◌";
+    case "function":
+    case "procedure":
+      return "ƒ";
+    case "sequence":
+      return "#";
+    case "index":
+      return "⌘";
+    case "trigger":
+      return "⚡";
+    case "type":
+      return "T";
     case "column":
       return "·";
     default:
@@ -27,8 +41,10 @@ function kindGlyph(kind: TreeUiNode["kind"]): string {
   }
 }
 
-function isRelation(kind: TreeUiNode["kind"]): kind is "table" | "view" {
-  return kind === "table" || kind === "view";
+function isRelation(
+  kind: TreeUiNode["kind"],
+): kind is "table" | "view" | "materialized_view" {
+  return kind === "table" || kind === "view" || kind === "materialized_view";
 }
 
 function isSelected(
@@ -74,7 +90,11 @@ function isSelected(
       <button
         type="button"
         class="node-main"
-        :disabled="node.kind === 'column' || node.kind === 'schema'"
+        :disabled="
+          node.kind === 'column' ||
+          node.kind === 'schema' ||
+          node.kind === 'folder'
+        "
         @click="isRelation(node.kind) && emit('selectRelation', node)"
       >
         <span class="glyph" aria-hidden="true">{{ kindGlyph(node.kind) }}</span>

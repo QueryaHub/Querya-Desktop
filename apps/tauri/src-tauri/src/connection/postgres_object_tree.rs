@@ -1,15 +1,20 @@
-//! Postgres object tree: schemas → tables/views → columns.
+//! Postgres object tree: schemas → folders → objects (Flutter pg tree parity).
 
 use super::error::{ConnectionError, ConnectionResult};
 use super::id::DriverKind;
 use super::introspect::{ColumnMeta, TableSchema};
 use super::object_tree::{
-    column_id, parse_object_id, relation_id, schema_id, ObjectTreeProvider, ParsedObjectId,
-    SqlObjectKind, SqlObjectNode,
+    column_id, folder_id, named_object_id, parse_object_id, relation_child_id, relation_id,
+    schema_id, ObjectTreeProvider, ParsedObjectId, SchemaFolderKind, SqlObjectKind, SqlObjectNode,
 };
 use super::postgres::PostgresSession;
 use super::runtime;
 use sqlx::Row;
+use std::fmt::Display;
+
+fn postgres_err(e: impl Display) -> ConnectionError {
+    ConnectionError::driver(DriverKind::Postgres, e.to_string())
+}
 
 pub struct PostgresObjectTree {
     session: PostgresSession,
@@ -26,14 +31,19 @@ impl ObjectTreeProvider for PostgresObjectTree {
         match parent_id {
             None => self.list_schemas(),
             Some(pid) => match parse_object_id(pid)? {
-                ParsedObjectId::Schema { schema, .. } => self.list_relations(&schema),
+                ParsedObjectId::Schema { schema, .. } => self.list_schema_folders(&schema),
+                ParsedObjectId::Folder { schema, folder, .. } => {
+                    self.list_folder_children(&schema, folder)
+                }
                 ParsedObjectId::Relation {
                     kind,
                     schema,
                     name,
                     ..
                 } => self.list_columns_nodes(kind, &schema, &name),
-                ParsedObjectId::Column { .. } => Ok(vec![]),
+                ParsedObjectId::Column { .. }
+                | ParsedObjectId::Named { .. }
+                | ParsedObjectId::RelationChild { .. } => Ok(vec![]),
             },
         }
     }
@@ -62,7 +72,7 @@ impl PostgresObjectTree {
                 )
                 .fetch_all(pool)
                 .await
-                .map_err(|e| ConnectionError::driver(DriverKind::Postgres, e.to_string()))?;
+                .map_err(postgres_err)?;
 
                 Ok(rows
                     .into_iter()
@@ -81,39 +91,224 @@ impl PostgresObjectTree {
         })
     }
 
-    fn list_relations(&self, schema: &str) -> ConnectionResult<Vec<SqlObjectNode>> {
+    fn list_schema_folders(&self, schema: &str) -> ConnectionResult<Vec<SqlObjectNode>> {
+        let parent = schema_id(DriverKind::Postgres, schema);
+        Ok(SchemaFolderKind::ALL
+            .into_iter()
+            .map(|folder| {
+                SqlObjectNode::new(
+                    folder_id(DriverKind::Postgres, schema, folder),
+                    folder.label().to_owned(),
+                    SqlObjectKind::Folder,
+                    Some(schema.to_owned()),
+                    Some(parent.clone()),
+                )
+            })
+            .collect())
+    }
+
+    fn list_folder_children(
+        &self,
+        schema: &str,
+        folder: SchemaFolderKind,
+    ) -> ConnectionResult<Vec<SqlObjectNode>> {
+        match folder {
+            SchemaFolderKind::Tables => self.list_relations(schema, RelationFilter::Tables),
+            SchemaFolderKind::Views => self.list_relations(schema, RelationFilter::Views),
+            SchemaFolderKind::MaterializedViews => {
+                self.list_relations(schema, RelationFilter::MaterializedViews)
+            }
+            SchemaFolderKind::Functions => self.list_named_objects(
+                schema,
+                "SELECT DISTINCT p.proname
+                 FROM pg_proc p
+                 JOIN pg_namespace n ON n.oid = p.pronamespace
+                 WHERE n.nspname = $1
+                   AND p.prokind IN ('f', 'a', 'w')
+                 ORDER BY p.proname",
+                SchemaFolderKind::Functions,
+                SqlObjectKind::Function,
+            ),
+            SchemaFolderKind::Sequences => self.list_named_objects(
+                schema,
+                "SELECT c.relname
+                 FROM pg_class c
+                 JOIN pg_namespace n ON n.oid = c.relnamespace
+                 WHERE n.nspname = $1 AND c.relkind = 'S'
+                 ORDER BY c.relname",
+                SchemaFolderKind::Sequences,
+                SqlObjectKind::Sequence,
+            ),
+            SchemaFolderKind::Indexes => self.list_relation_children(
+                schema,
+                "SELECT c.relname::text, i.relname::text
+                 FROM pg_index x
+                 JOIN pg_class c ON c.oid = x.indrelid
+                 JOIN pg_class i ON i.oid = x.indexrelid
+                 JOIN pg_namespace n ON n.oid = c.relnamespace
+                 WHERE n.nspname = $1
+                   AND c.relkind IN ('r', 'm', 'p')
+                 ORDER BY c.relname, i.relname",
+                SchemaFolderKind::Indexes,
+                SqlObjectKind::Index,
+            ),
+            SchemaFolderKind::Triggers => self.list_relation_children(
+                schema,
+                "SELECT c.relname::text, t.tgname::text
+                 FROM pg_trigger t
+                 JOIN pg_class c ON c.oid = t.tgrelid
+                 JOIN pg_namespace n ON n.oid = c.relnamespace
+                 WHERE n.nspname = $1
+                   AND NOT t.tgisinternal
+                 ORDER BY c.relname, t.tgname",
+                SchemaFolderKind::Triggers,
+                SqlObjectKind::Trigger,
+            ),
+            SchemaFolderKind::Types => self.list_named_objects(
+                schema,
+                "SELECT t.typname::text
+                 FROM pg_type t
+                 JOIN pg_namespace n ON n.oid = t.typnamespace
+                 WHERE n.nspname = $1
+                   AND t.typtype IN ('c', 'd', 'e', 'r', 'm')
+                 ORDER BY t.typname",
+                SchemaFolderKind::Types,
+                SqlObjectKind::Type,
+            ),
+        }
+    }
+
+    fn list_relations(
+        &self,
+        schema: &str,
+        filter: RelationFilter,
+    ) -> ConnectionResult<Vec<SqlObjectNode>> {
         let schema_owned = schema.to_owned();
+        let sql = match filter {
+            RelationFilter::Tables => {
+                "SELECT c.relname, c.relkind::text
+                 FROM pg_class c
+                 JOIN pg_namespace n ON n.oid = c.relnamespace
+                 WHERE n.nspname = $1
+                   AND c.relkind IN ('r', 'p')
+                   AND NOT c.relispartition
+                 ORDER BY c.relname"
+            }
+            RelationFilter::Views => {
+                "SELECT c.relname, c.relkind::text
+                 FROM pg_class c
+                 JOIN pg_namespace n ON n.oid = c.relnamespace
+                 WHERE n.nspname = $1
+                   AND c.relkind = 'v'
+                 ORDER BY c.relname"
+            }
+            RelationFilter::MaterializedViews => {
+                "SELECT c.relname, c.relkind::text
+                 FROM pg_class c
+                 JOIN pg_namespace n ON n.oid = c.relnamespace
+                 WHERE n.nspname = $1
+                   AND c.relkind = 'm'
+                 ORDER BY c.relname"
+            }
+        };
         self.session.with_pool(|pool| {
             runtime::block_on(async {
-                let rows = sqlx::query(
-                    "SELECT c.relname,
-                            CASE c.relkind WHEN 'v' THEN 'view' WHEN 'm' THEN 'view' ELSE 'table' END
-                     FROM pg_class c
-                     JOIN pg_namespace n ON n.oid = c.relnamespace
-                     WHERE n.nspname = $1
-                       AND c.relkind IN ('r', 'p', 'v', 'm')
-                       AND NOT c.relispartition
-                     ORDER BY c.relname",
-                )
-                .bind(&schema_owned)
-                .fetch_all(pool)
-                .await
-                .map_err(|e| ConnectionError::driver(DriverKind::Postgres, e.to_string()))?;
+                let rows = sqlx::query(sql)
+                    .bind(&schema_owned)
+                    .fetch_all(pool)
+                    .await
+                    .map_err(postgres_err)?;
 
-                let parent = schema_id(DriverKind::Postgres, &schema_owned);
+                let parent = folder_id(DriverKind::Postgres, &schema_owned, filter.folder());
                 Ok(rows
                     .into_iter()
                     .map(|r| {
                         let name: String = r.get(0);
-                        let kind_s: String = r.get(1);
-                        let kind = if kind_s == "view" {
-                            SqlObjectKind::View
-                        } else {
-                            SqlObjectKind::Table
+                        let relkind: String = r.get(1);
+                        let kind = match relkind.as_str() {
+                            "v" => SqlObjectKind::View,
+                            "m" => SqlObjectKind::MaterializedView,
+                            _ => SqlObjectKind::Table,
                         };
                         SqlObjectNode::new(
                             relation_id(DriverKind::Postgres, kind, &schema_owned, &name),
                             name,
+                            kind,
+                            Some(schema_owned.clone()),
+                            Some(parent.clone()),
+                        )
+                    })
+                    .collect())
+            })
+        })
+    }
+
+    fn list_named_objects(
+        &self,
+        schema: &str,
+        sql: &str,
+        folder: SchemaFolderKind,
+        kind: SqlObjectKind,
+    ) -> ConnectionResult<Vec<SqlObjectNode>> {
+        let schema_owned = schema.to_owned();
+        self.session.with_pool(|pool| {
+            runtime::block_on(async {
+                let rows = sqlx::query(sql)
+                    .bind(&schema_owned)
+                    .fetch_all(pool)
+                    .await
+                    .map_err(postgres_err)?;
+
+                let parent = folder_id(DriverKind::Postgres, &schema_owned, folder);
+                Ok(rows
+                    .into_iter()
+                    .map(|r| {
+                        let name: String = r.get(0);
+                        SqlObjectNode::new(
+                            named_object_id(DriverKind::Postgres, kind, &schema_owned, &name),
+                            name,
+                            kind,
+                            Some(schema_owned.clone()),
+                            Some(parent.clone()),
+                        )
+                    })
+                    .collect())
+            })
+        })
+    }
+
+    fn list_relation_children(
+        &self,
+        schema: &str,
+        sql: &str,
+        folder: SchemaFolderKind,
+        kind: SqlObjectKind,
+    ) -> ConnectionResult<Vec<SqlObjectNode>> {
+        let schema_owned = schema.to_owned();
+        self.session.with_pool(|pool| {
+            runtime::block_on(async {
+                let rows = sqlx::query(sql)
+                    .bind(&schema_owned)
+                    .fetch_all(pool)
+                    .await
+                    .map_err(postgres_err)?;
+
+                let parent = folder_id(DriverKind::Postgres, &schema_owned, folder);
+                Ok(rows
+                    .into_iter()
+                    .map(|r| {
+                        let table: String = r.get(0);
+                        let name: String = r.get(1);
+                        let label = format!("{table}.{name}");
+                        SqlObjectNode::new(
+                            relation_child_id(
+                                DriverKind::Postgres,
+                                kind,
+                                &schema_owned,
+                                &table,
+                                &name,
+                            ),
+                            label,
                             kind,
                             Some(schema_owned.clone()),
                             Some(parent.clone()),
@@ -181,13 +376,10 @@ impl PostgresObjectTree {
                 .bind(&table)
                 .fetch_all(pool)
                 .await
-                .map_err(|e| ConnectionError::driver(DriverKind::Postgres, e.to_string()))?;
+                .map_err(postgres_err)?;
 
                 if rows.is_empty() {
-                    return Err(ConnectionError::driver(
-                        DriverKind::Postgres,
-                        format!("relation {schema}.{table} not found"),
-                    ));
+                    return Err(postgres_err(format!("relation {schema}.{table} not found")));
                 }
 
                 let mut columns = Vec::with_capacity(rows.len());
@@ -227,6 +419,22 @@ impl PostgresObjectTree {
     }
 }
 
+enum RelationFilter {
+    Tables,
+    Views,
+    MaterializedViews,
+}
+
+impl RelationFilter {
+    fn folder(self) -> SchemaFolderKind {
+        match self {
+            Self::Tables => SchemaFolderKind::Tables,
+            Self::Views => SchemaFolderKind::Views,
+            Self::MaterializedViews => SchemaFolderKind::MaterializedViews,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -257,13 +465,38 @@ mod tests {
         let schemas = tree.list_children(None).expect("schemas");
         assert!(schemas.iter().any(|s| s.name == "shop"));
         let shop = schemas.iter().find(|s| s.name == "shop").unwrap();
-        let rels = tree.list_children(Some(&shop.id)).expect("rels");
-        assert!(rels.iter().any(|r| r.name == "customers"));
-        let customers = rels.iter().find(|r| r.name == "customers").unwrap();
+
+        let folders = tree.list_children(Some(&shop.id)).expect("folders");
+        let names: Vec<_> = folders.iter().map(|f| f.name.as_str()).collect();
+        assert!(names.contains(&"Tables"));
+        assert!(names.contains(&"Functions"));
+        assert!(names.contains(&"Indexes"));
+        assert!(names.contains(&"Triggers"));
+        assert!(folders.iter().all(|f| f.kind == SqlObjectKind::Folder));
+
+        let tables_folder = folders.iter().find(|f| f.name == "Tables").unwrap();
+        let tables = tree.list_children(Some(&tables_folder.id)).expect("tables");
+        assert!(tables.iter().any(|r| r.name == "customers"));
+
+        let customers = tables.iter().find(|r| r.name == "customers").unwrap();
         let cols = tree.list_children(Some(&customers.id)).expect("cols");
         assert!(cols.iter().any(|c| c.name == "id"));
         let desc = tree.describe(&customers.id).expect("describe");
         assert!(desc.primary_keys.iter().any(|k| k == "id"));
+
+        let fn_folder = folders.iter().find(|f| f.name == "Functions").unwrap();
+        let functions = tree.list_children(Some(&fn_folder.id)).expect("functions");
+        assert!(
+            !functions.is_empty(),
+            "shop schema should expose functions in the tree"
+        );
+        assert!(functions.iter().all(|f| f.kind == SqlObjectKind::Function));
+
+        let idx_folder = folders.iter().find(|f| f.name == "Indexes").unwrap();
+        let indexes = tree.list_children(Some(&idx_folder.id)).expect("indexes");
+        assert!(indexes.iter().any(|i| i.name.contains("customers")));
+        assert!(indexes.iter().all(|i| i.kind == SqlObjectKind::Index));
+
         session.disconnect().ok();
     }
 }

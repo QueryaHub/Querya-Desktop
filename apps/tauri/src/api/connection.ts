@@ -10,13 +10,17 @@ export type SchemaObject = {
 
 export type SqlObjectKind =
   | "schema"
+  | "folder"
   | "table"
   | "view"
+  | "materialized_view"
   | "column"
   | "index"
   | "trigger"
   | "function"
-  | "procedure";
+  | "procedure"
+  | "sequence"
+  | "type";
 
 /** Stable tree node from `db_list_children`. */
 export type SqlObjectNode = {
@@ -27,6 +31,19 @@ export type SqlObjectNode = {
   parent_id?: string | null;
   expandable: boolean;
 };
+
+/** Mirrors Rust `ConnectionError` (serde tag = kind). */
+export type SqlGuardRule = "empty_query" | "single_statement" | "parse_error";
+
+export type ConnectionError =
+  | { kind: "not_found"; id: string }
+  | { kind: "already_connected"; id: string }
+  | { kind: "disconnected"; id: string }
+  | { kind: "invalid_config"; message: string }
+  | { kind: "unsupported_driver"; driver: string }
+  | { kind: "io"; message: string }
+  | { kind: "driver"; driver: string; message: string }
+  | { kind: "sql_guard"; rule: SqlGuardRule; message: string };
 
 export type ColumnMeta = {
   name: string;
@@ -193,16 +210,35 @@ export async function dbSqliteOverview(id: string): Promise<SqliteOverview> {
   return invoke<SqliteOverview>("db_sqlite_overview", { id });
 }
 
+export function isConnectionError(err: unknown): err is ConnectionError {
+  return (
+    !!err &&
+    typeof err === "object" &&
+    typeof (err as { kind?: unknown }).kind === "string"
+  );
+}
+
 export function formatConnectionError(err: unknown): string {
   if (typeof err === "string") return err;
+  if (isConnectionError(err)) {
+    switch (err.kind) {
+      case "sql_guard":
+        return `sql_guard: ${err.rule}: ${err.message}`;
+      case "driver":
+        return `${err.driver}: ${err.message}`;
+      case "not_found":
+      case "already_connected":
+      case "disconnected":
+        return `${err.kind}: ${err.id}`;
+      case "unsupported_driver":
+        return `unsupported_driver: ${err.driver}`;
+      case "invalid_config":
+      case "io":
+        return `${err.kind}: ${err.message}`;
+    }
+  }
   if (err && typeof err === "object") {
     const e = err as Record<string, unknown>;
-    if (typeof e.kind === "string") {
-      const parts = [e.kind, e.driver, e.message, e.id].filter(
-        (v): v is string => typeof v === "string" && v.length > 0,
-      );
-      return parts.join(": ");
-    }
     if (typeof e.message === "string") return e.message;
   }
   return String(err);
