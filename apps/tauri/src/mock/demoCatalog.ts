@@ -1,6 +1,6 @@
 /** Offline demo catalog for UI-core review (no live DB). */
 
-import type { SqlObjectNode } from "../api/connection";
+import type { ErdSchema, SqlObjectNode } from "../api/connection";
 
 export type DemoColumn = {
   name: string;
@@ -100,6 +100,68 @@ export const DEMO_CONNECTION: DemoConnection = {
 
 export function findDemoObject(name: string): DemoObject | undefined {
   return DEMO_CONNECTION.objects.find((o) => o.name === name);
+}
+
+/** Offline ER schema for the demo connection (orders → users). */
+export function demoErdSchema(opts?: {
+  focus?: string | null;
+  depth?: number;
+}): ErdSchema {
+  const tables = DEMO_CONNECTION.objects.map((o) => ({
+    name: o.name,
+    schema: "main",
+    isView: o.kind === "view",
+    columns: o.columns.map((c) => ({
+      name: c.name,
+      dataType: c.data_type,
+      isPrimaryKey: c.is_primary_key,
+      isForeignKey: o.name === "orders" && c.name === "user_id",
+      isNullable: c.is_nullable,
+    })),
+  }));
+  const relations = [
+    {
+      fromTable: "orders",
+      fromColumn: "user_id",
+      toTable: "users",
+      toColumn: "id",
+      optional: false,
+      oneToOne: false,
+    },
+  ];
+  const focus = opts?.focus;
+  if (!focus) {
+    return { tables, relations, truncated: false };
+  }
+  const depth = opts?.depth ?? 1;
+  const adjacent = new Map<string, Set<string>>();
+  for (const r of relations) {
+    if (!adjacent.has(r.fromTable)) adjacent.set(r.fromTable, new Set());
+    if (!adjacent.has(r.toTable)) adjacent.set(r.toTable, new Set());
+    adjacent.get(r.fromTable)!.add(r.toTable);
+    adjacent.get(r.toTable)!.add(r.fromTable);
+  }
+  const seen = new Set<string>([focus]);
+  let frontier = new Set<string>([focus]);
+  for (let i = 0; i < depth; i++) {
+    const next = new Set<string>();
+    for (const t of frontier) {
+      for (const n of adjacent.get(t) ?? []) {
+        if (!seen.has(n)) {
+          seen.add(n);
+          next.add(n);
+        }
+      }
+    }
+    frontier = next;
+  }
+  return {
+    tables: tables.filter((t) => seen.has(t.name)),
+    relations: relations.filter(
+      (r) => seen.has(r.fromTable) && seen.has(r.toTable),
+    ),
+    truncated: false,
+  };
 }
 
 const MAIN_SCHEMA_ID = "sqlite:schema:main";
