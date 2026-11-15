@@ -1,10 +1,15 @@
-//! Apply a [`TableMutationPlan`] inside a single DB transaction (#1889).
+//! Apply a [`TableMutationPlan`] inside a single DB transaction (#1889 / #1992).
 //!
 //! On success the caller should clear the staging buffer; on failure the
 //! buffer is left intact and the database is rolled back.
+//!
+//! Drivers: SQLite (`rusqlite`), Postgres / MySQL (`sqlx` via shared runtime).
 
 use super::dml::{SqlDialect, TableMutationPlan};
 use super::StagingBuffer;
+use crate::connection::mysql::MySqlPool;
+use crate::connection::postgres::PgPool;
+use crate::connection::runtime;
 use rusqlite::Connection;
 use serde::Serialize;
 use std::fmt;
@@ -107,17 +112,135 @@ pub fn apply_staging_sqlite(
     table_name: &str,
     schema: Option<&str>,
 ) -> Result<ApplyResult, ApplyError> {
-    let plan = buffer.generate_mutation_plan(
+    apply_staging_with(
+        buffer,
         SqlDialect::Sqlite,
         table_name,
         schema,
-        None,
-        None,
-    );
+        |plan| apply_plan_sqlite(conn, plan),
+    )
+}
+
+/// Execute every statement in `plan` atomically on a Postgres pool.
+pub fn apply_plan_postgres(
+    pool: &PgPool,
+    plan: &TableMutationPlan,
+) -> Result<ApplyResult, ApplyError> {
+    if !matches!(plan.dialect, SqlDialect::Postgres) {
+        return Err(ApplyError::DialectMismatch {
+            expected: "postgres".into(),
+            got: dialect_name(plan.dialect).into(),
+        });
+    }
     if plan.is_empty() {
         return Err(ApplyError::EmptyPlan);
     }
-    let result = apply_plan_sqlite(conn, &plan)?;
+
+    runtime::block_on(async {
+        let mut tx = pool.begin().await.map_err(|e| ApplyError::Transaction {
+            message: e.to_string(),
+        })?;
+        for (i, stmt) in plan.statements.iter().enumerate() {
+            sqlx::query(&stmt.sql)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| ApplyError::Execute {
+                    statement_index: i,
+                    sql: stmt.sql.clone(),
+                    message: e.to_string(),
+                })?;
+        }
+        tx.commit().await.map_err(|e| ApplyError::Transaction {
+            message: e.to_string(),
+        })?;
+        Ok(ApplyResult {
+            statements_applied: plan.statements.len(),
+        })
+    })
+}
+
+/// Generate + apply on Postgres; clear staging only on success.
+pub fn apply_staging_postgres(
+    pool: &PgPool,
+    buffer: &mut StagingBuffer,
+    table_name: &str,
+    schema: Option<&str>,
+) -> Result<ApplyResult, ApplyError> {
+    apply_staging_with(
+        buffer,
+        SqlDialect::Postgres,
+        table_name,
+        schema,
+        |plan| apply_plan_postgres(pool, plan),
+    )
+}
+
+/// Execute every statement in `plan` atomically on a MySQL pool.
+pub fn apply_plan_mysql(
+    pool: &MySqlPool,
+    plan: &TableMutationPlan,
+) -> Result<ApplyResult, ApplyError> {
+    if !matches!(plan.dialect, SqlDialect::Mysql) {
+        return Err(ApplyError::DialectMismatch {
+            expected: "mysql".into(),
+            got: dialect_name(plan.dialect).into(),
+        });
+    }
+    if plan.is_empty() {
+        return Err(ApplyError::EmptyPlan);
+    }
+
+    runtime::block_on(async {
+        let mut tx = pool.begin().await.map_err(|e| ApplyError::Transaction {
+            message: e.to_string(),
+        })?;
+        for (i, stmt) in plan.statements.iter().enumerate() {
+            sqlx::query(&stmt.sql)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| ApplyError::Execute {
+                    statement_index: i,
+                    sql: stmt.sql.clone(),
+                    message: e.to_string(),
+                })?;
+        }
+        tx.commit().await.map_err(|e| ApplyError::Transaction {
+            message: e.to_string(),
+        })?;
+        Ok(ApplyResult {
+            statements_applied: plan.statements.len(),
+        })
+    })
+}
+
+/// Generate + apply on MySQL; clear staging only on success.
+pub fn apply_staging_mysql(
+    pool: &MySqlPool,
+    buffer: &mut StagingBuffer,
+    table_name: &str,
+    schema: Option<&str>,
+) -> Result<ApplyResult, ApplyError> {
+    apply_staging_with(
+        buffer,
+        SqlDialect::Mysql,
+        table_name,
+        schema,
+        |plan| apply_plan_mysql(pool, plan),
+    )
+}
+
+fn apply_staging_with(
+    buffer: &mut StagingBuffer,
+    dialect: SqlDialect,
+    table_name: &str,
+    schema: Option<&str>,
+    apply: impl FnOnce(&TableMutationPlan) -> Result<ApplyResult, ApplyError>,
+) -> Result<ApplyResult, ApplyError> {
+    let plan = buffer.generate_mutation_plan(dialect, table_name, schema, None, None);
+    if plan.is_empty() {
+        return Err(ApplyError::EmptyPlan);
+    }
+    let result = apply(&plan)?;
     buffer.revert_all();
     Ok(result)
 }
