@@ -1,6 +1,8 @@
 use super::error::{ConnectionError, ConnectionResult};
 use super::id::{ConnectionId, DriverKind};
+use super::sqlite::SqliteSession;
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -44,6 +46,8 @@ pub trait ConnectionSession: Send + Sync {
     fn id(&self) -> &ConnectionId;
     fn driver(&self) -> DriverKind;
     fn disconnect(&mut self) -> ConnectionResult<()>;
+    /// Downcast hook for driver-specific APIs (introspection, query).
+    fn as_any(&self) -> &dyn Any;
 }
 
 /// Opens and tracks live DB sessions.
@@ -100,6 +104,25 @@ impl ConnectionRegistry {
         self.sessions
             .lock()
             .map_err(|_| ConnectionError::io("connection registry lock poisoned"))
+    }
+
+    /// Run a closure against a live [`SqliteSession`].
+    pub fn with_sqlite<T>(
+        &self,
+        id: &ConnectionId,
+        f: impl FnOnce(&SqliteSession) -> ConnectionResult<T>,
+    ) -> ConnectionResult<T> {
+        let map = self.lock()?;
+        let session = map
+            .get(id)
+            .ok_or_else(|| ConnectionError::NotFound { id: id.clone() })?;
+        let sqlite = session
+            .as_any()
+            .downcast_ref::<SqliteSession>()
+            .ok_or(ConnectionError::UnsupportedDriver {
+                driver: session.driver(),
+            })?;
+        f(sqlite)
     }
 }
 
@@ -159,6 +182,9 @@ mod tests {
         fn disconnect(&mut self) -> ConnectionResult<()> {
             self.closed = true;
             Ok(())
+        }
+        fn as_any(&self) -> &dyn Any {
+            self
         }
     }
 

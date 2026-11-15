@@ -15,12 +15,10 @@ pub struct SqliteSession {
 }
 
 impl SqliteSession {
-    #[allow(dead_code)] // used by introspection / query issues next
     pub fn path(&self) -> &str {
         &self.path
     }
 
-    #[allow(dead_code)] // used by execute_query / tree issues next
     pub fn with_connection<T>(
         &self,
         f: impl FnOnce(&Connection) -> ConnectionResult<T>,
@@ -35,6 +33,21 @@ impl SqliteSession {
                 id: self.id.clone(),
             })?;
         f(conn)
+    }
+
+    pub fn list_schemas(&self) -> ConnectionResult<Vec<String>> {
+        self.with_connection(super::sqlite_introspect::list_schemas)
+    }
+
+    pub fn list_tables(&self) -> ConnectionResult<Vec<super::introspect::SchemaObject>> {
+        self.with_connection(super::sqlite_introspect::list_tables)
+    }
+
+    pub fn list_columns(
+        &self,
+        table: &str,
+    ) -> ConnectionResult<super::introspect::TableSchema> {
+        self.with_connection(|c| super::sqlite_introspect::list_columns(c, table))
     }
 }
 
@@ -57,6 +70,10 @@ impl ConnectionSession for SqliteSession {
                 .map_err(|(_, e)| ConnectionError::driver(DriverKind::Sqlite, e.to_string()))?;
         }
         Ok(())
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
@@ -137,6 +154,39 @@ mod tests {
         assert_eq!(reg.driver_of(&id), Some(DriverKind::Sqlite));
         reg.disconnect(&id).expect("disconnect");
         assert!(!reg.is_connected(&id));
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn registry_introspect_fixture() {
+        let path = temp_db();
+        let path_str = path.to_string_lossy().to_string();
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT NOT NULL);",
+            )
+            .unwrap();
+        }
+        let reg = ConnectionRegistry::with_builtin_drivers();
+        let id = reg
+            .connect(ConnectionConfig::Sqlite {
+                path: path_str,
+            })
+            .expect("connect");
+        let schemas = reg
+            .with_sqlite(&id, |s| s.list_schemas())
+            .expect("schemas");
+        assert_eq!(schemas, vec!["main".to_string()]);
+        let tables = reg.with_sqlite(&id, |s| s.list_tables()).expect("tables");
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].name, "t");
+        let cols = reg
+            .with_sqlite(&id, |s| s.list_columns("t"))
+            .expect("columns");
+        assert_eq!(cols.primary_keys, vec!["id".to_string()]);
+        assert_eq!(cols.columns.len(), 2);
+        reg.disconnect(&id).unwrap();
         let _ = std::fs::remove_file(&path);
     }
 }
