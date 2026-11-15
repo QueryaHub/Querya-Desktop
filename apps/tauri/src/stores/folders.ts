@@ -35,15 +35,15 @@ function newId(): string {
 export const useFoldersStore = defineStore("folders", () => {
   const folders = reactive<ConnectionFolder[]>(load());
 
+  // Persist id/name only — expand toggles must not rewrite localStorage.
   watch(
-    folders,
+    () => folders.map((f) => `${f.id}\0${f.name}`).join("\n"),
     () => {
       const payload: Stored = {
         folders: folders.map(({ id, name }) => ({ id, name })),
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     },
-    { deep: true },
   );
 
   const byId = computed(() => {

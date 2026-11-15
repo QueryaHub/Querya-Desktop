@@ -209,12 +209,27 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
   );
 
   watch(
-    () => nav.expandedConnectionIds.slice(),
+    () => nav.expandedConnectionIds,
     (ids) => {
       for (const id of ids) void ensureLoaded(id);
     },
     { immediate: true },
   );
+
+  /** Memoized filter per connection — avoids recloning the tree every panel paint. */
+  const filteredRootsByConnection = computed(() => {
+    const out: Record<string, TreeUiNode[]> = {};
+    for (const id of Object.keys(byConnection)) {
+      const st = byConnection[id]!;
+      const q = st.filter.trim().toLowerCase();
+      out[id] = q ? filterTree(st.roots, q) : st.roots;
+    }
+    return out;
+  });
+
+  function filteredRootsFor(connId: string): TreeUiNode[] {
+    return filteredRootsByConnection.value[connId] ?? stateOf(connId).roots;
+  }
 
   return {
     byConnection,
@@ -224,6 +239,8 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
     loading,
     error,
     filter,
+    filteredRootsByConnection,
+    filteredRootsFor,
     stateOf,
     ensureLoaded,
     loadFor,

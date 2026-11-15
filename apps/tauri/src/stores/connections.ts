@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { computed, ref } from "vue";
+import { reactive, ref } from "vue";
 import {
   dbConnectSqlite,
   dbDisconnect,
@@ -29,16 +29,22 @@ function fileName(path: string): string {
 /** Saved / live sessions shown in SERVERS (Flutter connections list). */
 export const useConnectionsStore = defineStore("connections", () => {
   const items = ref<LiveConnection[]>([]);
-
-  const byId = computed(() => {
-    const map = new Map<string, LiveConnection>();
-    for (const c of items.value) map.set(c.id, c);
-    return map;
-  });
+  /** Incremental index — not rebuilt on every upsert. */
+  const byId = reactive(new Map<string, LiveConnection>());
 
   function upsert(conn: LiveConnection) {
-    const rest = items.value.filter((c) => c.id !== conn.id);
-    items.value = [...rest, conn];
+    const list = items.value;
+    const i = list.findIndex((c) => c.id === conn.id);
+    if (i >= 0) list[i] = conn;
+    else list.push(conn);
+    byId.set(conn.id, conn);
+  }
+
+  function remove(id: string) {
+    byId.delete(id);
+    const list = items.value;
+    const i = list.findIndex((c) => c.id === id);
+    if (i >= 0) list.splice(i, 1);
   }
 
   /** Flutter-style Demo — full UI without opening a real file. */
@@ -105,11 +111,11 @@ export const useConnectionsStore = defineStore("connections", () => {
   async function disconnect(id: string) {
     const status = useShellStatusStore();
     const nav = useShellNavStore();
-    const conn = byId.value.get(id);
+    const conn = byId.get(id);
     try {
       if (conn && !conn.mock) await dbDisconnect(id);
     } finally {
-      items.value = items.value.filter((c) => c.id !== id);
+      remove(id);
       if (nav.selectedConnectionId === id) {
         const next = items.value[0] ?? null;
         if (next) nav.selectConnection(next.id);
@@ -124,7 +130,7 @@ export const useConnectionsStore = defineStore("connections", () => {
   }
 
   function select(id: string) {
-    const conn = byId.value.get(id);
+    const conn = byId.get(id);
     if (!conn) return;
     const nav = useShellNavStore();
     const status = useShellStatusStore();
@@ -139,7 +145,7 @@ export const useConnectionsStore = defineStore("connections", () => {
   }
 
   function moveToFolder(connectionId: string, folderId: string | null) {
-    const conn = items.value.find((c) => c.id === connectionId);
+    const conn = byId.get(connectionId);
     if (!conn) return;
     conn.folderId = folderId;
   }

@@ -8,11 +8,7 @@ import {
 } from "../stores/connections";
 import { useFoldersStore } from "../stores/folders";
 import { useShellNavStore } from "../stores/shellNav";
-import {
-  filterTree,
-  useObjectTreeStore,
-  type TreeUiNode,
-} from "../stores/objectTree";
+import { useObjectTreeStore, type TreeUiNode } from "../stores/objectTree";
 import { useQueryaMotion } from "../motion";
 import SplitHandle from "./SplitHandle.vue";
 import QueryaContextMenu, { type CtxItem } from "./QueryaContextMenu.vue";
@@ -30,8 +26,7 @@ const nav = useShellNavStore();
 const tree = useObjectTreeStore();
 const { items } = storeToRefs(connections);
 const { folders } = storeToRefs(foldersStore);
-const { selectedConnectionId, expandedConnectionIds, selectedObject } =
-  storeToRefs(nav);
+const { selectedConnectionId, selectedObject } = storeToRefs(nav);
 const motion = useQueryaMotion();
 const filter = ref("");
 const dragging = ref(false);
@@ -205,8 +200,7 @@ function treeState(connId: string) {
 }
 
 function filteredRootsFor(connId: string) {
-  const st = tree.stateOf(connId);
-  return filterTree(st.roots, st.filter.trim().toLowerCase());
+  return tree.filteredRootsFor(connId);
 }
 
 function driverGlyph(c: LiveConnection): string {
@@ -284,7 +278,7 @@ onUnmounted(() => {
                 class="conn"
                 :class="{
                   active: c.id === selectedConnectionId && !selectedObject,
-                  expanded: expandedConnectionIds.includes(c.id),
+                  expanded: nav.isExpanded(c.id),
                 }"
               >
                 <div
@@ -296,11 +290,11 @@ onUnmounted(() => {
                   <button
                     type="button"
                     class="chev"
-                    :aria-expanded="expandedConnectionIds.includes(c.id)"
+                    :aria-expanded="nav.isExpanded(c.id)"
                     :aria-label="`Expand ${c.name}`"
                     @click="onConnExpand(c.id, $event)"
                   >
-                    {{ expandedConnectionIds.includes(c.id) ? "▾" : "▸" }}
+                    {{ nav.isExpanded(c.id) ? "▾" : "▸" }}
                   </button>
                   <button
                     type="button"
@@ -330,7 +324,7 @@ onUnmounted(() => {
                 </div>
 
                 <div
-                  v-if="expandedConnectionIds.includes(c.id)"
+                  v-if="nav.isExpanded(c.id)"
                   class="tree"
                   data-testid="sqlite-object-tree"
                 >
@@ -384,7 +378,7 @@ onUnmounted(() => {
             class="conn"
             :class="{
               active: c.id === selectedConnectionId && !selectedObject,
-              expanded: expandedConnectionIds.includes(c.id),
+              expanded: nav.isExpanded(c.id),
             }"
           >
             <div
@@ -396,11 +390,11 @@ onUnmounted(() => {
               <button
                 type="button"
                 class="chev"
-                :aria-expanded="expandedConnectionIds.includes(c.id)"
+                :aria-expanded="nav.isExpanded(c.id)"
                 :aria-label="`Expand ${c.name}`"
                 @click="onConnExpand(c.id, $event)"
               >
-                {{ expandedConnectionIds.includes(c.id) ? "▾" : "▸" }}
+                {{ nav.isExpanded(c.id) ? "▾" : "▸" }}
               </button>
               <button
                 type="button"
@@ -429,7 +423,7 @@ onUnmounted(() => {
             </div>
 
             <div
-              v-if="expandedConnectionIds.includes(c.id)"
+              v-if="nav.isExpanded(c.id)"
               class="tree"
               data-testid="sqlite-object-tree"
             >
