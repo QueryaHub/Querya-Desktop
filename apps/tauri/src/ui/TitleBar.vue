@@ -19,12 +19,8 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  newConnection: [];
-  newConnectionFromUrl: [];
   openSqlite: [];
   openPreferences: [];
-  openTour: [];
-  launchDemo: [];
 }>();
 
 const motion = useQueryaMotion();
@@ -145,13 +141,9 @@ onUnmounted(() => {
         <span class="title">{{ props.title }}</span>
       </div>
       <TitleBarMenus
-        @new-connection="emit('newConnection')"
-        @new-connection-from-url="emit('newConnectionFromUrl')"
         @open-sqlite="emit('openSqlite')"
         @open-preferences="emit('openPreferences')"
         @toggle-sidebar="shell.toggleSidebar()"
-        @open-tour="emit('openTour')"
-        @launch-demo="emit('launchDemo')"
       />
     </div>
 

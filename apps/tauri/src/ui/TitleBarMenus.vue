@@ -2,16 +2,12 @@
 import { onMounted, onUnmounted, ref } from "vue";
 
 const emit = defineEmits<{
-  newConnection: [];
-  newConnectionFromUrl: [];
   openSqlite: [];
   openPreferences: [];
   toggleSidebar: [];
-  openTour: [];
-  launchDemo: [];
 }>();
 
-type MenuId = "file" | "edit" | "view" | "connection" | "help" | null;
+type MenuId = "file" | "edit" | "view" | null;
 
 const openMenu = ref<MenuId>(null);
 
@@ -61,7 +57,11 @@ onUnmounted(() => {
         File
       </button>
       <div v-if="openMenu === 'file'" class="drop" role="menu">
-        <button type="button" role="menuitem" @click="act(() => emit('openSqlite'))">
+        <button
+          type="button"
+          role="menuitem"
+          @click="act(() => emit('openSqlite'))"
+        >
           Open SQLite File…
         </button>
         <button type="button" role="menuitem" disabled>Open Recent</button>
@@ -105,57 +105,6 @@ onUnmounted(() => {
           @click="act(() => emit('toggleSidebar'))"
         >
           Toggle Sidebar
-        </button>
-      </div>
-    </div>
-
-    <div class="slot">
-      <button
-        type="button"
-        class="top"
-        :aria-expanded="openMenu === 'connection'"
-        @click="toggle('connection')"
-      >
-        Connection
-      </button>
-      <div v-if="openMenu === 'connection'" class="drop" role="menu">
-        <button
-          type="button"
-          role="menuitem"
-          data-testid="menu-new-connection"
-          @click="act(() => emit('newConnection'))"
-        >
-          New Database Connection
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          @click="act(() => emit('newConnectionFromUrl'))"
-        >
-          New Connection from URL…
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          @click="act(() => emit('launchDemo'))"
-        >
-          Demo Playground
-        </button>
-      </div>
-    </div>
-
-    <div class="slot">
-      <button
-        type="button"
-        class="top"
-        :aria-expanded="openMenu === 'help'"
-        @click="toggle('help')"
-      >
-        Help
-      </button>
-      <div v-if="openMenu === 'help'" class="drop" role="menu">
-        <button type="button" role="menuitem" @click="act(() => emit('openTour'))">
-          Welcome Tour
         </button>
       </div>
     </div>

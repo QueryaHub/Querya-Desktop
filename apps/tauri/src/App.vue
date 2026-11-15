@@ -55,13 +55,6 @@ function onNewConnection() {
   });
 }
 
-function onNewConnectionFromUrl() {
-  status.setQueryMetrics({
-    message: "New connection from URL — form lands next",
-    busy: false,
-  });
-}
-
 function onNewFolder() {
   status.setQueryMetrics({
     message: "New folder — LocalDb folders land next",
@@ -126,12 +119,8 @@ onUnmounted(() => {
 <template>
   <div class="app-frame" data-testid="main-screen">
     <TitleBar
-      @new-connection="onNewConnection"
-      @new-connection-from-url="onNewConnectionFromUrl"
       @open-sqlite="onOpenSqlite"
       @open-preferences="onOpenPreferences"
-      @open-tour="onOpenTour"
-      @launch-demo="onLaunchDemo"
     />
     <QueryaDivider />
     <div class="body">
