@@ -167,6 +167,34 @@ mod tests {
         block_rule("SELECT FROM WHERE", DriverKind::Postgres, SqlGuardRule::Parse);
     }
 
+    /// Parity with Flutter MCP security splitter vectors (`mcp_security_test` /
+    /// `mcp_sql_guard_test`): comment-hidden `;`, dollar quotes, backslash smuggle.
+    #[test]
+    fn rejects_hidden_second_statements() {
+        block_rule(
+            "SELECT 1 /* ; */; DROP TABLE t",
+            DriverKind::Postgres,
+            SqlGuardRule::MultiStatement,
+        );
+        block_rule(
+            "SELECT $$ ; $$; DROP TABLE t",
+            DriverKind::Postgres,
+            SqlGuardRule::MultiStatement,
+        );
+        // Postgres/SQLite: `\'` does not escape inside `'...'`, so this is two
+        // statements (string ends at the second `'`, then DELETE…).
+        block_rule(
+            "SELECT 'a\\'; DELETE FROM users; --'",
+            DriverKind::Postgres,
+            SqlGuardRule::MultiStatement,
+        );
+        block_rule(
+            "SELECT 'a\\'; DELETE FROM users; --'",
+            DriverKind::Sqlite,
+            SqlGuardRule::MultiStatement,
+        );
+    }
+
     #[test]
     fn sql_guard_error_serde() {
         let err = ConnectionError::sql_guard(
