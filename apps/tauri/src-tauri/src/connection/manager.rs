@@ -124,6 +124,14 @@ impl ConnectionRegistry {
             })?;
         f(sqlite)
     }
+
+    /// Clone the SQLite connection Arc so callers can drop the registry lock.
+    pub fn sqlite_connection_arc(
+        &self,
+        id: &ConnectionId,
+    ) -> ConnectionResult<std::sync::Arc<std::sync::Mutex<Option<rusqlite::Connection>>>> {
+        self.with_sqlite(id, |s| Ok(s.connection_arc()))
+    }
 }
 
 impl ConnectionManager for ConnectionRegistry {

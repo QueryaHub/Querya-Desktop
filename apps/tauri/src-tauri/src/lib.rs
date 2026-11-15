@@ -3,12 +3,12 @@ mod connection;
 
 pub use connection::{
     ColumnMeta, ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager,
-    ConnectionRegistry, DriverKind, SchemaObject, SchemaObjectKind, TableSchema,
+    ConnectionRegistry, DriverKind, QueryEvent, SchemaObject, SchemaObjectKind, TableSchema,
 };
 
 use commands::{
-    db_connect_sqlite, db_disconnect, db_is_connected, db_list_columns, db_list_schemas,
-    db_list_tables,
+    db_connect_sqlite, db_disconnect, db_execute_query, db_is_connected, db_list_columns,
+    db_list_schemas, db_list_tables,
 };
 
 #[tauri::command]
@@ -47,6 +47,7 @@ pub fn run() {
             db_list_schemas,
             db_list_tables,
             db_list_columns,
+            db_execute_query,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

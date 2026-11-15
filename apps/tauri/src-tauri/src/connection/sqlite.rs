@@ -3,20 +3,25 @@
 use super::error::{ConnectionError, ConnectionResult};
 use super::id::{ConnectionId, DriverKind};
 use super::manager::ConnectionSession;
+use super::query::QueryEvent;
 use rusqlite::Connection;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 pub struct SqliteSession {
     id: ConnectionId,
     path: String,
-    /// rusqlite::Connection is !Sync — guard for Tauri/registry threads.
-    conn: Mutex<Option<Connection>>,
+    /// Shared so query streaming can drop the registry lock.
+    conn: Arc<Mutex<Option<Connection>>>,
 }
 
 impl SqliteSession {
     pub fn path(&self) -> &str {
         &self.path
+    }
+
+    pub fn connection_arc(&self) -> Arc<Mutex<Option<Connection>>> {
+        Arc::clone(&self.conn)
     }
 
     pub fn with_connection<T>(
@@ -49,6 +54,17 @@ impl SqliteSession {
     ) -> ConnectionResult<super::introspect::TableSchema> {
         self.with_connection(|c| super::sqlite_introspect::list_columns(c, table))
     }
+
+    pub fn execute_streaming(
+        &self,
+        sql: &str,
+        limit: Option<usize>,
+        emit: impl FnMut(QueryEvent) -> ConnectionResult<()>,
+    ) -> ConnectionResult<()> {
+        self.with_connection(|c| {
+            super::sqlite_query::execute_streaming(c, sql, limit, None, emit)
+        })
+    }
 }
 
 impl ConnectionSession for SqliteSession {
@@ -61,9 +77,9 @@ impl ConnectionSession for SqliteSession {
     }
 
     fn disconnect(&mut self) -> ConnectionResult<()> {
-        let guard = self
+        let mut guard = self
             .conn
-            .get_mut()
+            .lock()
             .map_err(|_| ConnectionError::io("sqlite connection lock poisoned"))?;
         if let Some(conn) = guard.take() {
             conn.close()
@@ -103,7 +119,7 @@ pub fn open_sqlite(path: impl AsRef<str>) -> ConnectionResult<Box<dyn Connection
     Ok(Box::new(SqliteSession {
         id: ConnectionId::new(),
         path: path.to_owned(),
-        conn: Mutex::new(Some(conn)),
+        conn: Arc::new(Mutex::new(Some(conn))),
     }))
 }
 
