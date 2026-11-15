@@ -1,7 +1,7 @@
 use crate::connection::{
     ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager, ConnectionRegistry,
-    ErdSchema, PostgresObjectDetail, SchemaObject, SchemaObjectKind, SqlObjectKind, SqlObjectNode,
-    SqliteOverview, TableSchema,
+    ErdSchema, PostgresObjectDetail, RedisScanPage, SchemaObject, SchemaObjectKind, SqlObjectKind,
+    SqlObjectNode, SqliteOverview, TableSchema,
 };
 use crate::profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 use crate::secrets::SharedSecretStore;
@@ -74,6 +74,70 @@ pub fn db_connect_mysql(
         password,
         id,
     })
+}
+
+#[tauri::command]
+pub fn db_connect_redis(
+    host: String,
+    port: u16,
+    password: Option<String>,
+    username: Option<String>,
+    db: Option<u8>,
+    id: Option<String>,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<ConnectionId, ConnectionError> {
+    registry.connect(ConnectionConfig::Redis {
+        host,
+        port,
+        password,
+        username,
+        db,
+        id,
+    })
+}
+
+#[tauri::command]
+pub fn redis_ping(
+    id: ConnectionId,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<String, ConnectionError> {
+    registry.with_redis(&id, |s| s.ping())
+}
+
+#[tauri::command]
+pub fn redis_scan(
+    id: ConnectionId,
+    cursor: Option<u64>,
+    pattern: Option<String>,
+    count: Option<u32>,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<RedisScanPage, ConnectionError> {
+    registry.with_redis(&id, |s| {
+        s.scan(
+            cursor.unwrap_or(0),
+            pattern.as_deref(),
+            count.map(|n| n as usize),
+        )
+    })
+}
+
+#[tauri::command]
+pub fn redis_get(
+    id: ConnectionId,
+    key: String,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<Option<String>, ConnectionError> {
+    registry.with_redis(&id, |s| s.get(&key))
+}
+
+#[tauri::command]
+pub fn redis_set(
+    id: ConnectionId,
+    key: String,
+    value: String,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<(), ConnectionError> {
+    registry.with_redis(&id, |s| s.set(&key, &value))
 }
 
 #[tauri::command]

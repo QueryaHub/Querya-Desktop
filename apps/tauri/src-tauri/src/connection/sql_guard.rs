@@ -117,6 +117,11 @@ fn parse_statements(sql: &str, driver: DriverKind) -> ConnectionResult<Vec<State
         DriverKind::Postgres => Parser::parse_sql(&PostgreSqlDialect {}, sql),
         DriverKind::Sqlite => Parser::parse_sql(&SQLiteDialect {}, sql),
         DriverKind::Mysql => Parser::parse_sql(&MySqlDialect {}, sql),
+        DriverKind::Redis => {
+            return Err(ConnectionError::UnsupportedDriver {
+                driver: DriverKind::Redis,
+            });
+        }
     };
 
     match primary {
