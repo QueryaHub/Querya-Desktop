@@ -4,10 +4,15 @@ import { storeToRefs } from "pinia";
 import { useShellStore } from "../stores/shell";
 import { useConnectionsStore } from "../stores/connections";
 import { useShellNavStore } from "../stores/shellNav";
-import { useObjectTreeStore } from "../stores/objectTree";
+import {
+  filterTree,
+  useObjectTreeStore,
+  type TreeUiNode,
+} from "../stores/objectTree";
 import { useQueryaMotion } from "../motion";
 import SplitHandle from "./SplitHandle.vue";
 import QueryaContextMenu, { type CtxItem } from "./QueryaContextMenu.vue";
+import SqlObjectTreeNodes from "./SqlObjectTreeNodes.vue";
 
 const emit = defineEmits<{
   newConnection: [];
@@ -21,7 +26,7 @@ const tree = useObjectTreeStore();
 const { items } = storeToRefs(connections);
 const { selectedConnectionId, expandedConnectionIds, selectedObject } =
   storeToRefs(nav);
-const { objects, filter: objectFilter, loading, error } = storeToRefs(tree);
+const { roots, filter: objectFilter, loading, error } = storeToRefs(tree);
 const motion = useQueryaMotion();
 const filter = ref("");
 const dragging = ref(false);
@@ -47,11 +52,9 @@ const filteredConnections = computed(() => {
   );
 });
 
-const filteredObjects = computed(() => {
-  const q = objectFilter.value.trim().toLowerCase();
-  if (!q) return objects.value;
-  return objects.value.filter((o) => o.name.toLowerCase().includes(q));
-});
+const filteredRoots = computed(() =>
+  filterTree(roots.value, objectFilter.value.trim().toLowerCase()),
+);
 
 const panelStyle = computed(() => ({
   width: shell.sidebarOpen ? `${shell.sidebarWidth}px` : "0px",
@@ -89,15 +92,21 @@ function onConnExpand(id: string, e: MouseEvent) {
   connections.select(id);
 }
 
-function onObjectClick(name: string, kind: "table" | "view") {
+function onRelationClick(node: TreeUiNode) {
   const id = selectedConnectionId.value;
-  if (!id) return;
-  nav.selectObject({ connectionId: id, name, kind });
+  if (!id || (node.kind !== "table" && node.kind !== "view")) return;
+  nav.selectObject({
+    connectionId: id,
+    name: node.name,
+    kind: node.kind,
+    objectId: node.id,
+    schema: node.schema,
+  });
 }
 
-function onObjectChevron(name: string, e: MouseEvent) {
+function onNodeChevron(node: TreeUiNode, e: MouseEvent) {
   e.stopPropagation();
-  void tree.toggleColumns(name);
+  void tree.toggleExpand(node.id);
 }
 
 function onPanelContext(e: MouseEvent) {
@@ -211,53 +220,20 @@ onUnmounted(() => {
                 v-model="objectFilter"
                 class="filter"
                 type="search"
-                placeholder="Filter tables…"
-                aria-label="Filter tables"
+                placeholder="Filter objects…"
+                aria-label="Filter objects"
               />
               <p v-if="loading" class="hint">Loading…</p>
               <p v-else-if="error" class="hint err">{{ error }}</p>
-              <ul v-else class="nodes">
-                <li v-for="obj in filteredObjects" :key="obj.name" class="node">
-                  <div
-                    class="node-row"
-                    :class="{
-                      selected:
-                        selectedObject?.name === obj.name &&
-                        selectedObject?.connectionId === c.id,
-                    }"
-                  >
-                    <button
-                      type="button"
-                      class="chev sm"
-                      @click="onObjectChevron(obj.name, $event)"
-                    >
-                      {{ obj.expanded ? "▾" : "▸" }}
-                    </button>
-                    <button
-                      type="button"
-                      class="node-main"
-                      @click="onObjectClick(obj.name, obj.kind)"
-                    >
-                      <span class="name">{{ obj.name }}</span>
-                      <span class="kind">{{ obj.kind }}</span>
-                    </button>
-                  </div>
-                  <ul v-if="obj.expanded" class="cols">
-                    <li v-if="obj.loadingColumns" class="col muted">Loading…</li>
-                    <li v-else-if="obj.error" class="col err">{{ obj.error }}</li>
-                    <li
-                      v-for="col in obj.columns ?? []"
-                      :key="col.name"
-                      class="col"
-                    >
-                      <span>
-                        {{ col.name }}
-                        <span v-if="col.is_primary_key" class="pk">PK</span>
-                      </span>
-                      <span class="type">{{ col.data_type || "—" }}</span>
-                    </li>
-                  </ul>
-                </li>
+              <ul v-else class="nodes" data-testid="sql-object-tree-roots">
+                <SqlObjectTreeNodes
+                  :nodes="filteredRoots"
+                  :connection-id="c.id"
+                  :selected-object="selectedObject"
+                  :depth="0"
+                  @toggle="onNodeChevron"
+                  @select-relation="onRelationClick"
+                />
               </ul>
             </div>
           </li>

@@ -144,6 +144,44 @@ impl ConnectionRegistry {
     ) -> ConnectionResult<()> {
         self.with_sqlite(id, |s| s.execute_streaming(sql, limit, emit))
     }
+
+    /// Driver-agnostic object tree for a live connection (SQLite first).
+    pub fn object_tree(
+        &self,
+        id: &ConnectionId,
+    ) -> ConnectionResult<Arc<dyn super::object_tree::ObjectTreeProvider>> {
+        let session = self.session_arc(id)?;
+        match session.driver() {
+            DriverKind::Sqlite => {
+                let sqlite = session
+                    .as_any()
+                    .downcast_ref::<SqliteSession>()
+                    .ok_or(ConnectionError::UnsupportedDriver {
+                        driver: DriverKind::Sqlite,
+                    })?;
+                Ok(Arc::new(super::sqlite_object_tree::SqliteObjectTree::new(
+                    sqlite.clone_handle(),
+                )))
+            }
+            other => Err(ConnectionError::UnsupportedDriver { driver: other }),
+        }
+    }
+
+    pub fn list_children(
+        &self,
+        id: &ConnectionId,
+        parent_id: Option<&str>,
+    ) -> ConnectionResult<Vec<super::object_tree::SqlObjectNode>> {
+        self.object_tree(id)?.list_children(parent_id)
+    }
+
+    pub fn describe_object(
+        &self,
+        id: &ConnectionId,
+        object_id: &str,
+    ) -> ConnectionResult<super::introspect::TableSchema> {
+        self.object_tree(id)?.describe(object_id)
+    }
 }
 
 impl ConnectionManager for ConnectionRegistry {

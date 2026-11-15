@@ -31,14 +31,14 @@ const hits = computed(() => {
       c.mock
         ? DEMO_CONNECTION.objects
         : c.id === tree.connectionId
-          ? tree.objects
+          ? tree.relations
           : [];
     for (const o of objs) {
       if (q && !o.name.toLowerCase().includes(q)) continue;
       out.push({
         connectionId: c.id,
         name: o.name,
-        kind: o.kind,
+        kind: o.kind as "table" | "view",
         connectionName: c.name,
       });
     }

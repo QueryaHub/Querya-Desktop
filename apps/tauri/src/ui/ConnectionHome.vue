@@ -18,9 +18,11 @@ const conn = computed(() =>
 );
 
 const tables = computed(() =>
-  tree.objects.filter((o) => o.kind === "table"),
+  tree.relations.filter((o) => o.kind === "table"),
 );
-const views = computed(() => tree.objects.filter((o) => o.kind === "view"));
+const views = computed(() =>
+  tree.relations.filter((o) => o.kind === "view"),
+);
 </script>
 
 <template>
@@ -78,7 +80,7 @@ const views = computed(() => tree.objects.filter((o) => o.kind === "view"));
           same as Flutter. SQL stays on this tab when you need it.
         </p>
         <ul class="obj-list">
-          <li v-for="o in tree.objects" :key="o.name">
+          <li v-for="o in tree.relations" :key="o.id">
             <button
               type="button"
               class="obj"
@@ -86,7 +88,9 @@ const views = computed(() => tree.objects.filter((o) => o.kind === "view"));
                 nav.selectObject({
                   connectionId: conn!.id,
                   name: o.name,
-                  kind: o.kind,
+                  kind: o.kind as 'table' | 'view',
+                  objectId: o.id,
+                  schema: o.schema,
                 })
               "
             >

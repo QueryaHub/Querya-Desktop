@@ -11,6 +11,9 @@ export type SelectedObject = {
   connectionId: string;
   name: string;
   kind: "table" | "view";
+  /** Stable object id when known (`sqlite:table:main:users`). */
+  objectId?: string;
+  schema?: string | null;
 };
 
 export const useShellNavStore = defineStore("shellNav", () => {

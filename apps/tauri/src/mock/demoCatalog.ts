@@ -1,5 +1,7 @@
 /** Offline demo catalog for UI-core review (no live DB). */
 
+import type { SqlObjectNode } from "../api/connection";
+
 export type DemoColumn = {
   name: string;
   data_type: string;
@@ -98,4 +100,46 @@ export const DEMO_CONNECTION: DemoConnection = {
 
 export function findDemoObject(name: string): DemoObject | undefined {
   return DEMO_CONNECTION.objects.find((o) => o.name === name);
+}
+
+const MAIN_SCHEMA_ID = "sqlite:schema:main";
+
+/** Root schemas for the demo object tree (same shape as live IPC). */
+export function demoRootNodes(): SqlObjectNode[] {
+  return [
+    {
+      id: MAIN_SCHEMA_ID,
+      name: "main",
+      kind: "schema",
+      schema: "main",
+      parent_id: null,
+      expandable: true,
+    },
+  ];
+}
+
+export function demoListChildren(parentId: string | null): SqlObjectNode[] {
+  if (parentId == null) return demoRootNodes();
+  if (parentId === MAIN_SCHEMA_ID) {
+    return DEMO_CONNECTION.objects.map((o) => ({
+      id: `sqlite:${o.kind}:main:${o.name}`,
+      name: o.name,
+      kind: o.kind,
+      schema: "main",
+      parent_id: parentId,
+      expandable: true,
+    }));
+  }
+  const relation = DEMO_CONNECTION.objects.find(
+    (o) => parentId === `sqlite:${o.kind}:main:${o.name}`,
+  );
+  if (!relation) return [];
+  return relation.columns.map((c) => ({
+    id: `sqlite:column:main:${relation.name}:${c.name}`,
+    name: c.name,
+    kind: "column" as const,
+    schema: "main",
+    parent_id: parentId,
+    expandable: false,
+  }));
 }

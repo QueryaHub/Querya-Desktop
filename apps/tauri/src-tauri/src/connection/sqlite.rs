@@ -21,6 +21,15 @@ impl SqliteSession {
         &self.path
     }
 
+    /// Clone the session handle (shared connection Arc) for providers outside the registry lock.
+    pub fn clone_handle(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            path: self.path.clone(),
+            conn: Arc::clone(&self.conn),
+        }
+    }
+
     pub fn with_connection<T>(
         &self,
         f: impl FnOnce(&Connection) -> ConnectionResult<T>,
