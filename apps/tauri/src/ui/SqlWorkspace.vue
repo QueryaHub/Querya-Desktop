@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { useWorkspaceStore } from "../stores/workspace";
 import { useQueryResultStore } from "../stores/queryResult";
+import { useShellNavStore } from "../stores/shellNav";
 import { useConnectionsStore } from "../stores/connections";
 import SqlEditor from "./SqlEditor.vue";
 import ResultGrid from "./ResultGrid.vue";
@@ -10,9 +11,17 @@ import ResultGrid from "./ResultGrid.vue";
 const workspace = useWorkspaceStore();
 const query = useQueryResultStore();
 const connections = useConnectionsStore();
+const nav = useShellNavStore();
 const { activeTab } = storeToRefs(workspace);
 const { columns, running, error, rowCount, elapsedMs, truncated, affectedRows } =
   storeToRefs(query);
+
+const hasLiveConnection = computed(() => {
+  const id = nav.selectedConnectionId;
+  if (!id) return false;
+  const c = connections.byId.get(id);
+  return !!c && !c.mock;
+});
 
 const editorRef = ref<InstanceType<typeof SqlEditor> | null>(null);
 
@@ -52,13 +61,15 @@ const hasGrid = computed(() => columns.value.length > 0);
         type="button"
         class="run"
         data-testid="sql-run"
-        :disabled="running || !connections.active"
+        :disabled="running || !hasLiveConnection"
         @click="onRun"
       >
         {{ running ? "Running…" : "Run" }}
       </button>
-      <span class="hint">Ctrl/Cmd+Enter · selection or whole buffer</span>
-      <span v-if="!connections.active" class="warn">Connect a database first</span>
+      <span class="hint">Parked under Overview · Ctrl/Cmd+Enter</span>
+      <span v-if="!hasLiveConnection" class="warn">
+        Live SQLite required for Run (Demo uses table Data view)
+      </span>
     </div>
     <div class="editor-pane">
       <SqlEditor

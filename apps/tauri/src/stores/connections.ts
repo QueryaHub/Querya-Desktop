@@ -5,6 +5,8 @@ import {
   dbDisconnect,
   formatConnectionError,
 } from "../api/connection";
+import { DEMO_CONNECTION } from "../mock/demoCatalog";
+import { useShellNavStore } from "./shellNav";
 import { useShellStatusStore } from "./shellStatus";
 
 export type LiveConnection = {
@@ -12,6 +14,8 @@ export type LiveConnection = {
   driver: "sqlite";
   name: string;
   path: string;
+  /** Offline UI demo — no Rust session. */
+  mock?: boolean;
 };
 
 function fileName(path: string): string {
@@ -19,18 +23,50 @@ function fileName(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
-/** Live DB sessions opened in this app process. */
+/** Saved / live sessions shown in SERVERS (Flutter connections list). */
 export const useConnectionsStore = defineStore("connections", () => {
   const items = ref<LiveConnection[]>([]);
-  const activeId = ref<string | null>(null);
 
-  const active = computed(
-    () => items.value.find((c) => c.id === activeId.value) ?? null,
-  );
+  const byId = computed(() => {
+    const map = new Map<string, LiveConnection>();
+    for (const c of items.value) map.set(c.id, c);
+    return map;
+  });
+
+  function upsert(conn: LiveConnection) {
+    const rest = items.value.filter((c) => c.id !== conn.id);
+    items.value = [...rest, conn];
+  }
+
+  /** Flutter-style Demo — full UI without opening a real file. */
+  function launchDemo() {
+    const nav = useShellNavStore();
+    const status = useShellStatusStore();
+    const conn: LiveConnection = {
+      id: DEMO_CONNECTION.id,
+      driver: "sqlite",
+      name: DEMO_CONNECTION.name,
+      path: DEMO_CONNECTION.path,
+      mock: true,
+    };
+    upsert(conn);
+    nav.setExpanded(conn.id, true);
+    nav.selectConnection(conn.id);
+    status.setConnection(conn.name, "Demo (offline)");
+    status.setQueryMetrics({
+      message: "Demo catalog · UI core (no live DB)",
+      busy: false,
+    });
+    return conn;
+  }
 
   async function connectSqlite(path: string) {
     const status = useShellStatusStore();
-    status.setQueryMetrics({ busy: true, message: `Opening ${fileName(path)}…` });
+    const nav = useShellNavStore();
+    status.setQueryMetrics({
+      busy: true,
+      message: `Opening ${fileName(path)}…`,
+    });
     try {
       const id = await dbConnectSqlite(path);
       const conn: LiveConnection = {
@@ -39,8 +75,9 @@ export const useConnectionsStore = defineStore("connections", () => {
         name: fileName(path),
         path,
       };
-      items.value = [...items.value, conn];
-      activeId.value = id;
+      upsert(conn);
+      nav.setExpanded(id, true);
+      nav.selectConnection(id);
       status.setConnection(conn.name, path);
       status.setQueryMetrics({
         busy: false,
@@ -56,16 +93,19 @@ export const useConnectionsStore = defineStore("connections", () => {
 
   async function disconnect(id: string) {
     const status = useShellStatusStore();
+    const nav = useShellNavStore();
+    const conn = byId.value.get(id);
     try {
-      await dbDisconnect(id);
+      if (conn && !conn.mock) await dbDisconnect(id);
     } finally {
       items.value = items.value.filter((c) => c.id !== id);
-      if (activeId.value === id) {
-        activeId.value = items.value[0]?.id ?? null;
-        const next = active.value;
+      if (nav.selectedConnectionId === id) {
+        const next = items.value[0] ?? null;
+        if (next) nav.selectConnection(next.id);
+        else nav.reset();
         status.setConnection(next?.name ?? null, next?.path ?? null);
         status.setQueryMetrics({
-          message: next ? `Connected · ${next.name}` : "Disconnected",
+          message: next ? `Connected · ${next.name}` : "No connection",
           busy: false,
         });
       }
@@ -73,13 +113,26 @@ export const useConnectionsStore = defineStore("connections", () => {
   }
 
   function select(id: string) {
-    const conn = items.value.find((c) => c.id === id);
+    const conn = byId.value.get(id);
     if (!conn) return;
-    activeId.value = id;
+    const nav = useShellNavStore();
     const status = useShellStatusStore();
-    status.setConnection(conn.name, conn.path);
-    status.setQueryMetrics({ message: `Connected · ${conn.name}`, busy: false });
+    nav.selectConnection(id);
+    status.setConnection(conn.name, conn.mock ? "Demo (offline)" : conn.path);
+    status.setQueryMetrics({
+      message: conn.mock
+        ? "Demo catalog · UI core (no live DB)"
+        : `Connected · ${conn.name}`,
+      busy: false,
+    });
   }
 
-  return { items, activeId, active, connectSqlite, disconnect, select };
+  return {
+    items,
+    byId,
+    launchDemo,
+    connectSqlite,
+    disconnect,
+    select,
+  };
 });

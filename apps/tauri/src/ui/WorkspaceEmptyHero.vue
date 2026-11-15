@@ -2,6 +2,7 @@
 const emit = defineEmits<{
   newConnection: [];
   openSqlite: [];
+  launchDemo: [];
   openTour: [];
 }>();
 </script>
@@ -9,7 +10,7 @@ const emit = defineEmits<{
 <template>
   <div class="hero" data-testid="workspace-empty-hero">
     <h1 class="brand">Querya</h1>
-    <p class="lead">Connect to a database to start querying.</p>
+    <p class="lead">Connect to a database to start exploring.</p>
     <div class="actions">
       <button
         type="button"
@@ -29,6 +30,14 @@ const emit = defineEmits<{
       </button>
       <button
         type="button"
+        class="btn"
+        data-testid="hero-demo"
+        @click="emit('launchDemo')"
+      >
+        Demo
+      </button>
+      <button
+        type="button"
         class="btn ghost"
         data-testid="hero-tour"
         @click="emit('openTour')"
@@ -37,8 +46,8 @@ const emit = defineEmits<{
       </button>
     </div>
     <p class="hint">
-      Tip: <kbd>Ctrl</kbd>+<kbd>B</kbd> toggles the connections sidebar ·
-      <kbd>Ctrl</kbd>+<kbd>N</kbd> new connection (coming soon)
+      Tip: expand a connection in the sidebar, then click a table to open its
+      <strong>Data</strong> grid — SQL is on the connection home tab.
     </p>
   </div>
 </template>
@@ -80,10 +89,10 @@ const emit = defineEmits<{
 
 .btn {
   appearance: none;
-  height: var(--q-control-h-md);
-  padding: 0 12px;
-  border-radius: var(--q-radius-control);
+  height: var(--q-control-h);
+  padding: 0 14px;
   border: 1px solid var(--q-border);
+  border-radius: var(--q-radius-control);
   background: var(--q-surface);
   color: var(--q-foreground);
   font: inherit;
@@ -110,17 +119,10 @@ const emit = defineEmits<{
 }
 
 .hint {
-  margin: var(--q-space-6) 0 0;
+  margin: var(--q-space-4) 0 0;
+  max-width: 32rem;
   font-size: 12px;
   color: var(--q-muted-foreground);
-}
-
-kbd {
-  font-family: var(--q-font-mono);
-  font-size: 11px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  border: 1px solid var(--q-border);
-  background: var(--q-surface);
+  line-height: 1.45;
 }
 </style>

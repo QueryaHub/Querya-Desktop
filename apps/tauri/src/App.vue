@@ -5,30 +5,28 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { storeToRefs } from "pinia";
 import { useShellStore } from "./stores/shell";
 import { useShellStatusStore } from "./stores/shellStatus";
-import { useWorkspaceStore } from "./stores/workspace";
 import { useConnectionsStore } from "./stores/connections";
+import { useShellNavStore } from "./stores/shellNav";
 import { initTheme } from "./theme/queryaTheme";
 import { provideQueryaMotion } from "./motion";
 import TitleBar from "./ui/TitleBar.vue";
 import ConnectionsPanel from "./ui/ConnectionsPanel.vue";
-import TabStrip from "./ui/TabStrip.vue";
 import StatusBar from "./ui/StatusBar.vue";
 import WorkspaceEmptyHero from "./ui/WorkspaceEmptyHero.vue";
 import QueryaDivider from "./ui/QueryaDivider.vue";
-import SqlWorkspace from "./ui/SqlWorkspace.vue";
+import ConnectionHome from "./ui/ConnectionHome.vue";
+import TableObjectView from "./ui/TableObjectView.vue";
 
 const shell = useShellStore();
 const status = useShellStatusStore();
-const workspace = useWorkspaceStore();
 const connections = useConnectionsStore();
-const { activeTab } = storeToRefs(workspace);
+const nav = useShellNavStore();
+const { surface } = storeToRefs(nav);
 provideQueryaMotion();
 
-const showEmpty = computed(
-  () => !connections.active && activeTab.value?.kind === "welcome",
-);
-
-const showSql = computed(() => activeTab.value?.kind === "sql");
+const showEmpty = computed(() => surface.value === "empty");
+const showHome = computed(() => surface.value === "connectionHome");
+const showTable = computed(() => surface.value === "tableObject");
 
 async function onOpenSqlite() {
   try {
@@ -42,8 +40,7 @@ async function onOpenSqlite() {
       ],
     });
     if (!selected || Array.isArray(selected)) return;
-    const conn = await connections.connectSqlite(selected);
-    workspace.addTab({ title: conn.name, kind: "sql" });
+    await connections.connectSqlite(selected);
   } catch (err) {
     if (String(err).includes("cancel")) return;
   }
@@ -51,9 +48,13 @@ async function onOpenSqlite() {
 
 function onNewConnection() {
   status.setQueryMetrics({
-    message: "Connection form will land with keyring/profiles",
+    message: "Connection form UI next — use Demo or Open SQLite for now",
     busy: false,
   });
+}
+
+function onLaunchDemo() {
+  connections.launchDemo();
 }
 
 function onOpenTour() {
@@ -80,7 +81,7 @@ onMounted(async () => {
       os?: string;
     }>("app_info");
     status.setQueryMetrics({
-      message: `${info.name} ${info.version} · ${info.stack}${info.os ? ` · ${info.os}` : ""}`,
+      message: `${info.name} ${info.version} · UI core · ${info.stack}${info.os ? ` · ${info.os}` : ""}`,
     });
   } catch {
     status.setQueryMetrics({ message: "IPC unavailable" });
@@ -104,21 +105,16 @@ onUnmounted(() => {
         @new-connection="onNewConnection"
       />
       <main class="workspace">
-        <TabStrip />
         <div class="workspace-body">
           <WorkspaceEmptyHero
             v-if="showEmpty"
             @new-connection="onNewConnection"
             @open-sqlite="onOpenSqlite"
+            @launch-demo="onLaunchDemo"
             @open-tour="onOpenTour"
           />
-          <SqlWorkspace v-else-if="showSql" />
-          <div v-else class="tab-placeholder" data-testid="tab-placeholder">
-            <h2>{{ activeTab?.title }}</h2>
-            <p v-if="connections.active">
-              Connected: {{ connections.active.path }}
-            </p>
-          </div>
+          <ConnectionHome v-else-if="showHome" />
+          <TableObjectView v-else-if="showTable" />
         </div>
       </main>
     </div>
@@ -159,22 +155,5 @@ onUnmounted(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-
-.tab-placeholder {
-  height: 100%;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: var(--q-space-2);
-  padding: var(--q-space-8);
-  text-align: center;
-  color: var(--q-muted-foreground);
-}
-
-.tab-placeholder h2 {
-  margin: 0;
-  color: var(--q-foreground);
-  font-size: var(--q-text-lg);
 }
 </style>

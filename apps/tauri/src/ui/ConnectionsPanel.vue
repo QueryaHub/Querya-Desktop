@@ -3,9 +3,10 @@ import { computed, onUnmounted, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { useShellStore } from "../stores/shell";
 import { useConnectionsStore } from "../stores/connections";
+import { useShellNavStore } from "../stores/shellNav";
+import { useObjectTreeStore } from "../stores/objectTree";
 import { useQueryaMotion } from "../motion";
 import SplitHandle from "./SplitHandle.vue";
-import SqliteObjectTree from "./SqliteObjectTree.vue";
 
 const emit = defineEmits<{
   openSqlite: [];
@@ -14,18 +15,30 @@ const emit = defineEmits<{
 
 const shell = useShellStore();
 const connections = useConnectionsStore();
-const { items, activeId } = storeToRefs(connections);
+const nav = useShellNavStore();
+const tree = useObjectTreeStore();
+const { items } = storeToRefs(connections);
+const { selectedConnectionId, expandedConnectionIds, selectedObject } =
+  storeToRefs(nav);
+const { objects, filter: objectFilter, loading, error } = storeToRefs(tree);
 const motion = useQueryaMotion();
 const filter = ref("");
 const dragging = ref(false);
+const menuOpen = ref(false);
 
-const filtered = computed(() => {
+const filteredConnections = computed(() => {
   const q = filter.value.trim().toLowerCase();
   if (!q) return items.value;
   return items.value.filter(
     (c) =>
       c.name.toLowerCase().includes(q) || c.path.toLowerCase().includes(q),
   );
+});
+
+const filteredObjects = computed(() => {
+  const q = objectFilter.value.trim().toLowerCase();
+  if (!q) return objects.value;
+  return objects.value.filter((o) => o.name.toLowerCase().includes(q));
 });
 
 const panelStyle = computed(() => ({
@@ -41,19 +54,44 @@ function onResizeStart(e: PointerEvent) {
   dragging.value = true;
   const startX = e.clientX;
   const startW = shell.sidebarWidth;
-
   const onMove = (ev: PointerEvent) => {
     shell.setSidebarWidth(startW + (ev.clientX - startX));
   };
   const onUp = () => {
     dragging.value = false;
-    // Flutter collapse threshold: flick under ~100px closes.
     if (shell.sidebarWidth < 100) shell.setSidebarOpen(false);
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
   };
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
+}
+
+function onConnClick(id: string) {
+  connections.select(id);
+}
+
+function onConnExpand(id: string, e: MouseEvent) {
+  e.stopPropagation();
+  nav.toggleExpanded(id);
+  connections.select(id);
+}
+
+function onObjectClick(name: string, kind: "table" | "view") {
+  const id = selectedConnectionId.value;
+  if (!id) return;
+  nav.selectObject({ connectionId: id, name, kind });
+}
+
+function onObjectChevron(name: string, e: MouseEvent) {
+  e.stopPropagation();
+  void tree.toggleColumns(name);
+}
+
+function onContextCreate(action: "connection" | "sqlite" | "folder") {
+  menuOpen.value = false;
+  if (action === "sqlite") emit("openSqlite");
+  else if (action === "connection") emit("newConnection");
 }
 
 onUnmounted(() => {
@@ -69,7 +107,7 @@ onUnmounted(() => {
     :style="panelStyle"
     :aria-hidden="!shell.sidebarOpen"
   >
-    <div class="inner">
+    <div class="inner" @contextmenu.prevent="menuOpen = true">
       <div class="servers-header" data-testid="connections-servers-header">
         <span class="servers-label">SERVERS</span>
         <span class="count">{{ items.length }}</span>
@@ -84,57 +122,144 @@ onUnmounted(() => {
           data-testid="connections-filter"
         />
       </div>
+
       <div class="body">
-        <ul v-if="filtered.length" class="list" data-testid="connections-list">
+        <p v-if="!filteredConnections.length" class="empty-title">
+          {{ filter ? "No connections match" : "No connections yet" }}
+        </p>
+        <p v-if="!filteredConnections.length" class="empty-hint">
+          Right-click → Create, or use the empty workspace actions.
+        </p>
+
+        <ul
+          v-else
+          class="list"
+          data-testid="connections-list"
+        >
           <li
-            v-for="c in filtered"
+            v-for="c in filteredConnections"
             :key="c.id"
-            class="row"
-            :class="{ active: c.id === activeId }"
+            class="conn"
+            :class="{
+              active: c.id === selectedConnectionId && !selectedObject,
+              expanded: expandedConnectionIds.includes(c.id),
+            }"
           >
-            <button
-              type="button"
-              class="row-main"
-              @click="connections.select(c.id)"
+            <div class="conn-row">
+              <button
+                type="button"
+                class="chev"
+                :aria-expanded="expandedConnectionIds.includes(c.id)"
+                :aria-label="`Expand ${c.name}`"
+                @click="onConnExpand(c.id, $event)"
+              >
+                {{ expandedConnectionIds.includes(c.id) ? "▾" : "▸" }}
+              </button>
+              <button
+                type="button"
+                class="conn-main"
+                @click="onConnClick(c.id)"
+              >
+                <span class="conn-name">{{ c.name }}</span>
+                <span class="conn-meta">
+                  {{ c.driver }}<template v-if="c.mock"> · demo</template>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="conn-x"
+                :aria-label="`Remove ${c.name}`"
+                @click.stop="connections.disconnect(c.id)"
+              >
+                ×
+              </button>
+            </div>
+
+            <div
+              v-if="expandedConnectionIds.includes(c.id) && c.id === selectedConnectionId"
+              class="tree"
+              data-testid="sqlite-object-tree"
             >
-              <span class="row-name">{{ c.name }}</span>
-              <span class="row-meta">sqlite</span>
-            </button>
-            <button
-              type="button"
-              class="row-x"
-              :aria-label="`Disconnect ${c.name}`"
-              @click="connections.disconnect(c.id)"
-            >
-              ×
-            </button>
+              <div class="tree-header">
+                <span class="tree-label">OBJECTS</span>
+                <button
+                  type="button"
+                  class="refresh"
+                  aria-label="Refresh"
+                  @click="tree.refresh()"
+                >
+                  ↻
+                </button>
+              </div>
+              <input
+                v-model="objectFilter"
+                class="filter"
+                type="search"
+                placeholder="Filter tables…"
+                aria-label="Filter tables"
+              />
+              <p v-if="loading" class="hint">Loading…</p>
+              <p v-else-if="error" class="hint err">{{ error }}</p>
+              <ul v-else class="nodes">
+                <li v-for="obj in filteredObjects" :key="obj.name" class="node">
+                  <div
+                    class="node-row"
+                    :class="{
+                      selected:
+                        selectedObject?.name === obj.name &&
+                        selectedObject?.connectionId === c.id,
+                    }"
+                  >
+                    <button
+                      type="button"
+                      class="chev sm"
+                      @click="onObjectChevron(obj.name, $event)"
+                    >
+                      {{ obj.expanded ? "▾" : "▸" }}
+                    </button>
+                    <button
+                      type="button"
+                      class="node-main"
+                      @click="onObjectClick(obj.name, obj.kind)"
+                    >
+                      <span class="name">{{ obj.name }}</span>
+                      <span class="kind">{{ obj.kind }}</span>
+                    </button>
+                  </div>
+                  <ul v-if="obj.expanded" class="cols">
+                    <li v-if="obj.loadingColumns" class="col muted">Loading…</li>
+                    <li v-else-if="obj.error" class="col err">{{ obj.error }}</li>
+                    <li
+                      v-for="col in obj.columns ?? []"
+                      :key="col.name"
+                      class="col"
+                    >
+                      <span>
+                        {{ col.name }}
+                        <span v-if="col.is_primary_key" class="pk">PK</span>
+                      </span>
+                      <span class="type">{{ col.data_type || "—" }}</span>
+                    </li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
           </li>
         </ul>
-        <template v-else>
-          <p class="empty-title">No connections yet</p>
-          <p class="empty-hint">
-            Open a SQLite file to start the vertical slice.
-          </p>
-        </template>
-        <SqliteObjectTree />
-        <div class="actions">
-          <button
-            type="button"
-            class="btn primary"
-            data-testid="connections-open-sqlite"
-            @click="emit('openSqlite')"
-          >
-            Open SQLite…
-          </button>
-          <button
-            type="button"
-            class="btn"
-            data-testid="connections-new"
-            @click="emit('newConnection')"
-          >
-            New connection
-          </button>
-        </div>
+      </div>
+
+      <div v-if="menuOpen" class="ctx" @click.stop>
+        <p class="ctx-label">Create</p>
+        <button type="button" @click="onContextCreate('connection')">
+          New Connection
+        </button>
+        <button type="button" @click="onContextCreate('sqlite')">
+          Open SQLite…
+        </button>
+        <button type="button" class="muted" disabled>New Folder</button>
+        <button type="button" class="dismiss" @click="menuOpen = false">
+          Close
+        </button>
       </div>
     </div>
     <SplitHandle v-if="shell.sidebarOpen" @pointerdown="onResizeStart" />
@@ -153,6 +278,7 @@ onUnmounted(() => {
 }
 
 .inner {
+  position: relative;
   flex: 1;
   min-width: var(--q-sidebar-min);
   height: 100%;
@@ -174,7 +300,8 @@ onUnmounted(() => {
   padding: 10px 12px 6px;
 }
 
-.servers-label {
+.servers-label,
+.tree-label {
   font-family: var(--q-font-mono);
   font-size: 11px;
   font-weight: 600;
@@ -214,38 +341,71 @@ onUnmounted(() => {
 
 .body {
   flex: 1;
-  padding: 16px 12px;
+  padding: 4px 8px 16px;
   overflow: auto;
+}
+
+.empty-title {
+  margin: 12px 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.empty-hint,
+.hint {
+  margin: 6px 4px 0;
+  font-size: 12px;
+  color: var(--q-muted-foreground);
+  line-height: 1.4;
+}
+
+.hint.err,
+.col.err {
+  color: var(--q-danger, #c44);
 }
 
 .list {
   list-style: none;
-  margin: 0 0 12px;
+  margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
-.row {
+.conn-row {
   display: flex;
   align-items: center;
   gap: 2px;
   border-radius: var(--q-radius-control);
 }
 
-.row.active {
+.conn.active > .conn-row {
   background: color-mix(in srgb, var(--q-primary) 16%, transparent);
 }
 
-.row-main {
+.chev {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  width: 1.25rem;
+  height: 1.5rem;
+  color: var(--q-muted-foreground);
+  cursor: pointer;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.chev.sm {
+  width: 1rem;
+}
+
+.conn-main,
+.node-main {
   appearance: none;
   border: 0;
   background: transparent;
   flex: 1;
   min-width: 0;
   text-align: left;
-  padding: 6px 8px;
+  padding: 6px 6px;
   cursor: pointer;
   color: var(--q-foreground);
   font: inherit;
@@ -253,11 +413,13 @@ onUnmounted(() => {
   border-radius: var(--q-radius-control);
 }
 
-.row-main:hover {
+.conn-main:hover,
+.node-main:hover {
   background: var(--q-accent);
 }
 
-.row-name {
+.conn-name,
+.name {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -265,14 +427,17 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-.row-meta {
+.conn-meta,
+.kind,
+.type {
   display: block;
   font-size: 10px;
   color: var(--q-muted-foreground);
   font-family: var(--q-font-mono);
 }
 
-.row-x {
+.conn-x,
+.refresh {
   appearance: none;
   border: 0;
   background: transparent;
@@ -283,56 +448,118 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-.row-x:hover {
+.conn-x:hover,
+.refresh:hover {
   background: var(--q-accent);
   color: var(--q-foreground);
 }
 
-.empty-title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--q-foreground);
+.tree {
+  margin: 2px 0 8px 6px;
+  padding: 6px 0 4px 6px;
+  border-left: 1px solid
+    color-mix(in srgb, var(--q-border) 55%, transparent);
 }
 
-.empty-hint {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: var(--q-muted-foreground);
-  line-height: 1.4;
-}
-
-.actions {
+.tree-header {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 14px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
 }
 
-.btn {
-  appearance: none;
-  height: var(--q-control-h-sm);
-  border: 1px solid var(--q-border);
+.nodes,
+.cols {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.node-row {
+  display: flex;
+  align-items: center;
+  border-radius: var(--q-radius-control);
+}
+
+.node-row.selected {
+  background: color-mix(in srgb, var(--q-primary) 14%, transparent);
+}
+
+.cols {
+  padding: 0 0 4px 1rem;
+}
+
+.col {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+.col.muted {
+  color: var(--q-muted-foreground);
+}
+
+.pk {
+  margin-left: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--q-primary);
+  font-family: var(--q-font-mono);
+}
+
+.ctx {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 5;
+  min-width: 160px;
+  padding: 6px;
   border-radius: var(--q-radius-control);
   background: var(--q-surface);
-  color: var(--q-foreground);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  padding: 0 8px;
+  border: 1px solid var(--q-border);
+  box-shadow: 0 8px 24px color-mix(in srgb, #000 35%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.btn:hover {
+.ctx-label {
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--q-muted-foreground);
+  text-transform: uppercase;
+}
+
+.ctx button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: var(--q-radius-sm);
+  font: inherit;
+  font-size: 12px;
+  color: var(--q-foreground);
+  cursor: pointer;
+}
+
+.ctx button:hover:not(:disabled) {
   background: var(--q-accent);
 }
 
-.btn.primary {
-  background: var(--q-primary);
-  border-color: transparent;
-  color: var(--q-primary-foreground);
+.ctx button:disabled,
+.ctx .muted {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
-.btn.primary:hover {
-  filter: brightness(1.05);
+.ctx .dismiss {
+  margin-top: 4px;
+  color: var(--q-muted-foreground);
 }
 </style>

@@ -7,8 +7,9 @@ import {
   type ColumnMeta,
   type SchemaObject,
 } from "../api/connection";
+import { DEMO_CONNECTION } from "../mock/demoCatalog";
 import { useConnectionsStore } from "./connections";
-import { useShellStatusStore } from "./shellStatus";
+import { useShellNavStore } from "./shellNav";
 
 export type TreeTableNode = SchemaObject & {
   expanded: boolean;
@@ -17,7 +18,6 @@ export type TreeTableNode = SchemaObject & {
   error: string | null;
 };
 
-/** SQLite object tree for the active connection. */
 export const useObjectTreeStore = defineStore("objectTree", () => {
   const connectionId = ref<string | null>(null);
   const objects = ref<TreeTableNode[]>([]);
@@ -25,12 +25,36 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
   const error = ref<string | null>(null);
   const filter = ref("");
 
+  function fromDemo(): TreeTableNode[] {
+    return DEMO_CONNECTION.objects.map((o) => ({
+      name: o.name,
+      kind: o.kind,
+      schema: "main",
+      expanded: false,
+      loadingColumns: false,
+      columns: o.columns.map((c) => ({
+        name: c.name,
+        data_type: c.data_type,
+        is_nullable: c.is_nullable,
+        is_primary_key: c.is_primary_key,
+      })),
+      error: null,
+    }));
+  }
+
   async function loadFor(id: string | null) {
     connectionId.value = id;
     objects.value = [];
     error.value = null;
     filter.value = "";
     if (!id) return;
+
+    const connections = useConnectionsStore();
+    const conn = connections.byId.get(id);
+    if (conn?.mock) {
+      objects.value = fromDemo();
+      return;
+    }
 
     loading.value = true;
     try {
@@ -49,7 +73,7 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
     }
   }
 
-  async function toggleTable(name: string) {
+  async function toggleColumns(name: string) {
     const id = connectionId.value;
     const node = objects.value.find((o) => o.name === name);
     if (!id || !node) return;
@@ -58,9 +82,11 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
       node.expanded = false;
       return;
     }
-
     node.expanded = true;
     if (node.columns) return;
+
+    const connections = useConnectionsStore();
+    if (connections.byId.get(id)?.mock) return;
 
     node.loadingColumns = true;
     node.error = null;
@@ -69,11 +95,6 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
       node.columns = schema.columns;
     } catch (err) {
       node.error = formatConnectionError(err);
-      const status = useShellStatusStore();
-      status.setQueryMetrics({
-        message: node.error,
-        busy: false,
-      });
     } finally {
       node.loadingColumns = false;
     }
@@ -83,10 +104,9 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
     return loadFor(connectionId.value);
   }
 
-  // Keep tree in sync with active connection.
-  const connections = useConnectionsStore();
+  const nav = useShellNavStore();
   watch(
-    () => connections.activeId,
+    () => nav.selectedConnectionId,
     (id) => {
       void loadFor(id);
     },
@@ -100,7 +120,7 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
     error,
     filter,
     loadFor,
-    toggleTable,
+    toggleColumns,
     refresh,
   };
 });

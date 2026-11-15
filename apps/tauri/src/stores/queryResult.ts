@@ -8,9 +8,10 @@ import {
 } from "../api/queryAccumulate";
 import { formatConnectionError } from "../api/connection";
 import { useConnectionsStore } from "./connections";
+import { useShellNavStore } from "./shellNav";
 import { useShellStatusStore } from "./shellStatus";
 
-/** Last streamed query result — Glide grid binds here. */
+/** Last streamed / browsed result — Glide grid binds here. */
 export const useQueryResultStore = defineStore("queryResult", () => {
   const columns = ref<string[]>([]);
   const rows = ref<unknown[][]>([]);
@@ -21,33 +22,65 @@ export const useQueryResultStore = defineStore("queryResult", () => {
   const affectedRows = ref<number | null>(null);
   const error = ref<string | null>(null);
 
-  function syncFrom(acc: AccumulatedQuery) {
-    columns.value = acc.columns;
-    rows.value = acc.rows;
-    truncated.value = acc.truncated;
-    rowCount.value = acc.rowCount;
-    elapsedMs.value = acc.elapsedMs;
-    affectedRows.value = acc.affectedRows;
-    error.value = acc.error;
+  let acc = emptyAccumulatedQuery();
+
+  function syncFrom(next: AccumulatedQuery) {
+    columns.value = next.columns;
+    rows.value = next.rows;
+    truncated.value = next.truncated;
+    rowCount.value = next.rowCount;
+    elapsedMs.value = next.elapsedMs;
+    affectedRows.value = next.affectedRows;
+    error.value = next.error;
   }
 
   function reset() {
-    syncFrom(emptyAccumulatedQuery());
+    acc = emptyAccumulatedQuery();
+    syncFrom(acc);
   }
 
-  let acc = emptyAccumulatedQuery();
-
-  function onEvent(ev: QueryEvent) {
+  function feedEvent(ev: QueryEvent) {
     acc = applyQueryEvent(acc, ev);
     syncFrom(acc);
   }
 
+  function setSnapshot(opts: {
+    columns: string[];
+    rows: unknown[][];
+    message?: string;
+  }) {
+    acc = {
+      ...emptyAccumulatedQuery(),
+      columns: opts.columns,
+      rows: opts.rows,
+      rowCount: opts.rows.length,
+      elapsedMs: 0,
+    };
+    syncFrom(acc);
+    if (opts.message) {
+      useShellStatusStore().setQueryMetrics({
+        message: opts.message,
+        busy: false,
+        rows: opts.rows.length,
+        cols: opts.columns.length,
+        durationMs: 0,
+      });
+    }
+  }
+
   async function run(sql: string) {
     const connections = useConnectionsStore();
+    const nav = useShellNavStore();
     const status = useShellStatusStore();
-    const id = connections.activeId;
-    if (!id) {
+    const id = nav.selectedConnectionId;
+    const conn = id ? connections.byId.get(id) : null;
+    if (!id || !conn) {
       error.value = "No active connection";
+      status.setQueryMetrics({ message: error.value, busy: false });
+      return;
+    }
+    if (conn.mock) {
+      error.value = "Demo connection — open a table from the sidebar for Data";
       status.setQueryMetrics({ message: error.value, busy: false });
       return;
     }
@@ -59,11 +92,10 @@ export const useQueryResultStore = defineStore("queryResult", () => {
     }
 
     reset();
-    acc = emptyAccumulatedQuery();
     running.value = true;
     status.setQueryMetrics({ message: "Running…", busy: true });
     try {
-      await dbExecuteQuery(id, trimmed, onEvent);
+      await dbExecuteQuery(id, trimmed, feedEvent);
       if (error.value) {
         status.setQueryMetrics({ message: error.value, busy: false });
       } else if (affectedRows.value != null && columns.value.length === 0) {
@@ -103,6 +135,8 @@ export const useQueryResultStore = defineStore("queryResult", () => {
     affectedRows,
     error,
     reset,
+    feedEvent,
+    setSnapshot,
     run,
   };
 });
