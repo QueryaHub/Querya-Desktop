@@ -1,6 +1,6 @@
 use crate::connection::{
     ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager, ConnectionRegistry,
-    QueryEvent, SchemaObject, TableSchema,
+    SchemaObject, TableSchema,
 };
 use tauri::ipc::Channel;
 use tauri::State;
@@ -51,35 +51,20 @@ pub fn db_list_columns(
     registry.with_sqlite(&id, |s| s.list_columns(&table))
 }
 
-/// Execute SQL and stream `QueryEvent` batches over `on_event` (not one giant IPC payload).
+/// Execute SQL and stream `QueryEvent` batches over `on_event`.
+/// Failures return as the invoke `Err` only (no dual channel `Error` event).
 #[tauri::command]
 pub fn db_execute_query(
     id: ConnectionId,
     sql: String,
     limit: Option<u32>,
-    on_event: Channel<QueryEvent>,
+    on_event: Channel<crate::connection::QueryEvent>,
     registry: State<'_, ConnectionRegistry>,
 ) -> Result<(), ConnectionError> {
-    let conn_arc = registry.sqlite_connection_arc(&id)?;
-    let guard = conn_arc
-        .lock()
-        .map_err(|_| ConnectionError::io("sqlite connection lock poisoned"))?;
-    let conn = guard
-        .as_ref()
-        .ok_or_else(|| ConnectionError::Disconnected { id: id.clone() })?;
-
     let limit = limit.map(|n| n as usize);
-    match crate::connection::sqlite_query::execute_streaming(conn, &sql, limit, None, |ev| {
+    registry.execute_sqlite_query(&id, &sql, limit, |ev| {
         on_event
             .send(ev)
             .map_err(|e| ConnectionError::io(format!("query channel closed: {e}")))
-    }) {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            let _ = on_event.send(QueryEvent::Error {
-                message: e.to_string(),
-            });
-            Err(e)
-        }
-    }
+    })
 }

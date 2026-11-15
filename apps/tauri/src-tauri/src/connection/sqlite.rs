@@ -10,18 +10,15 @@ use std::sync::{Arc, Mutex};
 
 pub struct SqliteSession {
     id: ConnectionId,
+    /// On-disk path used to open this session (for diagnostics / UI).
     path: String,
-    /// Shared so query streaming can drop the registry lock.
+    /// Shared so query streaming can hold the session Arc without the registry lock.
     conn: Arc<Mutex<Option<Connection>>>,
 }
 
 impl SqliteSession {
     pub fn path(&self) -> &str {
         &self.path
-    }
-
-    pub fn connection_arc(&self) -> Arc<Mutex<Option<Connection>>> {
-        Arc::clone(&self.conn)
     }
 
     pub fn with_connection<T>(
@@ -76,14 +73,13 @@ impl ConnectionSession for SqliteSession {
         DriverKind::Sqlite
     }
 
-    fn disconnect(&mut self) -> ConnectionResult<()> {
+    fn disconnect(&self) -> ConnectionResult<()> {
         let mut guard = self
             .conn
             .lock()
             .map_err(|_| ConnectionError::io("sqlite connection lock poisoned"))?;
         if let Some(conn) = guard.take() {
-            conn.close()
-                .map_err(|(_, e)| ConnectionError::driver(DriverKind::Sqlite, e.to_string()))?;
+            conn.close().map_err(|(_, e)| ConnectionError::from(e))?;
         }
         Ok(())
     }
@@ -94,7 +90,7 @@ impl ConnectionSession for SqliteSession {
 }
 
 /// Open a SQLite database file and return a live session.
-pub fn open_sqlite(path: impl AsRef<str>) -> ConnectionResult<Box<dyn ConnectionSession>> {
+pub fn open_sqlite(path: impl AsRef<str>) -> ConnectionResult<SqliteSession> {
     let path = path.as_ref().trim();
     if path.is_empty() {
         return Err(ConnectionError::invalid_config("sqlite path is empty"));
@@ -110,17 +106,14 @@ pub fn open_sqlite(path: impl AsRef<str>) -> ConnectionResult<Box<dyn Connection
         }
     }
 
-    let conn = Connection::open(path)
-        .map_err(|e| ConnectionError::driver(DriverKind::Sqlite, e.to_string()))?;
+    let conn = Connection::open(path)?;
+    conn.query_row("SELECT 1", [], |_| Ok(()))?;
 
-    conn.query_row("SELECT 1", [], |_| Ok(()))
-        .map_err(|e| ConnectionError::driver(DriverKind::Sqlite, e.to_string()))?;
-
-    Ok(Box::new(SqliteSession {
+    Ok(SqliteSession {
         id: ConnectionId::new(),
         path: path.to_owned(),
         conn: Arc::new(Mutex::new(Some(conn))),
-    }))
+    })
 }
 
 #[cfg(test)]
@@ -141,8 +134,9 @@ mod tests {
     fn open_and_disconnect_temp_db() {
         let path = temp_db();
         let path_str = path.to_string_lossy().to_string();
-        let mut session = open_sqlite(&path_str).expect("open");
+        let session = open_sqlite(&path_str).expect("open");
         assert_eq!(session.driver(), DriverKind::Sqlite);
+        assert_eq!(session.path(), path_str);
         session.disconnect().expect("disconnect");
         let _ = std::fs::remove_file(&path);
     }

@@ -1,7 +1,6 @@
 //! SQLite execute + batched row streaming (rusqlite).
 
 use super::error::{ConnectionError, ConnectionResult};
-use super::id::DriverKind;
 use super::query::QueryEvent;
 use rusqlite::{types::ValueRef, Connection, Statement};
 use std::time::Instant;
@@ -26,17 +25,12 @@ pub fn execute_streaming(
     let batch_size = batch_size.unwrap_or(DEFAULT_BATCH).max(1);
     let started = Instant::now();
 
-    let mut stmt = conn
-        .prepare(sql)
-        .map_err(|e| ConnectionError::driver(DriverKind::Sqlite, e.to_string()))?;
+    let mut stmt = conn.prepare(sql)?;
 
     let col_count = stmt.column_count();
     if col_count == 0 {
         // Non-SELECT (DDL/DML): execute and report changes.
-        let affected = stmt
-            .execute([])
-            .map_err(|e| ConnectionError::driver(DriverKind::Sqlite, e.to_string()))?
-            as u64;
+        let affected = stmt.execute([])? as u64;
         emit(QueryEvent::Done {
             row_count: 0,
             truncated: false,
@@ -62,9 +56,7 @@ fn stream_rows(
     started: Instant,
     emit: &mut impl FnMut(QueryEvent) -> ConnectionResult<()>,
 ) -> ConnectionResult<()> {
-    let mut rows = stmt
-        .query([])
-        .map_err(|e| ConnectionError::driver(DriverKind::Sqlite, e.to_string()))?;
+    let mut rows = stmt.query([])?;
 
     let mut batch: Vec<Vec<serde_json::Value>> = Vec::with_capacity(batch_size);
     let mut offset: u64 = 0;
@@ -80,16 +72,12 @@ fn stream_rows(
         let row = match rows.next() {
             Ok(Some(r)) => r,
             Ok(None) => break,
-            Err(e) => {
-                return Err(ConnectionError::driver(DriverKind::Sqlite, e.to_string()));
-            }
+            Err(e) => return Err(e.into()),
         };
 
         let mut cells = Vec::with_capacity(col_count);
         for i in 0..col_count {
-            let v = row
-                .get_ref(i)
-                .map_err(|e| ConnectionError::driver(DriverKind::Sqlite, e.to_string()))?;
+            let v = row.get_ref(i)?;
             cells.push(value_ref_to_json(v));
         }
         batch.push(cells);
@@ -107,13 +95,10 @@ fn stream_rows(
     }
 
     if !batch.is_empty() {
-        let n = batch.len() as u64;
         emit(QueryEvent::Rows {
             rows: batch,
             offset,
         })?;
-        offset += n;
-        let _ = offset;
     }
 
     emit(QueryEvent::Done {
@@ -253,5 +238,22 @@ mod tests {
                 assert!(rows.len() <= 3);
             }
         }
+    }
+
+    #[test]
+    fn empty_sql_is_invalid_config() {
+        let conn = Connection::open_in_memory().unwrap();
+        let err = execute_streaming(&conn, "   ", None, None, |_| Ok(())).unwrap_err();
+        assert!(matches!(err, ConnectionError::InvalidConfig { .. }));
+    }
+
+    #[test]
+    fn emit_failure_propagates() {
+        let conn = seed_nums();
+        let err = execute_streaming(&conn, "SELECT n FROM nums", Some(2), Some(1), |_| {
+            Err(ConnectionError::io("channel closed"))
+        })
+        .unwrap_err();
+        assert!(matches!(err, ConnectionError::Io { .. }));
     }
 }

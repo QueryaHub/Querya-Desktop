@@ -56,6 +56,12 @@ impl fmt::Display for ConnectionError {
 
 impl std::error::Error for ConnectionError {}
 
+impl From<rusqlite::Error> for ConnectionError {
+    fn from(value: rusqlite::Error) -> Self {
+        Self::driver(DriverKind::Sqlite, value.to_string())
+    }
+}
+
 /// IPC-friendly result alias.
 pub type ConnectionResult<T> = Result<T, ConnectionError>;
 
@@ -78,5 +84,17 @@ mod tests {
     fn display_driver() {
         let err = ConnectionError::driver(DriverKind::Sqlite, "no such table");
         assert_eq!(err.to_string(), "sqlite error: no such table");
+    }
+
+    #[test]
+    fn from_rusqlite() {
+        let err: ConnectionError = rusqlite::Error::InvalidQuery.into();
+        assert!(matches!(
+            err,
+            ConnectionError::Driver {
+                driver: DriverKind::Sqlite,
+                ..
+            }
+        ));
     }
 }

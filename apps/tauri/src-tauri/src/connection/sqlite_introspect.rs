@@ -18,7 +18,7 @@ pub fn list_tables(conn: &Connection) -> ConnectionResult<Vec<SchemaObject>> {
              WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' \
              ORDER BY type ASC, name ASC",
         )
-        .map_err(|e| ConnectionError::driver(DriverKind::Sqlite, e.to_string()))?;
+        ?;
 
     let rows = stmt
         .query_map([], |row| {
@@ -26,12 +26,12 @@ pub fn list_tables(conn: &Connection) -> ConnectionResult<Vec<SchemaObject>> {
             let type_str: String = row.get(1)?;
             Ok((name, type_str))
         })
-        .map_err(|e| ConnectionError::driver(DriverKind::Sqlite, e.to_string()))?;
+        ?;
 
     let mut out = Vec::new();
     for row in rows {
         let (name, type_str) =
-            row.map_err(|e| ConnectionError::driver(DriverKind::Sqlite, e.to_string()))?;
+            row?;
         let kind = match type_str.as_str() {
             "view" => SchemaObjectKind::View,
             _ => SchemaObjectKind::Table,
@@ -60,7 +60,7 @@ pub fn list_columns(conn: &Connection, table: &str) -> ConnectionResult<TableSch
     let sql = format!("PRAGMA table_info({})", quote_ident(table));
     let mut stmt = conn
         .prepare(&sql)
-        .map_err(|e| ConnectionError::driver(DriverKind::Sqlite, e.to_string()))?;
+        ?;
 
     let rows = stmt
         .query_map([], |row| {
@@ -71,13 +71,13 @@ pub fn list_columns(conn: &Connection, table: &str) -> ConnectionResult<TableSch
             let pk: i32 = row.get(5)?;
             Ok((name, data_type, notnull, dflt, pk))
         })
-        .map_err(|e| ConnectionError::driver(DriverKind::Sqlite, e.to_string()))?;
+        ?;
 
     let mut columns = Vec::new();
     let mut primary_keys = Vec::new();
     for row in rows {
         let (name, data_type, notnull, dflt, pk) =
-            row.map_err(|e| ConnectionError::driver(DriverKind::Sqlite, e.to_string()))?;
+            row?;
         let is_pk = pk > 0;
         if is_pk {
             primary_keys.push(name.clone());
