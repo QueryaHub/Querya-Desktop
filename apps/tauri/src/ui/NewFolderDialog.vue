@@ -46,7 +46,7 @@ function onKey(e: KeyboardEvent) {
 <template>
   <div
     v-if="open"
-    class="overlay"
+    class="overlay q-modal-scrim"
     data-testid="new-folder-dialog"
     @click.self="emit('close')"
     @keydown="onKey"
@@ -80,7 +80,6 @@ function onKey(e: KeyboardEvent) {
   z-index: 2100;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, #000 40%, transparent);
 }
 
 .dialog {

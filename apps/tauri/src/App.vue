@@ -74,6 +74,8 @@ function onNewConnection() {
 }
 
 async function onConnectSqliteFromDialog(payload: SqliteConnectPayload) {
+  // Close first — connect is async and must not leave the modal stuck open.
+  newConnectionOpen.value = false;
   try {
     await connections.connectSqlite(payload.path, { name: payload.name });
   } catch {

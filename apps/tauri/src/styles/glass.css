@@ -69,3 +69,36 @@
 .q-glass--strong {
   background: var(--q-glass-bg-strong);
 }
+
+/**
+ * Frosted modal scrim (Flutter `app_dialog` bokeh): constant blur sigma ≈ 8
+ * + dim tint. Tint only fades; blur stays fixed so enter/exit stay cheap (#1341).
+ */
+:root {
+  --q-modal-scrim-blur: 8px;
+  --q-modal-scrim-tint: color-mix(in srgb, #000 32%, transparent);
+}
+
+:root[data-platform="linux"],
+:root[data-platform="windows"] {
+  --q-modal-scrim-blur: 6px;
+}
+
+:root[data-motion="off"],
+:root[data-motion="reduced"] {
+  --q-modal-scrim-blur: 0px;
+  --q-modal-scrim-tint: color-mix(in srgb, #000 45%, transparent);
+}
+
+.q-modal-scrim {
+  background: var(--q-modal-scrim-tint);
+}
+
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .q-modal-scrim {
+    -webkit-backdrop-filter: blur(var(--q-modal-scrim-blur))
+      saturate(var(--q-glass-saturate));
+    backdrop-filter: blur(var(--q-modal-scrim-blur))
+      saturate(var(--q-glass-saturate));
+  }
+}
