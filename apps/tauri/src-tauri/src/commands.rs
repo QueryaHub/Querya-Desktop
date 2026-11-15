@@ -914,3 +914,27 @@ pub fn db_apply_staging(
 ) -> Result<ApplyResult, ConnectionError> {
     apply_staging_request(&registry, request)
 }
+
+/// Open a local SSH forward (`ssh -L`) for SQL drivers behind a bastion (#1894).
+#[tauri::command]
+pub fn ssh_tunnel_open(
+    request: crate::ssh_tunnel::SshTunnelOpenRequest,
+    tunnels: State<'_, crate::ssh_tunnel::SshTunnelRegistry>,
+) -> Result<crate::ssh_tunnel::SshTunnelInfo, crate::ssh_tunnel::SshTunnelError> {
+    tunnels.open(request)
+}
+
+#[tauri::command]
+pub fn ssh_tunnel_close(
+    id: String,
+    tunnels: State<'_, crate::ssh_tunnel::SshTunnelRegistry>,
+) -> Result<bool, crate::ssh_tunnel::SshTunnelError> {
+    tunnels.close(&id)
+}
+
+#[tauri::command]
+pub fn ssh_tunnel_list(
+    tunnels: State<'_, crate::ssh_tunnel::SshTunnelRegistry>,
+) -> Result<Vec<crate::ssh_tunnel::SshTunnelInfo>, crate::ssh_tunnel::SshTunnelError> {
+    tunnels.list()
+}
