@@ -27,6 +27,20 @@ pub struct ConnectPostgresRequest {
 /// Same shape as Postgres — separate type so Tauri command names stay clear.
 pub type ConnectMysqlRequest = ConnectPostgresRequest;
 
+/// Redis save+connect args (`database` is the logical DB index as a string).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectRedisRequest {
+    pub name: String,
+    pub host: String,
+    pub port: u16,
+    pub database: Option<String>,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub folder_id: Option<String>,
+    pub id: Option<String>,
+}
+
 #[tauri::command]
 pub fn db_connect_sqlite(
     path: String,
@@ -420,6 +434,110 @@ pub fn profiles_connect_mysql(
             database,
             user,
             password,
+            id: Some(profile.id.clone()),
+        })?;
+    }
+    Ok(profile)
+}
+
+/// Save Redis profile metadata (no password) and open a live session.
+#[tauri::command]
+pub fn profiles_connect_redis(
+    request: ConnectRedisRequest,
+    store: State<'_, ProfileStore>,
+    secrets: State<'_, SharedSecretStore>,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<ConnectionProfile, ConnectionError> {
+    let ConnectRedisRequest {
+        name,
+        host,
+        port,
+        database,
+        username,
+        password,
+        folder_id,
+        id,
+    } = request;
+
+    let db: u8 = database
+        .as_deref()
+        .unwrap_or("0")
+        .trim()
+        .parse()
+        .unwrap_or(0);
+    let user = username
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned);
+
+    let display_name = {
+        let t = name.trim();
+        if t.is_empty() {
+            format!("{host}:{port}/{db}")
+        } else {
+            t.to_owned()
+        }
+    };
+
+    let mut profile = match id.filter(|s| !s.trim().is_empty()) {
+        Some(existing_id) => store
+            .get(&existing_id)
+            .map_err(|e| ConnectionError::io(e.to_string()))?
+            .map(|mut p| {
+                p.name = display_name.clone();
+                p.host = Some(host.clone());
+                p.port = Some(i64::from(port));
+                p.database_name = Some(db.to_string());
+                p.username = user.clone();
+                p.folder_id = folder_id.clone();
+                p.driver = "redis".into();
+                p.path = None;
+                p
+            })
+            .unwrap_or_else(|| {
+                let mut p = ConnectionProfile::new_redis(
+                    display_name.clone(),
+                    host.clone(),
+                    port,
+                    db,
+                    user.clone(),
+                );
+                p.id = existing_id;
+                p.folder_id = folder_id.clone();
+                p
+            }),
+        None => {
+            let mut p =
+                ConnectionProfile::new_redis(display_name, host.clone(), port, db, user.clone());
+            p.folder_id = folder_id;
+            p
+        }
+    };
+    profile.touch();
+    store
+        .upsert(&profile)
+        .map_err(|e| ConnectionError::io(e.to_string()))?;
+
+    let password = match password {
+        Some(p) => {
+            secrets
+                .set_password(&profile.id, &p)
+                .map_err(|e| ConnectionError::io(format!("keyring write: {e}")))?;
+            Some(p)
+        }
+        None => secrets
+            .get_password(&profile.id)
+            .map_err(|e| ConnectionError::io(format!("keyring read: {e}")))?,
+    };
+
+    if !registry.is_connected(&ConnectionId::from(profile.id.as_str())) {
+        registry.connect(ConnectionConfig::Redis {
+            host,
+            port,
+            password,
+            username: user,
+            db: Some(db),
             id: Some(profile.id.clone()),
         })?;
     }

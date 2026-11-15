@@ -23,8 +23,9 @@ use commands::{
     db_apply_staging, db_connect_mysql, db_connect_postgres, db_connect_redis, db_connect_sqlite,
     db_describe_object, db_disconnect, db_erd_schema, db_execute_query, db_is_connected,
     db_list_children, db_list_columns, db_list_schemas, db_list_tables, db_postgres_object_detail,
-    db_sqlite_overview, profiles_connect_mysql, profiles_connect_postgres, profiles_connect_sqlite,
-    profiles_delete, profiles_list, profiles_upsert, redis_get, redis_ping, redis_scan, redis_set,
+    db_sqlite_overview, profiles_connect_mysql, profiles_connect_postgres, profiles_connect_redis,
+    profiles_connect_sqlite, profiles_delete, profiles_list, profiles_upsert, redis_get, redis_ping,
+    redis_scan, redis_set,
 };
 
 #[tauri::command]
@@ -118,6 +119,7 @@ pub fn run() {
             profiles_connect_sqlite,
             profiles_connect_postgres,
             profiles_connect_mysql,
+            profiles_connect_redis,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

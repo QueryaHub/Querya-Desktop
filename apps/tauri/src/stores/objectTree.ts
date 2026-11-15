@@ -109,11 +109,16 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
     return Boolean(useConnectionsStore().byId.get(id)?.mock);
   }
 
+  function isRedis(id: string): boolean {
+    return useConnectionsStore().byId.get(id)?.driver === "redis";
+  }
+
   async function fetchChildren(
     connId: string,
     parentId: string | null,
   ): Promise<SqlObjectNode[]> {
     if (isMock(connId)) return demoListChildren(parentId);
+    if (isRedis(connId)) return [];
     return dbListChildren(connId, parentId);
   }
 
@@ -139,6 +144,12 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
     st.error = null;
     try {
       await useConnectionsStore().ensureConnected(connId);
+      // Redis uses RedisBrowserView — no SQL object tree.
+      if (isRedis(connId)) {
+        st.roots = [];
+        st.loaded = true;
+        return;
+      }
       st.roots = toUi(await fetchChildren(connId, null));
       const [only] = st.roots;
       if (st.roots.length === 1 && only?.expandable) {

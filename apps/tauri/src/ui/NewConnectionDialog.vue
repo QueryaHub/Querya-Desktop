@@ -39,6 +39,16 @@ export type MysqlConnectPayload = {
   password: string;
 };
 
+export type RedisConnectPayload = {
+  driver: "redis";
+  name: string;
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+};
+
 type Category = "all" | "sql" | "nosql";
 
 type DriverChoice = {
@@ -94,13 +104,14 @@ const emit = defineEmits<{
   connectSqlite: [payload: SqliteConnectPayload];
   connectPostgres: [payload: PostgresConnectPayload];
   connectMysql: [payload: MysqlConnectPayload];
+  connectRedis: [payload: RedisConnectPayload];
 }>();
 
 function dismiss() {
   open.value = false;
 }
 
-type Step = "pick" | "sqlite" | "postgres" | "mysql" | "stub";
+type Step = "pick" | "sqlite" | "postgres" | "mysql" | "redis" | "stub";
 
 const step = ref<Step>("pick");
 const category = ref<Category>("all");
@@ -157,6 +168,17 @@ const canSavePostgres = computed(() => {
 });
 
 const canSaveMysql = canSavePostgres;
+
+const canSaveRedis = computed(() => {
+  const p = Number(port.value);
+  return (
+    name.value.trim().length > 0 &&
+    host.value.trim().length > 0 &&
+    Number.isFinite(p) &&
+    p > 0 &&
+    p <= 65535
+  );
+});
 
 function reset() {
   step.value = "pick";
@@ -225,6 +247,17 @@ function goNext() {
     port.value = "3306";
     database.value = "mysql";
     user.value = "root";
+    password.value = "";
+    void nextTick(() => nameEl.value?.focus());
+    return;
+  }
+  if (choice.id === "redis") {
+    step.value = "redis";
+    if (!name.value.trim()) name.value = "redis";
+    host.value = host.value.trim() || "127.0.0.1";
+    port.value = "6379";
+    database.value = "0";
+    user.value = "";
     password.value = "";
     void nextTick(() => nameEl.value?.focus());
     return;
@@ -306,6 +339,32 @@ function submitPostgres() {
   });
 }
 
+function submitRedis() {
+  error.value = null;
+  const n = name.value.trim();
+  const h = host.value.trim();
+  const p = Number(port.value);
+  const db = database.value.trim() || "0";
+  if (!n) {
+    error.value = "Connection name is required.";
+    return;
+  }
+  if (!h || !Number.isFinite(p) || p <= 0 || p > 65535) {
+    error.value = "Host and port are required.";
+    return;
+  }
+  dismiss();
+  emit("connectRedis", {
+    driver: "redis",
+    name: n,
+    host: h,
+    port: p,
+    database: db,
+    username: user.value.trim(),
+    password: password.value,
+  });
+}
+
 function submitMysql() {
   error.value = null;
   const n = name.value.trim();
@@ -347,6 +406,7 @@ function onKey(e: KeyboardEvent) {
     else if (step.value === "postgres" && canSavePostgres.value)
       submitPostgres();
     else if (step.value === "mysql" && canSaveMysql.value) submitMysql();
+    else if (step.value === "redis" && canSaveRedis.value) submitRedis();
   }
 }
 
@@ -698,7 +758,74 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
       </footer>
     </div>
 
-    <!-- Step 2d: stub for drivers without Tauri adapter yet -->
+    <!-- Step 2d: Redis -->
+    <div
+      v-else-if="step === 'redis'"
+      class="dialog form"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ncd-redis-title"
+    >
+      <header class="hdr form-hdr">
+        <h2 id="ncd-redis-title">New Redis Connection</h2>
+        <p class="sub">Connect to a Redis server (SCAN / GET / SET).</p>
+      </header>
+      <div class="body form-body">
+        <label>
+          Name
+          <input ref="nameEl" v-model="name" type="text" autocomplete="off" />
+        </label>
+        <label>
+          Host
+          <input v-model="host" type="text" autocomplete="off" />
+        </label>
+        <label>
+          Port
+          <input v-model="port" type="number" min="1" max="65535" />
+        </label>
+        <label>
+          Database
+          <input v-model="database" type="number" min="0" max="255" />
+        </label>
+        <label>
+          Username
+          <input
+            v-model="user"
+            type="text"
+            autocomplete="username"
+            placeholder="optional (ACL)"
+          />
+        </label>
+        <label>
+          Password
+          <input
+            v-model="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="optional"
+          />
+        </label>
+        <p v-if="error" class="err">{{ error }}</p>
+      </div>
+      <footer>
+        <QueryaButton variant="ghost" size="lg" @click="goBack">
+          Back
+        </QueryaButton>
+        <QueryaButton variant="ghost" size="lg" @click="dismiss">
+          Cancel
+        </QueryaButton>
+        <QueryaButton
+          variant="primary"
+          size="lg"
+          :disabled="!canSaveRedis"
+          @click="submitRedis"
+        >
+          Save
+        </QueryaButton>
+      </footer>
+    </div>
+
+    <!-- Step 2e: stub for drivers without Tauri adapter yet -->
     <div
       v-else-if="step === 'stub'"
       class="dialog form"

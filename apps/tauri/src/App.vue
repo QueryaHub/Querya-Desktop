@@ -29,6 +29,7 @@ import NewFolderDialog from "./ui/NewFolderDialog.vue";
 import NewConnectionDialog, {
   type MysqlConnectPayload,
   type PostgresConnectPayload,
+  type RedisConnectPayload,
   type SqliteConnectPayload,
 } from "./ui/NewConnectionDialog.vue";
 
@@ -109,6 +110,21 @@ async function onConnectMysqlFromDialog(payload: MysqlConnectPayload) {
       database: payload.database,
       user: payload.user,
       password: payload.password,
+    });
+  } catch {
+    // status already set in store
+  }
+}
+
+async function onConnectRedisFromDialog(payload: RedisConnectPayload) {
+  try {
+    await connections.connectRedis({
+      name: payload.name,
+      host: payload.host,
+      port: payload.port,
+      database: payload.database,
+      username: payload.username || null,
+      password: payload.password || null,
     });
   } catch {
     // status already set in store
@@ -300,6 +316,7 @@ onUnmounted(() => {
       @connect-sqlite="onConnectSqliteFromDialog"
       @connect-postgres="onConnectPostgresFromDialog"
       @connect-mysql="onConnectMysqlFromDialog"
+      @connect-redis="onConnectRedisFromDialog"
     />
   </div>
 </template>

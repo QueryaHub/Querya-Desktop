@@ -11,6 +11,7 @@ import { useShellNavStore } from "../stores/shellNav";
 import { useObjectTreeStore } from "../stores/objectTree";
 import QueryaButton from "./QueryaButton.vue";
 import SqlWorkspace from "./SqlWorkspace.vue";
+import RedisBrowserView from "./RedisBrowserView.vue";
 import { QueryaIcon } from "./icons";
 import ErdView from "./erd/ErdView.vue";
 
@@ -99,6 +100,7 @@ async function loadOverview() {
 }
 
 const isSqlite = computed(() => conn.value?.driver === "sqlite");
+const isRedis = computed(() => conn.value?.driver === "redis");
 const isServerSql = computed(
   () =>
     conn.value?.driver === "postgres" || conn.value?.driver === "mysql",
@@ -108,14 +110,17 @@ const driverLabel = computed(() => {
   if (d === "sqlite") return "SQLite";
   if (d === "postgres") return "PostgreSQL";
   if (d === "mysql") return "MySQL";
+  if (d === "redis") return "Redis";
   return d ?? "";
 });
 const endpointLabel = computed(() => {
   const c = conn.value;
   if (!c) return "";
   if (c.driver === "sqlite") return c.path ?? "";
-  const port = c.port ?? (c.driver === "mysql" ? 3306 : 5432);
-  return `${c.host ?? "localhost"}:${port}/${c.database ?? ""}`;
+  const port =
+    c.port ??
+    (c.driver === "mysql" ? 3306 : c.driver === "redis" ? 6379 : 5432);
+  return `${c.host ?? "localhost"}:${port}/${c.database ?? (c.driver === "redis" ? "0" : "")}`;
 });
 
 watch(
@@ -146,7 +151,27 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
 
 <template>
   <div v-if="conn" class="home" data-testid="connection-home">
-    <div class="strip" role="tablist" aria-label="Connection workspace">
+    <div
+      v-if="isRedis"
+      class="redis-host"
+      data-testid="redis-workspace"
+    >
+      <header class="redis-head">
+        <h1>{{ conn.name }}</h1>
+        <span class="driver-pill">Redis</span>
+        <p class="path">{{ endpointLabel }}</p>
+      </header>
+      <div class="redis-body">
+        <RedisBrowserView />
+      </div>
+    </div>
+
+    <div
+      v-else
+      class="strip"
+      role="tablist"
+      aria-label="Connection workspace"
+    >
       <button
         type="button"
         role="tab"
@@ -183,7 +208,7 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
     </div>
 
     <div
-      v-if="homeTab === 'overview'"
+      v-if="!isRedis && homeTab === 'overview'"
       class="overview"
       data-testid="home-overview"
     >
@@ -328,11 +353,19 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
       </section>
     </div>
 
-    <div v-else-if="homeTab === 'sql'" class="sql-park" data-testid="home-sql">
+    <div
+      v-else-if="!isRedis && homeTab === 'sql'"
+      class="sql-park"
+      data-testid="home-sql"
+    >
       <SqlWorkspace />
     </div>
 
-    <div v-else class="erd-park" data-testid="home-erd">
+    <div
+      v-else-if="!isRedis"
+      class="erd-park"
+      data-testid="home-erd"
+    >
       <ErdView
         :connection-id="conn.id"
         :mock="!!conn.mock"
@@ -347,6 +380,46 @@ function openRelation(o: { id: string; name: string; kind: string; schema?: stri
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.redis-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.redis-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid
+    color-mix(
+      in srgb,
+      var(--q-border) calc(var(--q-hairline-alpha) * 100%),
+      transparent
+    );
+  background: var(--q-sidebar-bg);
+}
+
+.redis-head h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.redis-head .path {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12px;
+  color: var(--q-muted-foreground);
+}
+
+.redis-body {
+  flex: 1;
+  min-height: 0;
 }
 
 .strip {
