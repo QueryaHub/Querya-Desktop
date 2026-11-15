@@ -1,0 +1,32 @@
+/**
+ * Fluid Motion CSS hooks. `data-motion` on <html> is set by provideQueryaMotion.
+ * Components should prefer the composable for JS; use these vars for CSS transitions.
+ */
+
+:root,
+:root[data-motion="full"] {
+  --q-motion-fast: 120ms;
+  --q-motion-standard: 200ms;
+  --q-motion-slow: 320ms;
+  --q-motion-sidebar: 160ms;
+  --q-motion-ease: cubic-bezier(0.65, 0, 0.35, 1);
+  --q-motion-ease-enter: cubic-bezier(0.33, 1, 0.68, 1);
+  --q-motion-ease-exit: cubic-bezier(0.32, 0, 0.67, 0);
+}
+
+:root[data-motion="reduced"] {
+  --q-motion-fast: 60ms;
+  --q-motion-standard: 100ms;
+  --q-motion-slow: 160ms;
+  --q-motion-sidebar: 80ms;
+}
+
+:root[data-motion="off"] {
+  --q-motion-fast: 0ms;
+  --q-motion-standard: 0ms;
+  --q-motion-slow: 0ms;
+  --q-motion-sidebar: 0ms;
+  --q-motion-ease: linear;
+  --q-motion-ease-enter: linear;
+  --q-motion-ease-exit: linear;
+}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useShellStore } from "./stores/shell";
 import {
@@ -7,10 +7,17 @@ import {
   initTheme,
   type QueryaThemeMode,
 } from "./theme/queryaTheme";
+import {
+  provideQueryaMotion,
+  type QueryaMotionLevel,
+} from "./motion";
 
 const shell = useShellStore();
+const motion = provideQueryaMotion();
+const { level: motionLevel, springsOn } = motion;
 const backend = ref<string>("…");
 const theme = ref<QueryaThemeMode>("system");
+const panelOpen = ref(false);
 
 const swatches = [
   { name: "bg", varName: "--q-background" },
@@ -20,6 +27,11 @@ const swatches = [
   { name: "border", varName: "--q-border" },
   { name: "destructive", varName: "--q-destructive" },
 ] as const;
+
+const panelStyle = computed(() => ({
+  transitionDuration: `${motion.duration("standard")}ms`,
+  transitionTimingFunction: motion.easing("enter"),
+}));
 
 onMounted(async () => {
   theme.value = initTheme();
@@ -39,13 +51,20 @@ function setTheme(mode: QueryaThemeMode) {
   theme.value = mode;
   applyTheme(mode);
 }
+
+function setMotion(level: QueryaMotionLevel) {
+  motion.setLevel(level);
+}
 </script>
 
 <template>
   <div class="shell">
     <header class="brand">Querya</header>
-    <p class="tagline">Tauri 2 + Vue 3 — Querya tokens (no shadcn)</p>
+    <p class="tagline">Tauri 2 + Vue 3 — tokens + Fluid Motion</p>
     <p class="meta" data-testid="backend-info">{{ backend }}</p>
+    <p class="meta">
+      springs: {{ springsOn ? "on" : "off" }} · level: {{ motionLevel }}
+    </p>
 
     <div class="swatches" aria-label="Querya token swatches">
       <div v-for="s in swatches" :key="s.name" class="swatch">
@@ -80,6 +99,43 @@ function setTheme(mode: QueryaThemeMode) {
         Dark
       </button>
     </div>
+
+    <div class="theme-row" role="group" aria-label="Motion">
+      <button
+        type="button"
+        class="btn"
+        :class="{ active: motionLevel === 'full' }"
+        @click="setMotion('full')"
+      >
+        Full
+      </button>
+      <button
+        type="button"
+        class="btn"
+        :class="{ active: motionLevel === 'reduced' }"
+        @click="setMotion('reduced')"
+      >
+        Reduced
+      </button>
+      <button
+        type="button"
+        class="btn"
+        :class="{ active: motionLevel === 'off' }"
+        @click="setMotion('off')"
+      >
+        Off
+      </button>
+    </div>
+
+    <button type="button" class="btn demo-toggle" @click="panelOpen = !panelOpen">
+      Toggle demo panel
+    </button>
+    <div
+      class="demo-panel"
+      :class="{ open: panelOpen }"
+      :style="panelStyle"
+      data-testid="motion-demo-panel"
+    />
   </div>
 </template>
 
@@ -88,6 +144,7 @@ function setTheme(mode: QueryaThemeMode) {
   min-height: 100%;
   display: grid;
   place-content: center;
+  justify-items: center;
   gap: var(--q-space-2);
   padding: var(--q-space-8);
   text-align: center;
@@ -107,7 +164,7 @@ function setTheme(mode: QueryaThemeMode) {
 }
 
 .meta {
-  margin: var(--q-space-3) 0 0;
+  margin: var(--q-space-1) 0 0;
   font-size: var(--q-text-sm);
   color: var(--q-muted-foreground);
   font-variant-numeric: tabular-nums;
@@ -144,7 +201,7 @@ function setTheme(mode: QueryaThemeMode) {
 .theme-row {
   display: inline-flex;
   gap: var(--q-space-2);
-  margin-top: var(--q-space-6);
+  margin-top: var(--q-space-4);
   padding: var(--q-space-1);
   border-radius: var(--q-radius-lg);
   background: var(--q-card);
@@ -171,5 +228,27 @@ function setTheme(mode: QueryaThemeMode) {
 .btn.active {
   color: var(--q-primary-foreground);
   background: var(--q-primary);
+}
+
+.demo-toggle {
+  margin-top: var(--q-space-4);
+  background: var(--q-secondary);
+  color: var(--q-secondary-foreground);
+  border: 1px solid var(--q-border);
+}
+
+.demo-panel {
+  width: 12rem;
+  height: 0;
+  margin-top: var(--q-space-3);
+  border-radius: var(--q-radius-md);
+  background: var(--q-primary);
+  opacity: 0.35;
+  transition-property: height, opacity;
+}
+
+.demo-panel.open {
+  height: 3rem;
+  opacity: 1;
 }
 </style>
