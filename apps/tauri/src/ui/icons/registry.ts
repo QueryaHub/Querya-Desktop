@@ -47,6 +47,8 @@ export const QUERYA_ICONS = {
   view: "view_week",
   /** Flutter `viewGroup` */
   viewGroup: "view_agenda",
+  /** Flutter `materializedViewGroup` */
+  materializedViewGroup: "dynamic_feed",
   /** Flutter `materializedViewLeaf` */
   materializedView: "layers",
   /** Flutter `functionLeaf` */

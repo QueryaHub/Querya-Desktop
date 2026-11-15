@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import QueryaIcon from "./QueryaIcon.vue";
+import { iconForDriver } from "./objectKind";
 import { connectionAsset, type QueryaIconName } from "./registry";
 
 const props = withDefaults(
@@ -19,25 +20,9 @@ const asset = computed(() =>
 );
 
 /** Flutter `QueryaIcons.connectionIcon` fallbacks when no PNG. */
-const fallback = computed<QueryaIconName>(() => {
-  if (props.mock) return "demo";
-  switch (props.driver) {
-    case "postgres":
-    case "postgresql":
-      return "database";
-    case "mysql":
-      return "tableGroup";
-    case "sqlite":
-      return "sqlite";
-    case "redis":
-      return "redis";
-    case "mongodb":
-    case "mongo":
-      return "mongo";
-    default:
-      return "extension";
-  }
-});
+const fallback = computed<QueryaIconName>(() =>
+  iconForDriver(props.driver, { mock: props.mock }),
+);
 
 const isMysql = computed(
   () => props.driver === "mysql" && !!asset.value && !broken.value,
@@ -66,9 +51,8 @@ const isMysql = computed(
   display: block;
 }
 
-/* Flutter DriverIcon: lift dark MySQL dolphin on dark surfaces (#1824). */
-:root[data-theme="dark"] .q-driver-icon.mysql,
-:root:not([data-theme="light"]) .q-driver-icon.mysql {
+/* Flutter DriverIcon #1824 — only when tokens are actually dark (tokens.css). */
+:root[data-theme="dark"] .q-driver-icon.mysql {
   filter: brightness(1.9) contrast(1.05);
 }
 

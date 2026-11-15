@@ -2,10 +2,11 @@ import type { SqlObjectKind } from "../../api/connection";
 import type { QueryaIconName } from "./registry";
 
 /** Folder display names → Flutter QueryaIcons group glyphs. */
+/** Keys must match Rust `SchemaFolderKind::label` / Flutter folder titles. */
 const FOLDER_ICONS: Record<string, QueryaIconName> = {
   Tables: "tableGroup",
   Views: "viewGroup",
-  "Materialized Views": "materializedView",
+  "Materialized views": "materializedViewGroup",
   Functions: "functionGroup",
   Sequences: "sequenceGroup",
   Indexes: "index",

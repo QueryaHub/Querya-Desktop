@@ -12,6 +12,9 @@ describe("iconForObjectNode", () => {
 
   it("maps named schema folders to Flutter group icons", () => {
     expect(iconForObjectNode("folder", "Tables")).toBe("tableGroup");
+    expect(iconForObjectNode("folder", "Materialized views")).toBe(
+      "materializedViewGroup",
+    );
     expect(iconForObjectNode("folder", "Triggers")).toBe("trigger");
     expect(iconForObjectNode("folder", "Other")).toBe("folder");
   });
