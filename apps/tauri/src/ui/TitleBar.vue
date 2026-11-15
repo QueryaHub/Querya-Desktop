@@ -9,6 +9,7 @@ import {
 } from "./platform";
 import { useQueryaMotion } from "../motion";
 import { useShellStore } from "../stores/shell";
+import TitleBarMenus from "./TitleBarMenus.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -16,6 +17,15 @@ const props = withDefaults(
   }>(),
   { title: "Querya" },
 );
+
+const emit = defineEmits<{
+  newConnection: [];
+  newConnectionFromUrl: [];
+  openSqlite: [];
+  openPreferences: [];
+  openTour: [];
+  launchDemo: [];
+}>();
 
 const motion = useQueryaMotion();
 const shell = useShellStore();
@@ -128,16 +138,24 @@ onUnmounted(() => {
         :aria-label="shell.sidebarOpen ? 'Hide sidebar' : 'Show sidebar'"
         @click="shell.toggleSidebar()"
       >
-        ☰
+        ▤
       </button>
-    </div>
-
-    <div class="region region--center" data-tauri-drag-region>
       <div class="brand" data-tauri-drag-region>
         <span class="mark" aria-hidden="true" />
         <span class="title">{{ props.title }}</span>
       </div>
+      <TitleBarMenus
+        @new-connection="emit('newConnection')"
+        @new-connection-from-url="emit('newConnectionFromUrl')"
+        @open-sqlite="emit('openSqlite')"
+        @open-preferences="emit('openPreferences')"
+        @toggle-sidebar="shell.toggleSidebar()"
+        @open-tour="emit('openTour')"
+        @launch-demo="emit('launchDemo')"
+      />
     </div>
+
+    <div class="region region--center" data-tauri-drag-region />
 
     <div class="region region--end" data-no-drag>
       <div v-if="!controlsOnLeft" class="controls controls--caption">
@@ -204,8 +222,9 @@ onUnmounted(() => {
 
 .region--start {
   justify-content: flex-start;
-  gap: var(--q-space-2);
+  gap: 6px;
   padding-left: var(--q-space-2);
+  overflow: visible;
 }
 
 .region--center {
@@ -240,11 +259,10 @@ onUnmounted(() => {
 .brand {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: var(--q-space-2);
   min-width: 0;
-  pointer-events: none;
-  padding: 0 var(--q-space-2);
+  padding: 0 4px 0 2px;
+  flex: 0 0 auto;
 }
 
 .mark {

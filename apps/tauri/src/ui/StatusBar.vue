@@ -5,6 +5,10 @@ import { useShellStore } from "../stores/shell";
 import { useShellStatusStore } from "../stores/shellStatus";
 import QueryaDivider from "./QueryaDivider.vue";
 
+const emit = defineEmits<{
+  openPreferences: [];
+}>();
+
 const shell = useShellStore();
 const status = useShellStatusStore();
 const {
@@ -65,6 +69,16 @@ const countsLabel = computed(() => {
     <div class="right">
       <span v-if="durationLabel" class="mono">{{ durationLabel }}</span>
       <span v-if="countsLabel" class="mono">{{ countsLabel }}</span>
+      <button
+        type="button"
+        class="icon-btn"
+        data-testid="status-preferences"
+        title="Preferences (Ctrl+,)"
+        aria-label="Preferences"
+        @click="emit('openPreferences')"
+      >
+        ⚙
+      </button>
     </div>
   </footer>
 </template>

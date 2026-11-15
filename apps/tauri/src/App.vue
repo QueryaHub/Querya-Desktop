@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { storeToRefs } from "pinia";
@@ -16,12 +16,14 @@ import WorkspaceEmptyHero from "./ui/WorkspaceEmptyHero.vue";
 import QueryaDivider from "./ui/QueryaDivider.vue";
 import ConnectionHome from "./ui/ConnectionHome.vue";
 import TableObjectView from "./ui/TableObjectView.vue";
+import PreferencesDialog from "./ui/PreferencesDialog.vue";
 
 const shell = useShellStore();
 const status = useShellStatusStore();
 const connections = useConnectionsStore();
 const nav = useShellNavStore();
 const { surface } = storeToRefs(nav);
+const prefsOpen = ref(false);
 provideQueryaMotion();
 
 const showEmpty = computed(() => surface.value === "empty");
@@ -53,6 +55,20 @@ function onNewConnection() {
   });
 }
 
+function onNewConnectionFromUrl() {
+  status.setQueryMetrics({
+    message: "New connection from URL — form lands next",
+    busy: false,
+  });
+}
+
+function onNewFolder() {
+  status.setQueryMetrics({
+    message: "New folder — LocalDb folders land next",
+    busy: false,
+  });
+}
+
 function onLaunchDemo() {
   connections.launchDemo();
 }
@@ -61,12 +77,24 @@ function onOpenTour() {
   status.setQueryMetrics({ message: "Tour stub", busy: false });
 }
 
+function onOpenPreferences() {
+  prefsOpen.value = true;
+}
+
 function onKeydown(e: KeyboardEvent) {
   const mod = e.metaKey || e.ctrlKey;
   if (!mod) return;
   if (e.key.toLowerCase() === "b") {
     e.preventDefault();
     shell.toggleSidebar();
+  }
+  if (e.key === ",") {
+    e.preventDefault();
+    onOpenPreferences();
+  }
+  if (e.key.toLowerCase() === "n") {
+    e.preventDefault();
+    onNewConnection();
   }
 }
 
@@ -97,12 +125,19 @@ onUnmounted(() => {
 
 <template>
   <div class="app-frame" data-testid="main-screen">
-    <TitleBar />
+    <TitleBar
+      @new-connection="onNewConnection"
+      @new-connection-from-url="onNewConnectionFromUrl"
+      @open-sqlite="onOpenSqlite"
+      @open-preferences="onOpenPreferences"
+      @open-tour="onOpenTour"
+      @launch-demo="onLaunchDemo"
+    />
     <QueryaDivider />
     <div class="body">
       <ConnectionsPanel
-        @open-sqlite="onOpenSqlite"
         @new-connection="onNewConnection"
+        @new-folder="onNewFolder"
       />
       <main class="workspace">
         <div class="workspace-body">
@@ -118,7 +153,8 @@ onUnmounted(() => {
         </div>
       </main>
     </div>
-    <StatusBar />
+    <StatusBar @open-preferences="onOpenPreferences" />
+    <PreferencesDialog :open="prefsOpen" @close="prefsOpen = false" />
   </div>
 </template>
 
