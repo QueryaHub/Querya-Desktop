@@ -181,6 +181,85 @@ export async function dbDescribeObject(
   return invoke<TableSchema>("db_describe_object", { id, objectId });
 }
 
+export type FunctionOverload = {
+  signature: string;
+  definition: string;
+};
+
+export type IndexListRow = {
+  table_name: string;
+  index_name: string;
+  definition: string;
+  size_bytes: number;
+};
+
+export type TriggerListRow = {
+  table_name: string;
+  trigger_name: string;
+  definition: string;
+};
+
+export type TypeListRow = {
+  name: string;
+  type_kind: string;
+};
+
+/** Mirrors Rust `PostgresObjectDetail`. */
+export type PostgresObjectDetail =
+  | {
+      kind: "function";
+      schema: string;
+      name: string;
+      overloads: FunctionOverload[];
+    }
+  | {
+      kind: "sequence";
+      schema: string;
+      name: string;
+      last_value: string;
+      start_value: string;
+      min_value: string;
+      max_value: string;
+      increment_by: string;
+      cache_size: string;
+      cycle: boolean;
+      ddl: string;
+    }
+  | {
+      kind: "index";
+      schema: string;
+      table: string;
+      name: string;
+      definition: string;
+      size_bytes: number;
+    }
+  | {
+      kind: "trigger";
+      schema: string;
+      table: string;
+      name: string;
+      definition: string;
+    }
+  | {
+      kind: "type";
+      schema: string;
+      name: string;
+      type_kind: string;
+    }
+  | { kind: "schema_indexes"; schema: string; rows: IndexListRow[] }
+  | { kind: "schema_triggers"; schema: string; rows: TriggerListRow[] }
+  | { kind: "schema_types"; schema: string; rows: TypeListRow[] };
+
+export async function dbPostgresObjectDetail(
+  id: string,
+  objectId: string,
+): Promise<PostgresObjectDetail> {
+  return invoke<PostgresObjectDetail>("db_postgres_object_detail", {
+    id,
+    objectId,
+  });
+}
+
 export async function dbListSchemas(id: string): Promise<string[]> {
   return invoke<string[]>("db_list_schemas", { id });
 }

@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import type { SelectedObject } from "../stores/shellNav";
+import {
+  isPgSchemaToolFolder,
+  type SelectedObject,
+} from "../stores/shellNav";
 import type { TreeUiNode } from "../stores/objectTree";
 
 defineProps<{
@@ -47,6 +50,20 @@ function isRelation(
   return kind === "table" || kind === "view" || kind === "materialized_view";
 }
 
+function isSelectable(node: TreeUiNode): boolean {
+  if (isRelation(node.kind)) return true;
+  if (
+    node.kind === "function" ||
+    node.kind === "sequence" ||
+    node.kind === "index" ||
+    node.kind === "trigger" ||
+    node.kind === "type"
+  ) {
+    return true;
+  }
+  return isPgSchemaToolFolder(node);
+}
+
 function isSelected(
   node: TreeUiNode,
   connectionId: string,
@@ -90,12 +107,8 @@ function isSelected(
       <button
         type="button"
         class="node-main"
-        :disabled="
-          node.kind === 'column' ||
-          node.kind === 'schema' ||
-          node.kind === 'folder'
-        "
-        @click="isRelation(node.kind) && emit('selectRelation', node)"
+        :disabled="!isSelectable(node)"
+        @click="isSelectable(node) && emit('selectRelation', node)"
       >
         <span class="glyph" aria-hidden="true">{{ kindGlyph(node.kind) }}</span>
         <span class="name">{{ node.name }}</span>

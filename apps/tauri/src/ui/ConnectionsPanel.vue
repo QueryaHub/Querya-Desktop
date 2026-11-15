@@ -7,7 +7,10 @@ import {
   type LiveConnection,
 } from "../stores/connections";
 import { useFoldersStore } from "../stores/folders";
-import { useShellNavStore } from "../stores/shellNav";
+import {
+  isPgSchemaToolFolder,
+  useShellNavStore,
+} from "../stores/shellNav";
 import { useObjectTreeStore, type TreeUiNode } from "../stores/objectTree";
 import { useQueryaMotion } from "../motion";
 import SplitHandle from "./SplitHandle.vue";
@@ -157,17 +160,31 @@ function onFolderExpand(id: string, e: MouseEvent) {
 }
 
 function onRelationClick(connectionId: string, node: TreeUiNode) {
-  if (
-    node.kind !== "table" &&
-    node.kind !== "view" &&
-    node.kind !== "materialized_view"
-  )
-    return;
+  const selectable =
+    node.kind === "table" ||
+    node.kind === "view" ||
+    node.kind === "materialized_view" ||
+    node.kind === "function" ||
+    node.kind === "sequence" ||
+    node.kind === "index" ||
+    node.kind === "trigger" ||
+    node.kind === "type" ||
+    isPgSchemaToolFolder(node);
+  if (!selectable) return;
   connections.select(connectionId);
   nav.selectObject({
     connectionId,
     name: node.name,
-    kind: node.kind,
+    kind: node.kind as
+      | "table"
+      | "view"
+      | "materialized_view"
+      | "function"
+      | "sequence"
+      | "index"
+      | "trigger"
+      | "type"
+      | "folder",
     objectId: node.id,
     schema: node.schema,
   });

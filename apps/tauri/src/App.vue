@@ -19,6 +19,7 @@ import WorkspaceEmptyHero from "./ui/WorkspaceEmptyHero.vue";
 import QueryaDivider from "./ui/QueryaDivider.vue";
 import ConnectionHome from "./ui/ConnectionHome.vue";
 import TableObjectView from "./ui/TableObjectView.vue";
+import PgObjectView from "./ui/PgObjectView.vue";
 import PreferencesDialog from "./ui/PreferencesDialog.vue";
 import CommandPalette from "./ui/CommandPalette.vue";
 import QuickSwitcher from "./ui/QuickSwitcher.vue";
@@ -51,6 +52,7 @@ provideQueryaMotion();
 const showEmpty = computed(() => surface.value === "empty");
 const showHome = computed(() => surface.value === "connectionHome");
 const showTable = computed(() => surface.value === "tableObject");
+const showPgObject = computed(() => surface.value === "pgObject");
 
 async function onOpenSqlite() {
   try {
@@ -251,6 +253,7 @@ onUnmounted(() => {
             />
             <ConnectionHome v-else-if="showHome" />
             <TableObjectView v-else-if="showTable" />
+            <PgObjectView v-else-if="showPgObject" />
           </div>
         </main>
       </div>
