@@ -6,7 +6,7 @@ import { useQueryResultStore } from "../stores/queryResult";
 import { useShellNavStore } from "../stores/shellNav";
 import { useConnectionsStore } from "../stores/connections";
 import SqlEditor from "./SqlEditor.vue";
-import ResultGrid from "./ResultGrid.vue";
+import ResultViewPane from "./ResultViewPane.vue";
 
 const workspace = useWorkspaceStore();
 const query = useQueryResultStore();
@@ -94,7 +94,7 @@ const hasGrid = computed(() => columns.value.length > 0);
       </div>
       <p v-if="error" class="error">{{ error }}</p>
       <div v-else-if="hasGrid" class="grid-host">
-        <ResultGrid />
+        <ResultViewPane />
       </div>
       <p v-else class="empty">Results appear here after Run.</p>
     </div>

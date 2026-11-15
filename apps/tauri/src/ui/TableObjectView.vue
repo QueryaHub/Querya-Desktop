@@ -13,7 +13,7 @@ import {
   dbListColumns,
   formatConnectionError,
 } from "../api/connection";
-import ResultGrid from "./ResultGrid.vue";
+import ResultViewPane from "./ResultViewPane.vue";
 import { QueryaIcon } from "./icons";
 import ErdView from "./erd/ErdView.vue";
 
@@ -182,7 +182,7 @@ watch(
         </template>
       </div>
       <div v-if="!error && columns.length" class="grid-host">
-        <ResultGrid @applied="onStagingApplied" />
+        <ResultViewPane @applied="onStagingApplied" />
       </div>
       <p v-else-if="!running && !error" class="empty">No rows</p>
     </div>
