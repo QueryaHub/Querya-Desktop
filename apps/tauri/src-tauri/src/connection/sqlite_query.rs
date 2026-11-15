@@ -91,6 +91,8 @@ fn stream_rows(
                 offset,
             })?;
             offset += n;
+            // `take` leaves capacity 0 — re-reserve so the next batch does not grow from empty.
+            batch.reserve(batch_size);
         }
     }
 
@@ -125,10 +127,12 @@ fn value_ref_to_json(v: ValueRef<'_>) -> serde_json::Value {
                 serde_json::Value::String(f.to_string())
             }
         }
-        ValueRef::Text(bytes) => {
-            let s = String::from_utf8_lossy(bytes);
-            serde_json::Value::String(s.into_owned())
-        }
+        ValueRef::Text(bytes) => match std::str::from_utf8(bytes) {
+            Ok(s) => serde_json::Value::String(s.to_owned()),
+            Err(_) => {
+                serde_json::Value::String(String::from_utf8_lossy(bytes).into_owned())
+            }
+        },
         ValueRef::Blob(bytes) => {
             let mut hex = String::with_capacity(2 + bytes.len() * 2);
             hex.push_str("X'");

@@ -13,7 +13,7 @@ import {
 import "@glideapps/glide-data-grid/dist/index.css";
 
 const query = useQueryResultStore();
-const { columns, rows } = storeToRefs(query);
+const { columns, rows, revision, rowCount } = storeToRefs(query);
 
 const host = ref<HTMLDivElement | null>(null);
 const size = ref({ width: 640, height: 320 });
@@ -57,7 +57,8 @@ onMounted(() => {
   refreshTheme();
 });
 
-watch([columns, rows], () => render(), { deep: true });
+// Shallow: revision/rowCount bump on append — no deep walk of unknown[][].
+watch([columns, revision, rowCount], () => render());
 
 onBeforeUnmount(() => {
   unsubTheme?.();

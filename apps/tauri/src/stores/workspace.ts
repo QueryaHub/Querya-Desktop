@@ -36,7 +36,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
 
   function ensureSql(id: string, seed = DEFAULT_SQL) {
     if (!(id in sqlBuffers.value)) {
-      sqlBuffers.value = { ...sqlBuffers.value, [id]: seed };
+      sqlBuffers.value[id] = seed;
     }
   }
 
@@ -45,7 +45,8 @@ export const useWorkspaceStore = defineStore("workspace", () => {
   }
 
   function setSql(id: string, sql: string) {
-    sqlBuffers.value = { ...sqlBuffers.value, [id]: sql };
+    // In-place — avoid `{ ...buffers }` identity churn on every keystroke.
+    sqlBuffers.value[id] = sql;
   }
 
   function addTab(partial?: Partial<Pick<WorkspaceTab, "title" | "kind">>) {
@@ -63,8 +64,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
   function closeTab(id: string) {
     const idx = tabs.value.findIndex((t) => t.id === id);
     if (idx < 0) return;
-    const { [id]: _removed, ...rest } = sqlBuffers.value;
-    sqlBuffers.value = rest;
+    delete sqlBuffers.value[id];
     if (tabs.value.length === 1) {
       const welcome = { id: nextId(), title: "Welcome", kind: "welcome" as const };
       tabs.value = [welcome];

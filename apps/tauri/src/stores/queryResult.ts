@@ -1,10 +1,9 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { ref, shallowRef } from "vue";
 import { dbExecuteQuery, type QueryEvent } from "../api/query";
 import {
   applyQueryEvent,
   emptyAccumulatedQuery,
-  type AccumulatedQuery,
 } from "../api/queryAccumulate";
 import { formatConnectionError } from "../api/connection";
 import { useConnectionsStore } from "./connections";
@@ -13,8 +12,13 @@ import { useShellStatusStore } from "./shellStatus";
 
 /** Last streamed / browsed result — Glide grid binds here. */
 export const useQueryResultStore = defineStore("queryResult", () => {
-  const columns = ref<string[]>([]);
-  const rows = ref<unknown[][]>([]);
+  let acc = emptyAccumulatedQuery();
+
+  const columns = shallowRef<string[]>(acc.columns);
+  /** Durable row buffer — mutated in place across batches. */
+  const rows = shallowRef<unknown[][]>(acc.rows);
+  /** Bumps on any result change so grids can shallow-watch without deep scan. */
+  const revision = ref(0);
   const running = ref(false);
   const truncated = ref(false);
   const rowCount = ref(0);
@@ -22,26 +26,45 @@ export const useQueryResultStore = defineStore("queryResult", () => {
   const affectedRows = ref<number | null>(null);
   const error = ref<string | null>(null);
 
-  let acc = emptyAccumulatedQuery();
+  function bump() {
+    revision.value += 1;
+  }
 
-  function syncFrom(next: AccumulatedQuery) {
-    columns.value = next.columns;
-    rows.value = next.rows;
-    truncated.value = next.truncated;
-    rowCount.value = next.rowCount;
-    elapsedMs.value = next.elapsedMs;
-    affectedRows.value = next.affectedRows;
-    error.value = next.error;
+  function bindBuffers() {
+    columns.value = acc.columns;
+    rows.value = acc.rows;
+  }
+
+  function syncScalars() {
+    truncated.value = acc.truncated;
+    rowCount.value = acc.rowCount || acc.rows.length;
+    elapsedMs.value = acc.elapsedMs;
+    affectedRows.value = acc.affectedRows;
+    error.value = acc.error;
   }
 
   function reset() {
     acc = emptyAccumulatedQuery();
-    syncFrom(acc);
+    bindBuffers();
+    syncScalars();
+    bump();
   }
 
   function feedEvent(ev: QueryEvent) {
-    acc = applyQueryEvent(acc, ev);
-    syncFrom(acc);
+    applyQueryEvent(acc, ev);
+    if (ev.type === "columns") {
+      bindBuffers();
+    } else if (rows.value !== acc.rows) {
+      rows.value = acc.rows;
+    }
+    if (ev.type === "rows") {
+      // Interim count while streaming; `done` sets authoritative row_count.
+      rowCount.value = acc.rows.length;
+    } else {
+      syncScalars();
+    }
+    if (ev.type === "error") error.value = acc.error;
+    bump();
   }
 
   function setSnapshot(opts: {
@@ -49,14 +72,14 @@ export const useQueryResultStore = defineStore("queryResult", () => {
     rows: unknown[][];
     message?: string;
   }) {
-    acc = {
-      ...emptyAccumulatedQuery(),
-      columns: opts.columns,
-      rows: opts.rows,
-      rowCount: opts.rows.length,
-      elapsedMs: 0,
-    };
-    syncFrom(acc);
+    acc = emptyAccumulatedQuery();
+    acc.columns = opts.columns;
+    acc.rows = opts.rows;
+    acc.rowCount = opts.rows.length;
+    acc.elapsedMs = 0;
+    bindBuffers();
+    syncScalars();
+    bump();
     if (opts.message) {
       useShellStatusStore().setQueryMetrics({
         message: opts.message,
@@ -128,6 +151,7 @@ export const useQueryResultStore = defineStore("queryResult", () => {
   return {
     columns,
     rows,
+    revision,
     running,
     truncated,
     rowCount,

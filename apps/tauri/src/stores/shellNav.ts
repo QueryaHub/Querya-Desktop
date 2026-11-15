@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { computed, ref } from "vue";
+import { computed, reactive, ref } from "vue";
 
 /** Flutter MainScreen workspace selection — chrome routing, not DB. */
 export type WorkspaceSurface = "empty" | "connectionHome" | "tableObject";
@@ -21,14 +21,21 @@ export const useShellNavStore = defineStore("shellNav", () => {
   const selectedObject = ref<SelectedObject | null>(null);
   const homeTab = ref<HomeStripTab>("overview");
   const objectTab = ref<ObjectStripTab>("data");
-  /** Expanded connection ids in the SERVERS tree (Flutter expand = show objects). */
-  const expandedConnectionIds = ref<string[]>([]);
+  /** Expanded SERVERS rows — Record avoids Set→array realloc on every toggle. */
+  const expanded = reactive<Record<string, true>>({});
 
   const surface = computed<WorkspaceSurface>(() => {
     if (selectedObject.value) return "tableObject";
     if (selectedConnectionId.value) return "connectionHome";
     return "empty";
   });
+
+  /** Snapshot of expanded ids for watchers (stable when membership unchanged). */
+  const expandedConnectionIds = computed(() => Object.keys(expanded));
+
+  function isExpanded(id: string): boolean {
+    return expanded[id] === true;
+  }
 
   function selectConnection(id: string | null) {
     selectedConnectionId.value = id;
@@ -48,17 +55,13 @@ export const useShellNavStore = defineStore("shellNav", () => {
   }
 
   function toggleExpanded(id: string) {
-    const set = new Set(expandedConnectionIds.value);
-    if (set.has(id)) set.delete(id);
-    else set.add(id);
-    expandedConnectionIds.value = [...set];
+    if (expanded[id]) delete expanded[id];
+    else expanded[id] = true;
   }
 
-  function setExpanded(id: string, expanded: boolean) {
-    const set = new Set(expandedConnectionIds.value);
-    if (expanded) set.add(id);
-    else set.delete(id);
-    expandedConnectionIds.value = [...set];
+  function setExpanded(id: string, on: boolean) {
+    if (on) expanded[id] = true;
+    else delete expanded[id];
   }
 
   function reset() {
@@ -66,7 +69,7 @@ export const useShellNavStore = defineStore("shellNav", () => {
     selectedObject.value = null;
     homeTab.value = "overview";
     objectTab.value = "data";
-    expandedConnectionIds.value = [];
+    for (const k of Object.keys(expanded)) delete expanded[k];
   }
 
   return {
@@ -74,7 +77,9 @@ export const useShellNavStore = defineStore("shellNav", () => {
     selectedObject,
     homeTab,
     objectTab,
+    expanded,
     expandedConnectionIds,
+    isExpanded,
     surface,
     selectConnection,
     selectObject,

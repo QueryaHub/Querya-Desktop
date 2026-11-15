@@ -22,36 +22,42 @@ export function emptyAccumulatedQuery(): AccumulatedQuery {
   };
 }
 
-/** Pure reducer used by the queryResult store and smoke tests. */
+/**
+ * Mutating reducer — appends row batches in place (no full-array concat).
+ * Callers must treat `state.rows` as the durable buffer across events.
+ */
 export function applyQueryEvent(
   state: AccumulatedQuery,
   ev: QueryEvent,
 ): AccumulatedQuery {
   switch (ev.type) {
     case "columns":
-      return {
-        ...state,
-        columns: ev.names,
-        rows: [],
-        error: null,
-      };
-    case "rows":
-      return {
-        ...state,
-        rows: state.rows.concat(ev.rows),
-      };
+      state.columns = ev.names;
+      state.rows.length = 0;
+      state.rowCount = 0;
+      state.truncated = false;
+      state.elapsedMs = null;
+      state.affectedRows = null;
+      state.error = null;
+      return state;
+    case "rows": {
+      // Append batch only — do not copy prior rows (was O(n²) via concat).
+      const rows = state.rows;
+      const batch = ev.rows;
+      for (let i = 0; i < batch.length; i++) rows.push(batch[i]!);
+      return state;
+    }
     case "done":
-      return {
-        ...state,
-        rowCount: ev.row_count,
-        truncated: ev.truncated,
-        elapsedMs: ev.elapsed_ms,
-        affectedRows:
-          ev.affected_rows === undefined || ev.affected_rows === null
-            ? null
-            : ev.affected_rows,
-      };
+      state.rowCount = ev.row_count;
+      state.truncated = ev.truncated;
+      state.elapsedMs = ev.elapsed_ms;
+      state.affectedRows =
+        ev.affected_rows === undefined || ev.affected_rows === null
+          ? null
+          : ev.affected_rows;
+      return state;
     case "error":
-      return { ...state, error: ev.message };
+      state.error = ev.message;
+      return state;
   }
 }
