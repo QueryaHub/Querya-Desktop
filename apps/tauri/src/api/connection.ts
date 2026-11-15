@@ -44,8 +44,56 @@ export type TableSchema = {
   primary_keys: string[];
 };
 
-export async function dbConnectSqlite(path: string): Promise<string> {
-  return invoke<string>("db_connect_sqlite", { path });
+/** Flutter LocalDb connection row (non-secret fields only). */
+export type ConnectionProfile = {
+  id: string;
+  driver: string;
+  name: string;
+  path?: string | null;
+  host?: string | null;
+  port?: number | null;
+  username?: string | null;
+  database_name?: string | null;
+  folder_id?: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function dbConnectSqlite(
+  path: string,
+  id?: string | null,
+): Promise<string> {
+  return invoke<string>("db_connect_sqlite", { path, id: id ?? null });
+}
+
+export async function profilesList(): Promise<ConnectionProfile[]> {
+  return invoke<ConnectionProfile[]>("profiles_list");
+}
+
+export async function profilesUpsert(
+  profile: ConnectionProfile,
+): Promise<ConnectionProfile> {
+  return invoke<ConnectionProfile>("profiles_upsert", { profile });
+}
+
+export async function profilesDelete(id: string): Promise<boolean> {
+  return invoke<boolean>("profiles_delete", { id });
+}
+
+/** Persist SQLite profile + open live session under the same id. */
+export async function profilesConnectSqlite(opts: {
+  name: string;
+  path: string;
+  folderId?: string | null;
+  id?: string | null;
+}): Promise<ConnectionProfile> {
+  return invoke<ConnectionProfile>("profiles_connect_sqlite", {
+    name: opts.name,
+    path: opts.path,
+    folderId: opts.folderId ?? null,
+    id: opts.id ?? null,
+  });
 }
 
 export async function dbDisconnect(id: string): Promise<void> {

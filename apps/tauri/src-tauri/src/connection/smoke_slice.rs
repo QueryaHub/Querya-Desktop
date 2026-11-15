@@ -23,6 +23,7 @@ fn connect_introspect_query_fixture() {
     let id = reg
         .connect(ConnectionConfig::Sqlite {
             path: path.to_string_lossy().into_owned(),
+            id: None,
         })
         .expect("connect fixture");
 

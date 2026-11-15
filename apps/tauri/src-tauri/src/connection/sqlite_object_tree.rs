@@ -148,6 +148,7 @@ mod tests {
         let id = reg
             .connect(ConnectionConfig::Sqlite {
                 path: path.to_string_lossy().into(),
+                id: None,
             })
             .unwrap();
 

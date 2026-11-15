@@ -2,15 +2,105 @@ use crate::connection::{
     ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager, ConnectionRegistry,
     SchemaObject, SchemaObjectKind, SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
 };
+use crate::profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 use tauri::ipc::Channel;
 use tauri::State;
 
 #[tauri::command]
 pub fn db_connect_sqlite(
     path: String,
+    id: Option<String>,
     registry: State<'_, ConnectionRegistry>,
 ) -> Result<ConnectionId, ConnectionError> {
-    registry.connect(ConnectionConfig::Sqlite { path })
+    registry.connect(ConnectionConfig::Sqlite { path, id })
+}
+
+#[tauri::command]
+pub fn profiles_list(
+    store: State<'_, ProfileStore>,
+) -> Result<Vec<ConnectionProfile>, ProfileStoreError> {
+    store.list()
+}
+
+#[tauri::command]
+pub fn profiles_upsert(
+    profile: ConnectionProfile,
+    store: State<'_, ProfileStore>,
+) -> Result<ConnectionProfile, ProfileStoreError> {
+    let mut profile = profile;
+    if profile.created_at.trim().is_empty() {
+        profile = ConnectionProfile {
+            created_at: profile.updated_at.clone(),
+            ..profile
+        };
+    }
+    profile.touch();
+    store.upsert(&profile)?;
+    Ok(profile)
+}
+
+#[tauri::command]
+pub fn profiles_delete(
+    id: String,
+    store: State<'_, ProfileStore>,
+) -> Result<bool, ProfileStoreError> {
+    store.delete(&id)
+}
+
+/// Save (or update) a SQLite profile and open a live session under the same id.
+#[tauri::command]
+pub fn profiles_connect_sqlite(
+    name: String,
+    path: String,
+    folder_id: Option<String>,
+    id: Option<String>,
+    store: State<'_, ProfileStore>,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<ConnectionProfile, ConnectionError> {
+    let display_name = {
+        let t = name.trim();
+        if t.is_empty() {
+            path.clone()
+        } else {
+            t.to_owned()
+        }
+    };
+
+    let mut profile = match id.filter(|s| !s.trim().is_empty()) {
+        Some(existing_id) => store
+            .get(&existing_id)
+            .map_err(|e| ConnectionError::io(e.to_string()))?
+            .map(|mut p| {
+                p.name = display_name.clone();
+                p.path = Some(path.clone());
+                p.folder_id = folder_id.clone();
+                p.driver = "sqlite".into();
+                p
+            })
+            .unwrap_or_else(|| {
+                let mut p = ConnectionProfile::new_sqlite(display_name.clone(), path.clone());
+                p.id = existing_id;
+                p.folder_id = folder_id.clone();
+                p
+            }),
+        None => {
+            let mut p = ConnectionProfile::new_sqlite(display_name, path.clone());
+            p.folder_id = folder_id;
+            p
+        }
+    };
+    profile.touch();
+    store
+        .upsert(&profile)
+        .map_err(|e| ConnectionError::io(e.to_string()))?;
+
+    if !registry.is_connected(&ConnectionId::from(profile.id.as_str())) {
+        registry.connect(ConnectionConfig::Sqlite {
+            path,
+            id: Some(profile.id.clone()),
+        })?;
+    }
+    Ok(profile)
 }
 
 #[tauri::command]

@@ -109,9 +109,20 @@ impl ConnectionSession for SqliteSession {
 
 /// Open a SQLite database file and return a live session.
 pub fn open_sqlite(path: impl AsRef<str>) -> ConnectionResult<SqliteSession> {
+    open_sqlite_with_id(path, ConnectionId::new())
+}
+
+/// Open SQLite with a stable session id (saved profile id).
+pub fn open_sqlite_with_id(
+    path: impl AsRef<str>,
+    id: ConnectionId,
+) -> ConnectionResult<SqliteSession> {
     let path = path.as_ref().trim();
     if path.is_empty() {
         return Err(ConnectionError::invalid_config("sqlite path is empty"));
+    }
+    if id.as_str().trim().is_empty() {
+        return Err(ConnectionError::invalid_config("connection id is empty"));
     }
 
     let p = Path::new(path);
@@ -128,7 +139,7 @@ pub fn open_sqlite(path: impl AsRef<str>) -> ConnectionResult<SqliteSession> {
     conn.query_row("SELECT 1", [], |_| Ok(()))?;
 
     Ok(SqliteSession {
-        id: ConnectionId::new(),
+        id,
         path: path.to_owned(),
         conn: Arc::new(Mutex::new(Some(conn))),
     })
@@ -176,6 +187,7 @@ mod tests {
         let id = reg
             .connect(ConnectionConfig::Sqlite {
                 path: path_str.clone(),
+                id: None,
             })
             .expect("connect");
         assert!(reg.is_connected(&id));
@@ -200,6 +212,7 @@ mod tests {
         let id = reg
             .connect(ConnectionConfig::Sqlite {
                 path: path_str,
+                id: None,
             })
             .expect("connect");
         let schemas = reg

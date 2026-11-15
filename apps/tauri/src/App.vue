@@ -191,6 +191,7 @@ onMounted(async () => {
     status.setQueryMetrics({
       message: `${info.name} ${info.version} · UI core · ${info.stack}${info.os ? ` · ${info.os}` : ""}`,
     });
+    await connections.hydrate();
   } catch {
     status.setQueryMetrics({ message: "IPC unavailable" });
   } finally {

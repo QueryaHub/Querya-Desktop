@@ -129,6 +129,7 @@ export const useObjectTreeStore = defineStore("objectTree", () => {
     st.loading = true;
     st.error = null;
     try {
+      await useConnectionsStore().ensureConnected(connId);
       st.roots = toUi(await fetchChildren(connId, null));
       const [only] = st.roots;
       if (st.roots.length === 1 && only?.expandable) {
