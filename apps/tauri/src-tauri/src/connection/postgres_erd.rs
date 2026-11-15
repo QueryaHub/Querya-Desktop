@@ -8,7 +8,7 @@ use sqlx::postgres::PgRow;
 use sqlx::{PgPool, Row};
 use std::collections::HashSet;
 
-/// Load tables of `schema` (default: `current_schema()`) plus FKs.
+/// Load tables of `schema`, or **all user schemas** when `schema` is `None`.
 ///
 /// When `focus` is set, only the neighbourhood within `depth` FK hops is kept.
 /// Focus may be `table` or `schema.table`.
@@ -85,6 +85,8 @@ fn filter_relations_to_tables(
 
 fn load_tables(pool: &PgPool, schema: Option<&str>) -> ConnectionResult<Vec<ErdTable>> {
     runtime::block_on(async {
+        // No schema → every user schema (public/shop/…); search_path alone
+        // left multi-schema DBs looking empty on the connection ER tab.
         let rows = if let Some(schema) = schema {
             sqlx::query(
                 "SELECT CASE WHEN ns.nspname = current_schema() THEN c.relname
@@ -110,9 +112,11 @@ fn load_tables(pool: &PgPool, schema: Option<&str>) -> ConnectionResult<Vec<ErdT
                         c.relkind::text AS relkind
                  FROM pg_catalog.pg_class c
                  JOIN pg_catalog.pg_namespace ns ON ns.oid = c.relnamespace
-                 WHERE ns.nspname = current_schema()
+                 WHERE ns.nspname NOT IN ('pg_catalog', 'information_schema')
+                   AND ns.nspname NOT LIKE 'pg_toast%'
+                   AND ns.nspname NOT LIKE 'pg_temp_%'
                    AND c.relkind IN ('r', 'p', 'v', 'm')
-                 ORDER BY c.relkind, table_name",
+                 ORDER BY ns.nspname, c.relkind, c.relname",
             )
             .fetch_all(pool)
             .await
