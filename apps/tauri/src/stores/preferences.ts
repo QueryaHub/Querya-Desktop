@@ -15,6 +15,7 @@ export type PrefsState = {
   historyMax: number;
   maxResultRows: number;
   mcpEnabled: boolean;
+  /** Percent — default 100. Presets or 1% fine values (75–200). */
   uiScale: number;
   animateThemeChanges: boolean;
 };
@@ -34,12 +35,30 @@ const defaults: PrefsState = {
   animateThemeChanges: true,
 };
 
+const SCALE_PRESETS = [75, 85, 90, 100, 110, 125, 150, 175, 200] as const;
+
+function snapToPreset(n: number): number {
+  return SCALE_PRESETS.reduce((best, p) =>
+    Math.abs(p - n) < Math.abs(best - n) ? p : best,
+  );
+}
+
+/** Accept preset or integer 75–200 (Shift fine); otherwise snap to nearest preset. */
+function normalizeUiScale(value: unknown): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return defaults.uiScale;
+  if (Number.isInteger(n) && n >= 75 && n <= 200) return n;
+  return snapToPreset(n);
+}
+
 function load(): PrefsState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...defaults };
     const parsed = JSON.parse(raw) as Partial<PrefsState>;
-    return { ...defaults, ...parsed };
+    const merged = { ...defaults, ...parsed };
+    merged.uiScale = normalizeUiScale(merged.uiScale);
+    return merged;
   } catch {
     return { ...defaults };
   }

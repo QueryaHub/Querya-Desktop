@@ -32,5 +32,7 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Whole-chrome scale from Preferences → Appearance (Flutter ui_scale). */
   zoom: var(--q-ui-scale);
+  transition: zoom var(--q-motion-slow) var(--q-motion-ease);
 }

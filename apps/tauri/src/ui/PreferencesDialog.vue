@@ -13,6 +13,7 @@ import {
   shortcutCategories,
   type ShortcutItem,
 } from "../preferences/shortcutsCatalog";
+import InterfaceScaleSlider from "./InterfaceScaleSlider.vue";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ close: [] }>();
@@ -110,7 +111,6 @@ const TIMEOUT_OPTS = [
 
 const HISTORY_OPTS = [25, 50, 100, 200, 500];
 const ROWS_OPTS = [1000, 2500, 5000, 10000, 25000, 50000, 100000];
-const SCALE_OPTS = [75, 85, 90, 100, 110, 125, 150, 175, 200];
 
 const category = ref<CategoryId>("general");
 const search = ref("");
@@ -374,14 +374,10 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
             <div class="field-row">
               <span class="field-label">Interface scale</span>
               <div class="field-control">
-                <select v-model.number="prefs.state.uiScale">
-                  <option v-for="n in SCALE_OPTS" :key="n" :value="n">
-                    {{ n }}%
-                  </option>
-                </select>
+                <InterfaceScaleSlider v-model="prefs.state.uiScale" />
                 <p class="field-hint">
-                  Snap to presets (75%, 85%, 90%, 100% …). Fine control lands with
-                  the scale slider.
+                  Snap to presets (75%, 85%, 90%, 100% …). Hold Shift for 1% fine
+                  control. Default is 100%.
                 </p>
               </div>
             </div>
