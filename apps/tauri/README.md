@@ -54,7 +54,7 @@ pnpm install
 pnpm tauri dev
 ```
 
-You should get an empty Querya splash window and an `app_info` IPC line in the UI.
+You should get the shell chrome and an `app_info` status line. **Open SQLite…** uses the native file dialog and `db_connect_sqlite` IPC (live connection list in the sidebar).
 
 ### Scripts
 

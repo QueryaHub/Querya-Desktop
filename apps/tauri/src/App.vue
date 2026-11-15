@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { storeToRefs } from "pinia";
 import { useShellStore } from "./stores/shell";
 import { useShellStatusStore } from "./stores/shellStatus";
 import { useWorkspaceStore } from "./stores/workspace";
+import { useConnectionsStore } from "./stores/connections";
 import { initTheme } from "./theme/queryaTheme";
 import { provideQueryaMotion } from "./motion";
 import TitleBar from "./ui/TitleBar.vue";
@@ -17,19 +19,32 @@ import QueryaDivider from "./ui/QueryaDivider.vue";
 const shell = useShellStore();
 const status = useShellStatusStore();
 const workspace = useWorkspaceStore();
+const connections = useConnectionsStore();
 const { activeTab } = storeToRefs(workspace);
 provideQueryaMotion();
 
 const showEmpty = computed(
-  () => !status.connectionName && activeTab.value?.kind === "welcome",
+  () => !connections.active && activeTab.value?.kind === "welcome",
 );
 
-function onOpenSqlite() {
-  status.setQueryMetrics({
-    message: "SQLite open will land with #1873",
-    busy: false,
-  });
-  workspace.addTab({ title: "SQLite", kind: "sql" });
+async function onOpenSqlite() {
+  try {
+    const selected = await open({
+      multiple: false,
+      directory: false,
+      title: "Open SQLite database",
+      filters: [
+        { name: "SQLite", extensions: ["db", "sqlite", "sqlite3"] },
+        { name: "All files", extensions: ["*"] },
+      ],
+    });
+    if (!selected || Array.isArray(selected)) return;
+    const conn = await connections.connectSqlite(selected);
+    workspace.addTab({ title: conn.name, kind: "sql" });
+  } catch (err) {
+    // Status already set by connections store on connect failure.
+    if (String(err).includes("cancel")) return;
+  }
 }
 
 function onNewConnection() {
@@ -46,7 +61,6 @@ function onOpenTour() {
 function onKeydown(e: KeyboardEvent) {
   const mod = e.metaKey || e.ctrlKey;
   if (!mod) return;
-  // Ctrl/Cmd+B — Flutter main_screen_shortcuts sidebar toggle
   if (e.key.toLowerCase() === "b") {
     e.preventDefault();
     shell.toggleSidebar();
@@ -98,7 +112,10 @@ onUnmounted(() => {
           />
           <div v-else class="tab-placeholder" data-testid="tab-placeholder">
             <h2>{{ activeTab?.title }}</h2>
-            <p>Kind: {{ activeTab?.kind }} — editor/grid land in the SQLite slice.</p>
+            <p v-if="connections.active">
+              Connected: {{ connections.active.path }}
+            </p>
+            <p>Kind: {{ activeTab?.kind }} — editor/grid land next in the slice.</p>
           </div>
         </div>
       </main>
