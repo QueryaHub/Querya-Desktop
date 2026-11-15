@@ -1,6 +1,7 @@
 mod commands;
 mod connection;
 mod profiles;
+mod secrets;
 
 pub use connection::{
     ColumnMeta, ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager,
@@ -8,6 +9,7 @@ pub use connection::{
     SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
 };
 pub use profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
+pub use secrets::{KeyringSecretStore, MemorySecretStore, SecretError, SecretStore, SharedSecretStore};
 
 use commands::{
     db_connect_postgres, db_connect_sqlite, db_describe_object, db_disconnect, db_execute_query,
@@ -43,6 +45,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(ConnectionRegistry::new())
+        .manage(KeyringSecretStore::shared())
         .setup(|app| {
             use tauri::Manager;
             let store = ProfileStore::open_default().map_err(|e| {

@@ -3,6 +3,7 @@ use crate::connection::{
     SchemaObject, SchemaObjectKind, SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
 };
 use crate::profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
+use crate::secrets::SharedSecretStore;
 use tauri::ipc::Channel;
 use tauri::State;
 
@@ -63,7 +64,10 @@ pub fn profiles_upsert(
 pub fn profiles_delete(
     id: String,
     store: State<'_, ProfileStore>,
+    secrets: State<'_, SharedSecretStore>,
 ) -> Result<bool, ProfileStoreError> {
+    // Best-effort secret cleanup — profile row is source of truth for "gone".
+    let _ = secrets.delete_password(&id);
     store.delete(&id)
 }
 
@@ -135,6 +139,7 @@ pub fn profiles_connect_postgres(
     folder_id: Option<String>,
     id: Option<String>,
     store: State<'_, ProfileStore>,
+    secrets: State<'_, SharedSecretStore>,
     registry: State<'_, ConnectionRegistry>,
 ) -> Result<ConnectionProfile, ConnectionError> {
     let display_name = {
@@ -184,6 +189,19 @@ pub fn profiles_connect_postgres(
     store
         .upsert(&profile)
         .map_err(|e| ConnectionError::io(e.to_string()))?;
+
+    // Resolve password: explicit form value wins; else OS keyring (#1878).
+    let password = match password {
+        Some(p) => {
+            secrets
+                .set_password(&profile.id, &p)
+                .map_err(|e| ConnectionError::io(format!("keyring write: {e}")))?;
+            Some(p)
+        }
+        None => secrets
+            .get_password(&profile.id)
+            .map_err(|e| ConnectionError::io(format!("keyring read: {e}")))?,
+    };
 
     if !registry.is_connected(&ConnectionId::from(profile.id.as_str())) {
         registry.connect(ConnectionConfig::Postgres {
