@@ -64,7 +64,10 @@ You should get the shell chrome and an `app_info` status line. **Open SQLite…*
 | `pnpm tauri dev` | Full desktop shell |
 | `pnpm build` | `vue-tsc` + Vite production build |
 | `pnpm typecheck` | TypeScript / Vue check |
+| `pnpm test` | Vitest (query stream accumulator smoke) |
 | `pnpm tauri build` | Native bundles |
+
+SQLite fixture: [`fixtures/smoke.db`](./fixtures/smoke.db) — exercised by `cargo test` (`connect_introspect_query_fixture`).
 
 ### Rust
 

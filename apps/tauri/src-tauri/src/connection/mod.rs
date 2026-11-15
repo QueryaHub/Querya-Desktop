@@ -5,6 +5,7 @@ mod id;
 mod introspect;
 mod manager;
 mod query;
+mod smoke_slice;
 mod sqlite;
 mod sqlite_introspect;
 pub(crate) mod sqlite_query;

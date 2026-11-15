@@ -1,14 +1,16 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { dbExecuteQuery, type QueryEvent } from "../api/query";
 import {
-  dbExecuteQuery,
-  type QueryEvent,
-} from "../api/query";
+  applyQueryEvent,
+  emptyAccumulatedQuery,
+  type AccumulatedQuery,
+} from "../api/queryAccumulate";
 import { formatConnectionError } from "../api/connection";
 import { useConnectionsStore } from "./connections";
 import { useShellStatusStore } from "./shellStatus";
 
-/** Last streamed query result — grid (#1876) binds here. */
+/** Last streamed query result — Glide grid binds here. */
 export const useQueryResultStore = defineStore("queryResult", () => {
   const columns = ref<string[]>([]);
   const rows = ref<unknown[][]>([]);
@@ -19,38 +21,25 @@ export const useQueryResultStore = defineStore("queryResult", () => {
   const affectedRows = ref<number | null>(null);
   const error = ref<string | null>(null);
 
-  function reset() {
-    columns.value = [];
-    rows.value = [];
-    truncated.value = false;
-    rowCount.value = 0;
-    elapsedMs.value = null;
-    affectedRows.value = null;
-    error.value = null;
+  function syncFrom(acc: AccumulatedQuery) {
+    columns.value = acc.columns;
+    rows.value = acc.rows;
+    truncated.value = acc.truncated;
+    rowCount.value = acc.rowCount;
+    elapsedMs.value = acc.elapsedMs;
+    affectedRows.value = acc.affectedRows;
+    error.value = acc.error;
   }
 
+  function reset() {
+    syncFrom(emptyAccumulatedQuery());
+  }
+
+  let acc = emptyAccumulatedQuery();
+
   function onEvent(ev: QueryEvent) {
-    switch (ev.type) {
-      case "columns":
-        columns.value = ev.names;
-        rows.value = [];
-        break;
-      case "rows":
-        rows.value = rows.value.concat(ev.rows);
-        break;
-      case "done":
-        rowCount.value = ev.row_count;
-        truncated.value = ev.truncated;
-        elapsedMs.value = ev.elapsed_ms;
-        affectedRows.value =
-          ev.affected_rows === undefined || ev.affected_rows === null
-            ? null
-            : ev.affected_rows;
-        break;
-      case "error":
-        error.value = ev.message;
-        break;
-    }
+    acc = applyQueryEvent(acc, ev);
+    syncFrom(acc);
   }
 
   async function run(sql: string) {
@@ -70,6 +59,7 @@ export const useQueryResultStore = defineStore("queryResult", () => {
     }
 
     reset();
+    acc = emptyAccumulatedQuery();
     running.value = true;
     status.setQueryMetrics({ message: "Running…", busy: true });
     try {
