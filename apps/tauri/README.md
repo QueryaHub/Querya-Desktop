@@ -54,7 +54,7 @@ pnpm install
 pnpm tauri dev
 ```
 
-You should get the shell chrome and an `app_info` status line. **Open SQLite…** uses the native file dialog and `db_connect_sqlite` IPC (live connection list in the sidebar).
+UI-core first: empty hero → **Demo** (offline catalog) or Open SQLite → connection **Overview** → click a table for **Data** grid. SQL is parked on the connection home SQL tab. Live DB commands remain for later slices.
 
 ### Scripts
 
