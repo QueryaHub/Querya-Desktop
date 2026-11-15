@@ -122,6 +122,11 @@ fn parse_statements(sql: &str, driver: DriverKind) -> ConnectionResult<Vec<State
                 driver: DriverKind::Redis,
             });
         }
+        DriverKind::Mongo => {
+            return Err(ConnectionError::UnsupportedDriver {
+                driver: DriverKind::Mongo,
+            });
+        }
     };
 
     match primary {

@@ -1,7 +1,7 @@
 use crate::connection::{
     ConnectionConfig, ConnectionError, ConnectionId, ConnectionManager, ConnectionRegistry,
-    ErdSchema, PostgresObjectDetail, RedisKeyMeta, RedisKeyView, RedisScanPage, SchemaObject,
-    SchemaObjectKind, SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
+    ErdSchema, MongoFindResult, PostgresObjectDetail, RedisKeyMeta, RedisKeyView, RedisScanPage,
+    SchemaObject, SchemaObjectKind, SqlObjectKind, SqlObjectNode, SqliteOverview, TableSchema,
 };
 use crate::profiles::{ConnectionProfile, ProfileStore, ProfileStoreError};
 use crate::secrets::SharedSecretStore;
@@ -37,6 +37,21 @@ pub struct ConnectRedisRequest {
     pub database: Option<String>,
     pub username: Option<String>,
     pub password: Option<String>,
+    pub folder_id: Option<String>,
+    pub id: Option<String>,
+}
+
+/// Mongo save+connect args.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectMongoRequest {
+    pub name: String,
+    pub host: String,
+    pub port: u16,
+    pub database: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub auth_source: Option<String>,
     pub folder_id: Option<String>,
     pub id: Option<String>,
 }
@@ -107,6 +122,72 @@ pub fn db_connect_redis(
         username,
         db,
         id,
+    })
+}
+
+#[tauri::command]
+pub fn db_connect_mongo(
+    host: String,
+    port: u16,
+    database: String,
+    username: Option<String>,
+    password: Option<String>,
+    auth_source: Option<String>,
+    id: Option<String>,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<ConnectionId, ConnectionError> {
+    registry.connect(ConnectionConfig::Mongo {
+        host,
+        port,
+        database,
+        username,
+        password,
+        auth_source,
+        id,
+    })
+}
+
+#[tauri::command]
+pub fn mongo_ping(
+    id: ConnectionId,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<String, ConnectionError> {
+    registry.with_mongo(&id, |s| s.ping())
+}
+
+#[tauri::command]
+pub fn mongo_list_databases(
+    id: ConnectionId,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<Vec<String>, ConnectionError> {
+    registry.with_mongo(&id, |s| s.list_databases())
+}
+
+#[tauri::command]
+pub fn mongo_list_collections(
+    id: ConnectionId,
+    database: String,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<Vec<String>, ConnectionError> {
+    registry.with_mongo(&id, |s| s.list_collections(&database))
+}
+
+#[tauri::command]
+pub fn mongo_find(
+    id: ConnectionId,
+    database: String,
+    collection: String,
+    filter_json: Option<String>,
+    limit: Option<i64>,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<MongoFindResult, ConnectionError> {
+    registry.with_mongo(&id, |s| {
+        s.find(
+            &database,
+            &collection,
+            filter_json.as_deref(),
+            limit,
+        )
     })
 }
 
@@ -556,6 +637,124 @@ pub fn profiles_connect_redis(
             password,
             username: user,
             db: Some(db),
+            id: Some(profile.id.clone()),
+        })?;
+    }
+    Ok(profile)
+}
+
+/// Save Mongo profile metadata (no password) and open a live session.
+#[tauri::command]
+pub fn profiles_connect_mongo(
+    request: ConnectMongoRequest,
+    store: State<'_, ProfileStore>,
+    secrets: State<'_, SharedSecretStore>,
+    registry: State<'_, ConnectionRegistry>,
+) -> Result<ConnectionProfile, ConnectionError> {
+    let ConnectMongoRequest {
+        name,
+        host,
+        port,
+        database,
+        username,
+        password,
+        auth_source,
+        folder_id,
+        id,
+    } = request;
+
+    let database = {
+        let t = database.trim();
+        if t.is_empty() {
+            "querya".to_owned()
+        } else {
+            t.to_owned()
+        }
+    };
+    let user = username
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned);
+    let auth = auth_source
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned);
+
+    let display_name = {
+        let t = name.trim();
+        if t.is_empty() {
+            format!("{host}:{port}/{database}")
+        } else {
+            t.to_owned()
+        }
+    };
+
+    let mut profile = match id.filter(|s| !s.trim().is_empty()) {
+        Some(existing_id) => store
+            .get(&existing_id)
+            .map_err(|e| ConnectionError::io(e.to_string()))?
+            .map(|mut p| {
+                p.name = display_name.clone();
+                p.host = Some(host.clone());
+                p.port = Some(i64::from(port));
+                p.database_name = Some(database.clone());
+                p.username = user.clone();
+                p.folder_id = folder_id.clone();
+                p.driver = "mongo".into();
+                p.path = None;
+                p
+            })
+            .unwrap_or_else(|| {
+                let mut p = ConnectionProfile::new_mongo(
+                    display_name.clone(),
+                    host.clone(),
+                    port,
+                    database.clone(),
+                    user.clone(),
+                );
+                p.id = existing_id;
+                p.folder_id = folder_id.clone();
+                p
+            }),
+        None => {
+            let mut p = ConnectionProfile::new_mongo(
+                display_name,
+                host.clone(),
+                port,
+                database.clone(),
+                user.clone(),
+            );
+            p.folder_id = folder_id;
+            p
+        }
+    };
+    profile.touch();
+    store
+        .upsert(&profile)
+        .map_err(|e| ConnectionError::io(e.to_string()))?;
+
+    let password = match password {
+        Some(p) => {
+            secrets
+                .set_password(&profile.id, &p)
+                .map_err(|e| ConnectionError::io(format!("keyring write: {e}")))?;
+            Some(p)
+        }
+        None => secrets
+            .get_password(&profile.id)
+            .map_err(|e| ConnectionError::io(format!("keyring read: {e}")))?,
+    };
+
+    if !registry.is_connected(&ConnectionId::from(profile.id.as_str())) {
+        registry.connect(ConnectionConfig::Mongo {
+            host,
+            port,
+            database,
+            username: user,
+            password,
+            auth_source: auth,
             id: Some(profile.id.clone()),
         })?;
     }
