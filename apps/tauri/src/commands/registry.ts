@@ -11,6 +11,7 @@ export type CommandHandlers = {
   toggleSidebar: () => void;
   openTour: () => void;
   openAbout: () => void;
+  openSduiSample: () => void;
   openPalette: () => void;
   openQuickSwitcher: () => void;
   launchDemo: () => void;
@@ -86,6 +87,12 @@ export function buildCoreCommands(h: CommandHandlers): AppCommand[] {
       title: "About Querya",
       keywords: ["version"],
       run: h.openAbout,
+    },
+    {
+      id: "sdui-sample",
+      title: "Preview SDUI Sample Panel",
+      keywords: ["extension", "sdui", "hello", "panel"],
+      run: h.openSduiSample,
     },
     {
       id: "updates",
