@@ -201,6 +201,7 @@ mod tests {
     use crate::connection::ConnectionConfig;
     use crate::mcp::endpoint::McpEndpoint;
     use crate::mcp::host::McpController;
+    use serde_json::json;
     use std::time::Duration;
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
     use tokio::net::TcpStream;
