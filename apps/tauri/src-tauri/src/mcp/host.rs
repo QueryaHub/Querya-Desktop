@@ -2,6 +2,7 @@
 
 use super::endpoint::McpEndpoint;
 use super::server::QueryaMcpServer;
+use crate::connection::ConnectionRegistry;
 use rmcp::ServiceExt;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -52,14 +53,17 @@ struct RunningHost {
 }
 
 /// Starts / stops the in-process MCP loopback server.
-#[derive(Default)]
 pub struct McpController {
+    registry: Arc<ConnectionRegistry>,
     inner: Mutex<Option<RunningHost>>,
 }
 
 impl McpController {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(registry: Arc<ConnectionRegistry>) -> Self {
+        Self {
+            registry,
+            inner: Mutex::new(None),
+        }
     }
 
     pub fn status(&self) -> Result<McpStatus, McpError> {
@@ -92,7 +96,7 @@ impl McpController {
         crate::connection::runtime::block_on(self.stop_async())
     }
 
-    async fn start_async(
+    pub(crate) async fn start_async(
         &self,
         endpoint_path: Option<PathBuf>,
     ) -> Result<McpStatus, McpError> {
@@ -131,6 +135,7 @@ impl McpController {
         let stop_flag = Arc::clone(&stop);
         let sessions = Arc::clone(&session_count);
         let accept_token = token.clone();
+        let registry = Arc::clone(&self.registry);
 
         let accept_task = tokio::spawn(async move {
             loop {
@@ -144,9 +149,16 @@ impl McpController {
                         let token = accept_token.clone();
                         let sessions = Arc::clone(&sessions);
                         let stop_flag = Arc::clone(&stop_flag);
+                        let registry = Arc::clone(&registry);
                         tokio::spawn(async move {
-                            if let Err(e) =
-                                handle_connection(socket, token, sessions, stop_flag).await
+                            if let Err(e) = handle_connection(
+                                socket,
+                                token,
+                                sessions,
+                                stop_flag,
+                                registry,
+                            )
+                            .await
                             {
                                 eprintln!("mcp session error: {e}");
                             }
@@ -173,7 +185,7 @@ impl McpController {
         self.status()
     }
 
-    async fn stop_async(&self) -> Result<McpStatus, McpError> {
+    pub(crate) async fn stop_async(&self) -> Result<McpStatus, McpError> {
         let running = {
             let mut guard = self
                 .inner
@@ -195,6 +207,7 @@ async fn handle_connection(
     expected_token: String,
     session_count: Arc<AtomicUsize>,
     stop: Arc<AtomicBool>,
+    registry: Arc<ConnectionRegistry>,
 ) -> Result<(), McpError> {
     if stop.load(Ordering::SeqCst) {
         return Ok(());
@@ -219,7 +232,7 @@ async fn handle_connection(
     session_count.fetch_add(1, Ordering::SeqCst);
     let _guard = SessionGuard(session_count);
 
-    let server = QueryaMcpServer::new();
+    let server = QueryaMcpServer::new(registry);
     let running = server
         .serve(socket)
         .await
@@ -283,7 +296,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
 
         crate::connection::runtime::block_on(async {
-            let ctrl = McpController::new();
+            let ctrl = McpController::new(Arc::new(ConnectionRegistry::new()));
             let status = ctrl
                 .start_async(Some(ep_path.clone()))
                 .await
@@ -368,7 +381,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
 
         crate::connection::runtime::block_on(async {
-            let ctrl = McpController::new();
+            let ctrl = McpController::new(Arc::new(ConnectionRegistry::new()));
             let status = ctrl.start_async(Some(ep_path.clone())).await.unwrap();
             let port = status.port.unwrap();
             let mut stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
