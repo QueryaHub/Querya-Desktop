@@ -13,6 +13,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 name = "querya-mcp"
 path = "src/bin/querya_mcp.rs"
 
+[[bin]]
+name = "querya-ext-echo"
+path = "src/bin/querya_ext_echo.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

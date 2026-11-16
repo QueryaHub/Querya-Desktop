@@ -258,11 +258,7 @@ pub fn open_mongo(params: MongoConnectParams) -> ConnectionResult<MongoSession> 
 
     Ok(MongoSession {
         id,
-        host: if host.contains("://") {
-            host.to_owned()
-        } else {
-            host.to_owned()
-        },
+        host: host.to_owned(),
         port: params.port,
         database,
         client: Arc::new(Mutex::new(Some(client))),
