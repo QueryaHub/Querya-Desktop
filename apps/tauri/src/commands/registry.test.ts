@@ -9,6 +9,7 @@ describe("command registry", () => {
     toggleSidebar: noop,
     openTour: noop,
     openAbout: noop,
+    openSduiSample: noop,
     openPalette: noop,
     openQuickSwitcher: noop,
     launchDemo: noop,
