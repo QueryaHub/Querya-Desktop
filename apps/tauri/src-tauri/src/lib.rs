@@ -1,6 +1,6 @@
 mod commands;
 mod connection;
-mod mcp;
+pub mod mcp;
 mod profiles;
 mod secrets;
 mod ssh_tunnel;
