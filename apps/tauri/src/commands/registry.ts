@@ -12,6 +12,7 @@ export type CommandHandlers = {
   openTour: () => void;
   openAbout: () => void;
   openSduiSample: () => void;
+  openHelloPanel: () => void;
   openPalette: () => void;
   openQuickSwitcher: () => void;
   launchDemo: () => void;
@@ -93,6 +94,12 @@ export function buildCoreCommands(h: CommandHandlers): AppCommand[] {
       title: "Preview SDUI Sample Panel",
       keywords: ["extension", "sdui", "hello", "panel"],
       run: h.openSduiSample,
+    },
+    {
+      id: "hello-panel",
+      title: "Open Hello Panel Extension",
+      keywords: ["extension", "sdui", "hello", "panel", "rpc"],
+      run: h.openHelloPanel,
     },
     {
       id: "updates",

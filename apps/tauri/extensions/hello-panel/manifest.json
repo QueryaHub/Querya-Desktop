@@ -1,0 +1,26 @@
+{
+  "manifestVersion": 1,
+  "id": "querya.hello-panel",
+  "name": "Hello Panel",
+  "version": "0.1.0",
+  "publisher": "QueryaHub",
+  "type": "script",
+  "description": "Minimal sample that mounts an SDUI hello panel over NDJSON RPC.",
+  "main": "querya-ext-hello-panel",
+  "engines": {
+    "querya_desktop": ">=0.1.0"
+  },
+  "capabilities": {
+    "sduiPanels": true
+  },
+  "contributions": {
+    "commands": [
+      {
+        "id": "helloPanel.open",
+        "title": "Open Hello Panel",
+        "category": "Extensions",
+        "aliases": ["sdui", "hello"]
+      }
+    ]
+  }
+}

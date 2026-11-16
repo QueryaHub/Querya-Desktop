@@ -17,6 +17,10 @@ path = "src/bin/querya_mcp.rs"
 name = "querya-ext-echo"
 path = "src/bin/querya_ext_echo.rs"
 
+[[bin]]
+name = "querya-ext-hello-panel"
+path = "src/bin/querya_ext_hello_panel.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

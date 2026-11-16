@@ -1012,3 +1012,9 @@ pub async fn ext_host_list(
 ) -> Result<Vec<crate::extensions::ExtensionSessionInfo>, String> {
     Ok(host.list().await)
 }
+
+/// Resolve the sample hello-panel extension executable (#1905).
+#[tauri::command]
+pub fn ext_hello_panel_executable() -> Result<String, String> {
+    crate::extensions::hello_panel_executable().map(|p| p.display().to_string())
+}
