@@ -10,7 +10,6 @@ use rmcp::model::{
 };
 use rmcp::{schemars, tool, tool_handler, tool_router};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::sync::Arc;
 
 const MCP_MAX_ROWS: usize = 1000;
