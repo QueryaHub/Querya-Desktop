@@ -960,3 +960,54 @@ pub fn mcp_status(
 ) -> Result<crate::mcp::McpStatus, crate::mcp::McpError> {
     mcp.status()
 }
+
+/// Spawn an extension process and run `system.handshake` (#1903).
+#[tauri::command]
+pub async fn ext_host_start(
+    host: State<'_, std::sync::Arc<crate::extensions::ExtensionHost>>,
+    session_id: String,
+    executable: String,
+    args: Option<Vec<String>>,
+    handshake_params: Option<serde_json::Value>,
+) -> Result<crate::extensions::ExtensionSessionInfo, String> {
+    host.start(
+        session_id,
+        std::path::PathBuf::from(executable),
+        args.unwrap_or_default(),
+        handshake_params.unwrap_or(serde_json::json!({})),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn ext_host_call(
+    host: State<'_, std::sync::Arc<crate::extensions::ExtensionHost>>,
+    session_id: String,
+    method: String,
+    params: Option<serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    host.call(&session_id, &method, params).await
+}
+
+#[tauri::command]
+pub async fn ext_host_ping(
+    host: State<'_, std::sync::Arc<crate::extensions::ExtensionHost>>,
+    session_id: String,
+) -> Result<serde_json::Value, String> {
+    host.ping(&session_id).await
+}
+
+#[tauri::command]
+pub async fn ext_host_stop(
+    host: State<'_, std::sync::Arc<crate::extensions::ExtensionHost>>,
+    session_id: String,
+) -> Result<(), String> {
+    host.stop(&session_id).await
+}
+
+#[tauri::command]
+pub async fn ext_host_list(
+    host: State<'_, std::sync::Arc<crate::extensions::ExtensionHost>>,
+) -> Result<Vec<crate::extensions::ExtensionSessionInfo>, String> {
+    Ok(host.list().await)
+}
