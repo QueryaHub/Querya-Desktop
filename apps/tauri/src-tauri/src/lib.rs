@@ -83,13 +83,14 @@ fn open_main_window(app: &tauri::App) -> tauri::Result<()> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let registry = std::sync::Arc::new(ConnectionRegistry::new());
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .manage(ConnectionRegistry::new())
+        .manage(std::sync::Arc::clone(&registry))
         .manage(KeyringSecretStore::shared())
         .manage(SshTunnelRegistry::new())
-        .manage(McpController::new())
+        .manage(McpController::new(registry))
         .setup(|app| {
             use tauri::Manager;
             let store = ProfileStore::open_default().map_err(|e| {

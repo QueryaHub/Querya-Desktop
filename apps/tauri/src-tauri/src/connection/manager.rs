@@ -414,6 +414,15 @@ impl ConnectionRegistry {
         }
     }
 
+    /// Live sessions currently open in the registry (id + driver).
+    pub fn list_sessions(&self) -> ConnectionResult<Vec<(ConnectionId, DriverKind)>> {
+        let guard = self.lock()?;
+        Ok(guard
+            .iter()
+            .map(|(id, session)| (id.clone(), session.driver()))
+            .collect())
+    }
+
     pub fn list_children(
         &self,
         id: &ConnectionId,

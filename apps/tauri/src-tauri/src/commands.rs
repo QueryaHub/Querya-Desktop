@@ -60,7 +60,7 @@ pub struct ConnectMongoRequest {
 pub fn db_connect_sqlite(
     path: String,
     id: Option<String>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<ConnectionId, ConnectionError> {
     registry.connect(ConnectionConfig::Sqlite { path, id })
 }
@@ -73,7 +73,7 @@ pub fn db_connect_postgres(
     user: String,
     password: Option<String>,
     id: Option<String>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<ConnectionId, ConnectionError> {
     registry.connect(ConnectionConfig::Postgres {
         host,
@@ -93,7 +93,7 @@ pub fn db_connect_mysql(
     user: String,
     password: Option<String>,
     id: Option<String>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<ConnectionId, ConnectionError> {
     registry.connect(ConnectionConfig::Mysql {
         host,
@@ -113,7 +113,7 @@ pub fn db_connect_redis(
     username: Option<String>,
     db: Option<u8>,
     id: Option<String>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<ConnectionId, ConnectionError> {
     registry.connect(ConnectionConfig::Redis {
         host,
@@ -134,7 +134,7 @@ pub fn db_connect_mongo(
     password: Option<String>,
     auth_source: Option<String>,
     id: Option<String>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<ConnectionId, ConnectionError> {
     registry.connect(ConnectionConfig::Mongo {
         host,
@@ -150,7 +150,7 @@ pub fn db_connect_mongo(
 #[tauri::command]
 pub fn mongo_ping(
     id: ConnectionId,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<String, ConnectionError> {
     registry.with_mongo(&id, |s| s.ping())
 }
@@ -158,7 +158,7 @@ pub fn mongo_ping(
 #[tauri::command]
 pub fn mongo_list_databases(
     id: ConnectionId,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<Vec<String>, ConnectionError> {
     registry.with_mongo(&id, |s| s.list_databases())
 }
@@ -167,7 +167,7 @@ pub fn mongo_list_databases(
 pub fn mongo_list_collections(
     id: ConnectionId,
     database: String,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<Vec<String>, ConnectionError> {
     registry.with_mongo(&id, |s| s.list_collections(&database))
 }
@@ -179,7 +179,7 @@ pub fn mongo_find(
     collection: String,
     filter_json: Option<String>,
     limit: Option<i64>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<MongoFindResult, ConnectionError> {
     registry.with_mongo(&id, |s| {
         s.find(
@@ -194,7 +194,7 @@ pub fn mongo_find(
 #[tauri::command]
 pub fn redis_ping(
     id: ConnectionId,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<String, ConnectionError> {
     registry.with_redis(&id, |s| s.ping())
 }
@@ -205,7 +205,7 @@ pub fn redis_scan(
     cursor: Option<u64>,
     pattern: Option<String>,
     count: Option<u32>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<RedisScanPage, ConnectionError> {
     registry.with_redis(&id, |s| {
         s.scan(
@@ -220,7 +220,7 @@ pub fn redis_scan(
 pub fn redis_get(
     id: ConnectionId,
     key: String,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<Option<String>, ConnectionError> {
     registry.with_redis(&id, |s| s.get(&key))
 }
@@ -230,7 +230,7 @@ pub fn redis_set(
     id: ConnectionId,
     key: String,
     value: String,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<(), ConnectionError> {
     registry.with_redis(&id, |s| s.set(&key, &value))
 }
@@ -239,7 +239,7 @@ pub fn redis_set(
 pub fn redis_key_metas(
     id: ConnectionId,
     keys: Vec<String>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<Vec<RedisKeyMeta>, ConnectionError> {
     registry.with_redis(&id, |s| s.types_and_ttls(&keys))
 }
@@ -248,7 +248,7 @@ pub fn redis_key_metas(
 pub fn redis_read_key(
     id: ConnectionId,
     key: String,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<RedisKeyView, ConnectionError> {
     registry.with_redis(&id, |s| s.read_key(&key))
 }
@@ -296,7 +296,7 @@ pub fn profiles_connect_sqlite(
     folder_id: Option<String>,
     id: Option<String>,
     store: State<'_, ProfileStore>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<ConnectionProfile, ConnectionError> {
     let display_name = {
         let t = name.trim();
@@ -350,7 +350,7 @@ pub fn profiles_connect_postgres(
     request: ConnectPostgresRequest,
     store: State<'_, ProfileStore>,
     secrets: State<'_, SharedSecretStore>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<ConnectionProfile, ConnectionError> {
     let ConnectPostgresRequest {
         name,
@@ -448,7 +448,7 @@ pub fn profiles_connect_mysql(
     request: ConnectMysqlRequest,
     store: State<'_, ProfileStore>,
     secrets: State<'_, SharedSecretStore>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<ConnectionProfile, ConnectionError> {
     let ConnectMysqlRequest {
         name,
@@ -545,7 +545,7 @@ pub fn profiles_connect_redis(
     request: ConnectRedisRequest,
     store: State<'_, ProfileStore>,
     secrets: State<'_, SharedSecretStore>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<ConnectionProfile, ConnectionError> {
     let ConnectRedisRequest {
         name,
@@ -649,7 +649,7 @@ pub fn profiles_connect_mongo(
     request: ConnectMongoRequest,
     store: State<'_, ProfileStore>,
     secrets: State<'_, SharedSecretStore>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<ConnectionProfile, ConnectionError> {
     let ConnectMongoRequest {
         name,
@@ -764,13 +764,13 @@ pub fn profiles_connect_mongo(
 #[tauri::command]
 pub fn db_disconnect(
     id: ConnectionId,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<(), ConnectionError> {
     registry.disconnect(&id)
 }
 
 #[tauri::command]
-pub fn db_is_connected(id: ConnectionId, registry: State<'_, ConnectionRegistry>) -> bool {
+pub fn db_is_connected(id: ConnectionId, registry: State<'_, std::sync::Arc<ConnectionRegistry>>) -> bool {
     registry.is_connected(&id)
 }
 
@@ -779,7 +779,7 @@ pub fn db_is_connected(id: ConnectionId, registry: State<'_, ConnectionRegistry>
 pub fn db_list_children(
     id: ConnectionId,
     parent_id: Option<String>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<Vec<SqlObjectNode>, ConnectionError> {
     registry.list_children(&id, parent_id.as_deref())
 }
@@ -789,7 +789,7 @@ pub fn db_list_children(
 pub fn db_describe_object(
     id: ConnectionId,
     object_id: String,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<TableSchema, ConnectionError> {
     registry.describe_object(&id, &object_id)
 }
@@ -799,7 +799,7 @@ pub fn db_describe_object(
 pub fn db_postgres_object_detail(
     id: ConnectionId,
     object_id: String,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<PostgresObjectDetail, ConnectionError> {
     registry.postgres_object_detail(&id, &object_id)
 }
@@ -808,7 +808,7 @@ pub fn db_postgres_object_detail(
 #[tauri::command]
 pub fn db_list_schemas(
     id: ConnectionId,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<Vec<String>, ConnectionError> {
     Ok(registry
         .list_children(&id, None)?
@@ -821,7 +821,7 @@ pub fn db_list_schemas(
 #[tauri::command]
 pub fn db_list_tables(
     id: ConnectionId,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<Vec<SchemaObject>, ConnectionError> {
     let main = registry
         .list_children(&id, None)?
@@ -851,7 +851,7 @@ pub fn db_list_tables(
 pub fn db_list_columns(
     id: ConnectionId,
     table: String,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<TableSchema, ConnectionError> {
     registry.with_sqlite(&id, |s| s.list_columns(&table))
 }
@@ -860,7 +860,7 @@ pub fn db_list_columns(
 #[tauri::command]
 pub fn db_sqlite_overview(
     id: ConnectionId,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<SqliteOverview, ConnectionError> {
     registry.with_sqlite(&id, |s| s.database_overview())
 }
@@ -872,7 +872,7 @@ pub fn db_erd_schema(
     schema: Option<String>,
     focus: Option<String>,
     depth: Option<u32>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<ErdSchema, ConnectionError> {
     registry.erd_schema(
         &id,
@@ -895,7 +895,7 @@ pub fn db_execute_query(
     limit: Option<u32>,
     confirmed: Option<bool>,
     on_event: Channel<crate::connection::QueryEvent>,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<(), ConnectionError> {
     let limit = limit.map(|n| n as usize);
     let confirmed = confirmed.unwrap_or(false);
@@ -910,7 +910,7 @@ pub fn db_execute_query(
 #[tauri::command]
 pub fn db_apply_staging(
     request: StagingApplyRequest,
-    registry: State<'_, ConnectionRegistry>,
+    registry: State<'_, std::sync::Arc<ConnectionRegistry>>,
 ) -> Result<ApplyResult, ConnectionError> {
     apply_staging_request(&registry, request)
 }
