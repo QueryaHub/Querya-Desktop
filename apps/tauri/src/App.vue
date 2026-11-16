@@ -26,6 +26,7 @@ import QuickSwitcher from "./ui/QuickSwitcher.vue";
 import WelcomeTourDialog from "./ui/WelcomeTourDialog.vue";
 import AboutDialog from "./ui/AboutDialog.vue";
 import SduiSampleDialog from "./ui/sdui/SduiSampleDialog.vue";
+import HelloPanelDialog from "./ui/sdui/HelloPanelDialog.vue";
 import NewFolderDialog from "./ui/NewFolderDialog.vue";
 import NewConnectionDialog, {
   type MongoConnectPayload,
@@ -49,6 +50,7 @@ const switcherOpen = ref(false);
 const tourOpen = ref(false);
 const aboutOpen = ref(false);
 const sduiSampleOpen = ref(false);
+const helloPanelOpen = ref(false);
 const newFolderOpen = ref(false);
 const newConnectionOpen = ref(false);
 
@@ -197,6 +199,10 @@ function onOpenSduiSample() {
   sduiSampleOpen.value = true;
 }
 
+function onOpenHelloPanel() {
+  helloPanelOpen.value = true;
+}
+
 function onCheckUpdates() {
   status.setQueryMetrics({
     message: "Updater stub — check for updates lands with packaging epic",
@@ -220,6 +226,7 @@ const commands = computed<AppCommand[]>(() =>
     openTour: onOpenTour,
     openAbout: onOpenAbout,
     openSduiSample: onOpenSduiSample,
+    openHelloPanel: onOpenHelloPanel,
     openPalette: onOpenPalette,
     openQuickSwitcher: onOpenQuickSwitcher,
     launchDemo: onLaunchDemo,
@@ -331,6 +338,7 @@ onUnmounted(() => {
     />
     <AboutDialog :open="aboutOpen" @close="aboutOpen = false" />
     <SduiSampleDialog :open="sduiSampleOpen" @close="sduiSampleOpen = false" />
+    <HelloPanelDialog :open="helloPanelOpen" @close="helloPanelOpen = false" />
     <NewFolderDialog
       :open="newFolderOpen"
       @close="newFolderOpen = false"

@@ -37,6 +37,7 @@ use commands::{
     profiles_list, profiles_upsert, redis_get, redis_key_metas, redis_ping, redis_read_key,
     redis_scan, redis_set, mcp_start, mcp_status, mcp_stop, ssh_tunnel_close, ssh_tunnel_list,
     ssh_tunnel_open, ext_host_start, ext_host_call, ext_host_ping, ext_host_stop, ext_host_list,
+    ext_hello_panel_executable,
 };
 
 #[tauri::command]
@@ -154,6 +155,7 @@ pub fn run() {
             ext_host_ping,
             ext_host_stop,
             ext_host_list,
+            ext_hello_panel_executable,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
