@@ -938,3 +938,25 @@ pub fn ssh_tunnel_list(
 ) -> Result<Vec<crate::ssh_tunnel::SshTunnelInfo>, crate::ssh_tunnel::SshTunnelError> {
     tunnels.list()
 }
+
+/// Start the in-process MCP loopback server and write the endpoint file (#1900).
+#[tauri::command]
+pub fn mcp_start(
+    mcp: State<'_, crate::mcp::McpController>,
+) -> Result<crate::mcp::McpStatus, crate::mcp::McpError> {
+    mcp.start()
+}
+
+#[tauri::command]
+pub fn mcp_stop(
+    mcp: State<'_, crate::mcp::McpController>,
+) -> Result<crate::mcp::McpStatus, crate::mcp::McpError> {
+    mcp.stop()
+}
+
+#[tauri::command]
+pub fn mcp_status(
+    mcp: State<'_, crate::mcp::McpController>,
+) -> Result<crate::mcp::McpStatus, crate::mcp::McpError> {
+    mcp.status()
+}

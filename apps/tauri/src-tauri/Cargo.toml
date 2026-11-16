@@ -47,6 +47,7 @@ redis = { version = "0.27", features = ["aio", "tokio-comp"] }
 mongodb = "3.10.1"
 russh = { version = "0.65.1", features = ["default"] }
 rand = "0.10.4"
+rmcp = { version = "3.10.0", features = ["server", "transport-async-rw"] }
 
 [profile.release]
 codegen-units = 1
