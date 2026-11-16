@@ -126,6 +126,7 @@ pub fn db_connect_redis(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn db_connect_mongo(
     host: String,
     port: u16,
