@@ -100,6 +100,7 @@ async function onConnectPostgresFromDialog(payload: PostgresConnectPayload) {
       database: payload.database,
       user: payload.user,
       password: payload.password,
+      ssh: payload.ssh,
     });
   } catch {
     // status already set in store
@@ -115,6 +116,7 @@ async function onConnectMysqlFromDialog(payload: MysqlConnectPayload) {
       database: payload.database,
       user: payload.user,
       password: payload.password,
+      ssh: payload.ssh,
     });
   } catch {
     // status already set in store
@@ -130,6 +132,7 @@ async function onConnectRedisFromDialog(payload: RedisConnectPayload) {
       database: payload.database,
       username: payload.username || null,
       password: payload.password || null,
+      ssh: payload.ssh,
     });
   } catch {
     // status already set in store
@@ -146,6 +149,7 @@ async function onConnectMongoFromDialog(payload: MongoConnectPayload) {
       username: payload.username || null,
       password: payload.password || null,
       authSource: payload.authSource || "admin",
+      ssh: payload.ssh,
     });
   } catch {
     // status already set in store
