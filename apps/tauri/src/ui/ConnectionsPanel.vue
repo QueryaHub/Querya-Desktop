@@ -236,10 +236,6 @@ function treeState(connId: string) {
   return tree.stateOf(connId);
 }
 
-function filteredRootsFor(connId: string) {
-  return tree.filteredRootsFor(connId);
-}
-
 
 onUnmounted(() => {
   dragging.value = false;
@@ -407,26 +403,13 @@ onUnmounted(() => {
                       <QueryaIcon name="refresh" :size="12" />
                     </button>
                   </div>
-                  <input
-                    class="filter"
-                    type="search"
-                    placeholder="Filter objects…"
-                    aria-label="Filter objects"
-                    :value="treeState(c.id).filter"
-                    @input="
-                      tree.setFilter(
-                        c.id,
-                        ($event.target as HTMLInputElement).value,
-                      )
-                    "
-                  />
                   <p v-if="treeState(c.id).loading" class="hint">Loading…</p>
                   <p v-else-if="treeState(c.id).error" class="hint err">
                     {{ treeState(c.id).error }}
                   </p>
                   <ul v-else class="nodes">
                     <SqlObjectTreeNodes
-                      :nodes="filteredRootsFor(c.id)"
+                      :nodes="treeState(c.id).roots"
                       :connection-id="c.id"
                       :selected-object="selectedObject"
                       :depth="0"
@@ -534,26 +517,13 @@ onUnmounted(() => {
                   <QueryaIcon name="refresh" :size="12" />
                 </button>
               </div>
-              <input
-                class="filter"
-                type="search"
-                placeholder="Filter objects…"
-                aria-label="Filter objects"
-                :value="treeState(c.id).filter"
-                @input="
-                  tree.setFilter(
-                    c.id,
-                    ($event.target as HTMLInputElement).value,
-                  )
-                "
-              />
               <p v-if="treeState(c.id).loading" class="hint">Loading…</p>
               <p v-else-if="treeState(c.id).error" class="hint err">
                 {{ treeState(c.id).error }}
               </p>
               <ul v-else class="nodes">
                 <SqlObjectTreeNodes
-                  :nodes="filteredRootsFor(c.id)"
+                  :nodes="treeState(c.id).roots"
                   :connection-id="c.id"
                   :selected-object="selectedObject"
                   :depth="0"
@@ -794,10 +764,6 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
-}
-
-.tree .filter {
   margin-bottom: 4px;
 }
 
