@@ -3,7 +3,13 @@ import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 // Must not be named `open` — it would shadow the `open` prop/model in the
 // template and make `v-if="open"` always truthy (Save connected, dialog stuck).
 import { open as pickSqliteFile } from "@tauri-apps/plugin-dialog";
+import {
+  emptySshTunnelForm,
+  sshFormIsValid,
+  type SshTunnelForm,
+} from "../api/sshTunnel";
 import QueryaButton from "./QueryaButton.vue";
+import SshTunnelSection from "./SshTunnelSection.vue";
 import { QueryaIcon } from "./icons";
 
 export type BuiltInDriverId =
@@ -27,6 +33,7 @@ export type PostgresConnectPayload = {
   database: string;
   user: string;
   password: string;
+  ssh?: SshTunnelForm;
 };
 
 export type MysqlConnectPayload = {
@@ -37,6 +44,7 @@ export type MysqlConnectPayload = {
   database: string;
   user: string;
   password: string;
+  ssh?: SshTunnelForm;
 };
 
 export type RedisConnectPayload = {
@@ -47,6 +55,7 @@ export type RedisConnectPayload = {
   database: string;
   username: string;
   password: string;
+  ssh?: SshTunnelForm;
 };
 
 export type MongoConnectPayload = {
@@ -58,6 +67,7 @@ export type MongoConnectPayload = {
   username: string;
   password: string;
   authSource: string;
+  ssh?: SshTunnelForm;
 };
 
 type Category = "all" | "sql" | "nosql";
@@ -148,6 +158,7 @@ const database = ref("querya");
 const user = ref("querya");
 const password = ref("querya");
 const authSource = ref("admin");
+const ssh = ref<SshTunnelForm>(emptySshTunnelForm());
 const error = ref<string | null>(null);
 const stubDriver = ref<DriverChoice | null>(null);
 
@@ -225,8 +236,23 @@ function reset() {
   database.value = "querya";
   user.value = "querya";
   password.value = "querya";
+  authSource.value = "admin";
+  ssh.value = emptySshTunnelForm();
   error.value = null;
   stubDriver.value = null;
+}
+
+function sshPayload(): SshTunnelForm | undefined {
+  return ssh.value.enabled ? { ...ssh.value } : undefined;
+}
+
+function requireSshValid(): boolean {
+  if (sshFormIsValid(ssh.value)) return true;
+  error.value =
+    ssh.value.authType === "privateKey"
+      ? "SSH bastion needs host, user, and a private key path."
+      : "SSH bastion needs host, user, and password.";
+  return false;
 }
 
 watch(open, async (v) => {
@@ -371,6 +397,7 @@ function submitPostgres() {
     error.value = "Host, port, database, and user are required.";
     return;
   }
+  if (!requireSshValid()) return;
   dismiss();
   emit("connectPostgres", {
     driver: "postgresql",
@@ -380,6 +407,7 @@ function submitPostgres() {
     database: db,
     user: u,
     password: password.value,
+    ssh: sshPayload(),
   });
 }
 
@@ -397,6 +425,7 @@ function submitRedis() {
     error.value = "Host and port are required.";
     return;
   }
+  if (!requireSshValid()) return;
   dismiss();
   emit("connectRedis", {
     driver: "redis",
@@ -406,6 +435,7 @@ function submitRedis() {
     database: db,
     username: user.value.trim(),
     password: password.value,
+    ssh: sshPayload(),
   });
 }
 
@@ -423,6 +453,7 @@ function submitMongo() {
     error.value = "Host, port and database are required.";
     return;
   }
+  if (!requireSshValid()) return;
   dismiss();
   emit("connectMongo", {
     driver: "mongodb",
@@ -433,6 +464,7 @@ function submitMongo() {
     username: user.value.trim(),
     password: password.value,
     authSource: authSource.value.trim() || "admin",
+    ssh: sshPayload(),
   });
 }
 
@@ -451,6 +483,7 @@ function submitMysql() {
     error.value = "Host, port, database and user are required.";
     return;
   }
+  if (!requireSshValid()) return;
   dismiss();
   emit("connectMysql", {
     driver: "mysql",
@@ -460,6 +493,7 @@ function submitMysql() {
     database: db,
     user: u,
     password: password.value,
+    ssh: sshPayload(),
   });
 }
 
@@ -734,6 +768,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
         <p class="hint-inline">
           Password is stored in the OS keyring (not in the profile database).
         </p>
+        <SshTunnelSection v-model="ssh" :target-host="host" :target-port="port" />
         <p v-if="error" class="err">{{ error }}</p>
       </div>
 
@@ -809,6 +844,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
         <p class="hint-inline">
           Password is stored in the OS keyring (not in the profile database).
         </p>
+        <SshTunnelSection v-model="ssh" :target-host="host" :target-port="port" />
         <p v-if="error" class="err">{{ error }}</p>
       </div>
 
@@ -877,6 +913,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
             placeholder="optional"
           />
         </label>
+        <SshTunnelSection v-model="ssh" :target-host="host" :target-port="port" />
         <p v-if="error" class="err">{{ error }}</p>
       </div>
       <footer>
@@ -948,6 +985,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
           Auth source
           <input v-model="authSource" type="text" autocomplete="off" />
         </label>
+        <SshTunnelSection v-model="ssh" :target-host="host" :target-port="port" />
         <p v-if="error" class="err">{{ error }}</p>
       </div>
       <footer>

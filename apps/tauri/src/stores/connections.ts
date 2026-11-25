@@ -13,6 +13,12 @@ import {
 } from "../api/connection";
 import { profilesConnectMongo } from "../api/mongo";
 import { profilesConnectRedis } from "../api/redis";
+import {
+  sshTunnelClose,
+  sshTunnelOpen,
+  toOpenRequest,
+  type SshTunnelForm,
+} from "../api/sshTunnel";
 import { DEMO_CONNECTION } from "../mock/demoCatalog";
 import { useFoldersStore } from "./folders";
 import { useShellNavStore } from "./shellNav";
@@ -34,6 +40,11 @@ export type LiveConnection = {
   folderId?: string | null;
   /** Live session open in the registry. */
   connected?: boolean;
+  /** Active SSH local-forward id (session-only). */
+  sshTunnelId?: string | null;
+  /** Bastion target as typed by the user (before local forward). */
+  sshRemoteHost?: string | null;
+  sshRemotePort?: number | null;
 };
 
 /** Session-only passwords — never written to ProfileStore (keyring: #1878). */
@@ -47,8 +58,9 @@ function fileName(path: string): string {
 function endpointLabel(conn: LiveConnection): string {
   if (conn.mock) return "Demo (offline)";
   if (conn.driver === "sqlite") return conn.path ?? "";
-  const host = conn.host ?? "localhost";
+  const host = conn.sshRemoteHost ?? conn.host ?? "localhost";
   const port =
+    conn.sshRemotePort ??
     conn.port ??
     (conn.driver === "mysql"
       ? 3306
@@ -58,7 +70,24 @@ function endpointLabel(conn: LiveConnection): string {
           ? 27017
           : 5432);
   const db = conn.database ?? (conn.driver === "redis" ? "0" : "");
-  return `${host}:${port}/${db}`;
+  const via = conn.sshTunnelId ? " · via SSH" : "";
+  return `${host}:${port}/${db}${via}`;
+}
+
+async function openSshIfNeeded(
+  ssh: SshTunnelForm | null | undefined,
+  remoteHost: string,
+  remotePort: number,
+): Promise<{ host: string; port: number; tunnelId: string | null }> {
+  if (!ssh?.enabled) {
+    return { host: remoteHost, port: remotePort, tunnelId: null };
+  }
+  const info = await sshTunnelOpen(toOpenRequest(ssh, remoteHost, remotePort));
+  return {
+    host: info.localHost,
+    port: info.localPort,
+    tunnelId: info.id,
+  };
 }
 
 function fromProfile(p: ConnectionProfile, connected = false): LiveConnection | null {
@@ -307,6 +336,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     password?: string | null;
     folderId?: string | null;
     id?: string | null;
+    ssh?: SshTunnelForm | null;
   }) {
     return connectServerDriver("postgres", opts);
   }
@@ -320,6 +350,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     password?: string | null;
     folderId?: string | null;
     id?: string | null;
+    ssh?: SshTunnelForm | null;
   }) {
     return connectServerDriver("mysql", opts);
   }
@@ -333,6 +364,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     password?: string | null;
     folderId?: string | null;
     id?: string | null;
+    ssh?: SshTunnelForm | null;
   }) {
     const status = useShellStatusStore();
     const nav = useShellNavStore();
@@ -340,13 +372,24 @@ export const useConnectionsStore = defineStore("connections", () => {
       opts.name.trim() || `${opts.host}:${opts.port}/${opts.database ?? "0"}`;
     status.setQueryMetrics({
       busy: true,
-      message: `Connecting Redis ${opts.host}:${opts.port}…`,
+      message: opts.ssh?.enabled
+        ? `Opening SSH tunnel to ${opts.host}:${opts.port}…`
+        : `Connecting Redis ${opts.host}:${opts.port}…`,
     });
+    let tunnelId: string | null = null;
     try {
+      const forward = await openSshIfNeeded(opts.ssh, opts.host, opts.port);
+      tunnelId = forward.tunnelId;
+      if (tunnelId) {
+        status.setQueryMetrics({
+          busy: true,
+          message: `Connecting Redis via SSH ${forward.host}:${forward.port}…`,
+        });
+      }
       const profile = await profilesConnectRedis({
         name,
-        host: opts.host,
-        port: opts.port,
+        host: forward.host,
+        port: forward.port,
         database: opts.database ?? "0",
         username: opts.username ?? null,
         password: opts.password ?? null,
@@ -358,12 +401,15 @@ export const useConnectionsStore = defineStore("connections", () => {
         id: profile.id,
         driver: "redis",
         name: profile.name,
-        host: profile.host ?? opts.host,
-        port: profile.port != null ? Number(profile.port) : opts.port,
+        host: profile.host ?? forward.host,
+        port: profile.port != null ? Number(profile.port) : forward.port,
         database: profile.database_name ?? opts.database ?? "0",
         user: profile.username ?? opts.username ?? undefined,
         folderId: profile.folder_id ?? opts.folderId ?? null,
         connected: true,
+        sshTunnelId: tunnelId,
+        sshRemoteHost: tunnelId ? opts.host : null,
+        sshRemotePort: tunnelId ? opts.port : null,
       };
       upsert(conn);
       nav.setExpanded(conn.id, true);
@@ -375,6 +421,7 @@ export const useConnectionsStore = defineStore("connections", () => {
       });
       return conn;
     } catch (err) {
+      if (tunnelId) await sshTunnelClose(tunnelId).catch(() => undefined);
       const msg = formatConnectionError(err);
       status.setQueryMetrics({ busy: false, message: msg });
       throw err;
@@ -391,6 +438,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     authSource?: string | null;
     folderId?: string | null;
     id?: string | null;
+    ssh?: SshTunnelForm | null;
   }) {
     const status = useShellStatusStore();
     const nav = useShellNavStore();
@@ -399,13 +447,24 @@ export const useConnectionsStore = defineStore("connections", () => {
       `${opts.host}:${opts.port}/${opts.database}`;
     status.setQueryMetrics({
       busy: true,
-      message: `Connecting Mongo ${opts.host}:${opts.port}…`,
+      message: opts.ssh?.enabled
+        ? `Opening SSH tunnel to ${opts.host}:${opts.port}…`
+        : `Connecting Mongo ${opts.host}:${opts.port}…`,
     });
+    let tunnelId: string | null = null;
     try {
+      const forward = await openSshIfNeeded(opts.ssh, opts.host, opts.port);
+      tunnelId = forward.tunnelId;
+      if (tunnelId) {
+        status.setQueryMetrics({
+          busy: true,
+          message: `Connecting Mongo via SSH ${forward.host}:${forward.port}…`,
+        });
+      }
       const profile = await profilesConnectMongo({
         name,
-        host: opts.host,
-        port: opts.port,
+        host: forward.host,
+        port: forward.port,
         database: opts.database,
         username: opts.username ?? null,
         password: opts.password ?? null,
@@ -418,12 +477,15 @@ export const useConnectionsStore = defineStore("connections", () => {
         id: profile.id,
         driver: "mongo",
         name: profile.name,
-        host: profile.host ?? opts.host,
-        port: profile.port != null ? Number(profile.port) : opts.port,
+        host: profile.host ?? forward.host,
+        port: profile.port != null ? Number(profile.port) : forward.port,
         database: profile.database_name ?? opts.database,
         user: profile.username ?? opts.username ?? undefined,
         folderId: profile.folder_id ?? opts.folderId ?? null,
         connected: true,
+        sshTunnelId: tunnelId,
+        sshRemoteHost: tunnelId ? opts.host : null,
+        sshRemotePort: tunnelId ? opts.port : null,
       };
       upsert(conn);
       nav.setExpanded(conn.id, true);
@@ -435,6 +497,7 @@ export const useConnectionsStore = defineStore("connections", () => {
       });
       return conn;
     } catch (err) {
+      if (tunnelId) await sshTunnelClose(tunnelId).catch(() => undefined);
       const msg = formatConnectionError(err);
       status.setQueryMetrics({ busy: false, message: msg });
       throw err;
@@ -452,6 +515,7 @@ export const useConnectionsStore = defineStore("connections", () => {
       password?: string | null;
       folderId?: string | null;
       id?: string | null;
+      ssh?: SshTunnelForm | null;
     },
   ) {
     const status = useShellStatusStore();
@@ -461,15 +525,26 @@ export const useConnectionsStore = defineStore("connections", () => {
       `${opts.user}@${opts.host}/${opts.database}`;
     status.setQueryMetrics({
       busy: true,
-      message: `Connecting ${opts.host}:${opts.port}…`,
+      message: opts.ssh?.enabled
+        ? `Opening SSH tunnel to ${opts.host}:${opts.port}…`
+        : `Connecting ${opts.host}:${opts.port}…`,
     });
+    let tunnelId: string | null = null;
     try {
+      const forward = await openSshIfNeeded(opts.ssh, opts.host, opts.port);
+      tunnelId = forward.tunnelId;
+      if (tunnelId) {
+        status.setQueryMetrics({
+          busy: true,
+          message: `Connecting via SSH ${forward.host}:${forward.port}…`,
+        });
+      }
       const profile =
         driver === "postgres"
           ? await profilesConnectPostgres({
               name,
-              host: opts.host,
-              port: opts.port,
+              host: forward.host,
+              port: forward.port,
               database: opts.database,
               user: opts.user,
               password: opts.password ?? null,
@@ -478,8 +553,8 @@ export const useConnectionsStore = defineStore("connections", () => {
             })
           : await profilesConnectMysql({
               name,
-              host: opts.host,
-              port: opts.port,
+              host: forward.host,
+              port: forward.port,
               database: opts.database,
               user: opts.user,
               password: opts.password ?? null,
@@ -491,12 +566,15 @@ export const useConnectionsStore = defineStore("connections", () => {
         id: profile.id,
         driver,
         name: profile.name,
-        host: profile.host ?? opts.host,
-        port: profile.port != null ? Number(profile.port) : opts.port,
+        host: profile.host ?? forward.host,
+        port: profile.port != null ? Number(profile.port) : forward.port,
         database: profile.database_name ?? opts.database,
         user: profile.username ?? opts.user,
         folderId: profile.folder_id ?? opts.folderId ?? null,
         connected: true,
+        sshTunnelId: tunnelId,
+        sshRemoteHost: tunnelId ? opts.host : null,
+        sshRemotePort: tunnelId ? opts.port : null,
       };
       upsert(conn);
       nav.setExpanded(conn.id, true);
@@ -508,6 +586,7 @@ export const useConnectionsStore = defineStore("connections", () => {
       });
       return conn;
     } catch (err) {
+      if (tunnelId) await sshTunnelClose(tunnelId).catch(() => undefined);
       const msg = formatConnectionError(err);
       status.setQueryMetrics({ busy: false, message: msg });
       throw err;
@@ -574,6 +653,10 @@ export const useConnectionsStore = defineStore("connections", () => {
     try {
       if (conn && !conn.mock && conn.connected) await dbDisconnect(id);
     } finally {
+      if (conn?.sshTunnelId) {
+        await sshTunnelClose(conn.sshTunnelId).catch(() => undefined);
+        conn.sshTunnelId = null;
+      }
       if (conn && !conn.mock) {
         conn.connected = false;
         byId.set(id, conn);
@@ -602,6 +685,9 @@ export const useConnectionsStore = defineStore("connections", () => {
           } catch {
             /* already closed */
           }
+        }
+        if (conn.sshTunnelId) {
+          await sshTunnelClose(conn.sshTunnelId).catch(() => undefined);
         }
         await profilesDelete(id);
       }
