@@ -962,6 +962,12 @@ pub fn mcp_status(
     mcp.status()
 }
 
+/// Resolve the bundled/session `querya-mcp` shim path (#2011).
+#[tauri::command]
+pub fn mcp_shim_executable() -> Result<String, String> {
+    crate::mcp::paths::mcp_shim_executable().map(|p| p.display().to_string())
+}
+
 /// Spawn an extension process and run `system.handshake` (#1903).
 #[tauri::command]
 pub async fn ext_host_start(
