@@ -7,6 +7,16 @@ import {
 } from "../theme/queryaTheme";
 import { useQueryaMotion } from "../motion";
 import type { QueryaMotionLevel } from "../motion/types";
+import {
+  mcpClientSnippet,
+  mcpShimExecutable,
+  mcpStart,
+  mcpStatus,
+  mcpStop,
+  type McpClientKind,
+  type McpStatus,
+} from "../api/mcp";
+import { useConnectionsStore } from "../stores/connections";
 import { usePreferencesStore } from "../stores/preferences";
 import {
   allShortcuts,
@@ -120,8 +130,83 @@ const searchEl = ref<HTMLInputElement | null>(null);
 const shortcutChip = ref<(typeof shortcutCategories)[number]>("All");
 const themeMode = ref<QueryaThemeMode>(readStoredTheme());
 const prefs = usePreferencesStore();
+const connections = useConnectionsStore();
 const motion = useQueryaMotion();
 const extMsg = ref<string | null>(null);
+const mcpLive = ref<McpStatus | null>(null);
+const mcpBusy = ref(false);
+const mcpMsg = ref<string | null>(null);
+const mcpShimPath = ref("querya-mcp");
+const syncingMcpToggle = ref(false);
+
+const mcpShareable = computed(() =>
+  connections.items.filter((c) => !c.mock),
+);
+
+function mcpShared(id: string): boolean {
+  return prefs.state.mcpSharedIds.includes(id);
+}
+
+function setMcpShared(id: string, on: boolean) {
+  const set = new Set(prefs.state.mcpSharedIds);
+  if (on) set.add(id);
+  else set.delete(id);
+  prefs.state.mcpSharedIds = [...set];
+}
+
+async function refreshMcp() {
+  try {
+    mcpLive.value = await mcpStatus();
+    mcpShimPath.value = await mcpShimExecutable();
+  } catch (err) {
+    mcpMsg.value = String(err);
+  }
+}
+
+async function applyMcpEnabled(want: boolean) {
+  if (syncingMcpToggle.value || mcpBusy.value) return;
+  mcpBusy.value = true;
+  mcpMsg.value = null;
+  try {
+    mcpLive.value = want ? await mcpStart() : await mcpStop();
+    syncingMcpToggle.value = true;
+    prefs.state.mcpEnabled = mcpLive.value.running;
+  } catch (err) {
+    mcpMsg.value = String(err);
+    syncingMcpToggle.value = true;
+    prefs.state.mcpEnabled = false;
+    await refreshMcp();
+  } finally {
+    syncingMcpToggle.value = false;
+    mcpBusy.value = false;
+  }
+}
+
+async function onMcpToggle(ev: Event) {
+  const checked = (ev.target as HTMLInputElement).checked;
+  await applyMcpEnabled(checked);
+}
+
+async function copyMcpConfig(kind: McpClientKind) {
+  const text = mcpClientSnippet(kind, mcpShimPath.value);
+  try {
+    await navigator.clipboard.writeText(text);
+    mcpMsg.value = `Copied ${kind} MCP config`;
+  } catch (err) {
+    mcpMsg.value = String(err);
+  }
+}
+
+watch(
+  () => [props.open, category.value] as const,
+  async ([open, cat]) => {
+    if (!open || cat !== "mcp") return;
+    await refreshMcp();
+    if (prefs.state.mcpEnabled && !mcpLive.value?.running) {
+      await applyMcpEnabled(true);
+    }
+  },
+);
 
 const searchQuery = computed(() => search.value.trim().toLowerCase());
 const hasSearch = computed(() => searchQuery.value.length > 0);
@@ -578,7 +663,7 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
           </div>
 
           <!-- MCP -->
-          <div v-else-if="category === 'mcp'" class="section">
+          <div v-else-if="category === 'mcp'" class="section" data-testid="prefs-mcp">
             <h2 class="sec-title">MCP Server</h2>
             <p class="hint">
               Let AI clients (Claude, Cursor, VS Code, Gemini…) read shared
@@ -588,42 +673,78 @@ onUnmounted(() => window.removeEventListener("keydown", onKey, true));
               <div class="switch-copy">
                 <span class="t">Enable MCP server</span>
                 <span class="s">{{
-                  prefs.state.mcpEnabled
-                    ? "Running · stub host (Rust MCP epic next)"
+                  mcpLive?.running
+                    ? `Running · port ${mcpLive.port ?? "—"} · ${mcpLive.sessionCount} session${mcpLive.sessionCount === 1 ? "" : "s"}`
                     : "Stopped — enable to expose Querya tools to MCP clients"
                 }}</span>
               </div>
               <input
-                v-model="prefs.state.mcpEnabled"
                 type="checkbox"
                 class="switch"
+                :checked="prefs.state.mcpEnabled"
+                :disabled="mcpBusy"
+                @change="onMcpToggle"
               />
             </label>
+            <p v-if="mcpLive?.endpointPath" class="hint mono">
+              Endpoint: {{ mcpLive.endpointPath }}
+            </p>
             <div class="card">
               <p class="card-title">Shared connections</p>
-              <p class="card-body">
-                No live connections yet. Open Demo or a database, then choose which
-                sessions MCP clients may read.
+              <p v-if="!mcpShareable.length" class="card-body">
+                No connections yet. Connect a database, then choose which sessions
+                MCP clients may read.
               </p>
+              <ul v-else class="share-list">
+                <li v-for="c in mcpShareable" :key="c.id">
+                  <label class="share-row">
+                    <input
+                      type="checkbox"
+                      :checked="mcpShared(c.id)"
+                      @change="
+                        setMcpShared(
+                          c.id,
+                          ($event.target as HTMLInputElement).checked,
+                        )
+                      "
+                    />
+                    <span class="share-name">{{ c.name }}</span>
+                    <span class="share-meta">{{ c.driver }}</span>
+                  </label>
+                </li>
+              </ul>
             </div>
             <div class="card">
               <p class="card-title">Connect a client</p>
               <p class="card-body">
-                Copy client configs and manage the access token when the in-process
-                MCP host lands.
+                Copy a stdio config that starts
+                <code>{{ mcpShimPath }}</code>, which talks to this running app.
               </p>
               <div class="btn-row">
-                <QueryaButton variant="secondary" size="sm" disabled>
+                <QueryaButton
+                  variant="secondary"
+                  size="sm"
+                  @click="copyMcpConfig('claude')"
+                >
                   Copy Claude Desktop config
                 </QueryaButton>
-                <QueryaButton variant="secondary" size="sm" disabled>
+                <QueryaButton
+                  variant="secondary"
+                  size="sm"
+                  @click="copyMcpConfig('cursor')"
+                >
                   Copy Cursor config
                 </QueryaButton>
-                <QueryaButton variant="secondary" size="sm" disabled>
+                <QueryaButton
+                  variant="secondary"
+                  size="sm"
+                  @click="copyMcpConfig('vscode')"
+                >
                   Copy VS Code config
                 </QueryaButton>
               </div>
             </div>
+            <p v-if="mcpMsg" class="msg">{{ mcpMsg }}</p>
           </div>
 
           <!-- Shortcuts -->
@@ -1161,6 +1282,40 @@ kbd {
   margin: 0 0 4px;
   font-size: 15px;
   font-weight: 650;
+}
+
+.hint.mono {
+  font-family: var(--q-font-mono);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.share-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.share-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.share-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--q-foreground);
+}
+
+.share-meta {
+  color: var(--q-muted-foreground);
+  font-size: 11px;
 }
 
 .footer {

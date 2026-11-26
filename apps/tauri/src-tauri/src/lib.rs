@@ -35,7 +35,8 @@ use commands::{
     mongo_list_databases, mongo_ping, profiles_connect_mongo, profiles_connect_mysql,
     profiles_connect_postgres, profiles_connect_redis, profiles_connect_sqlite, profiles_delete,
     profiles_list, profiles_upsert, redis_get, redis_key_metas, redis_ping, redis_read_key,
-    redis_scan, redis_set, mcp_start, mcp_status, mcp_stop, ssh_tunnel_close, ssh_tunnel_list,
+    redis_scan, redis_set, mcp_start, mcp_status, mcp_stop, mcp_shim_executable, ssh_tunnel_close,
+    ssh_tunnel_list,
     ssh_tunnel_open, ext_host_start, ext_host_call, ext_host_ping, ext_host_stop, ext_host_list,
     ext_hello_panel_executable,
 };
@@ -150,6 +151,7 @@ pub fn run() {
             mcp_start,
             mcp_stop,
             mcp_status,
+            mcp_shim_executable,
             ext_host_start,
             ext_host_call,
             ext_host_ping,

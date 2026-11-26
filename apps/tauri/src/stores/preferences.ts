@@ -15,6 +15,8 @@ export type PrefsState = {
   historyMax: number;
   maxResultRows: number;
   mcpEnabled: boolean;
+  /** Connection ids exposed to MCP clients (session filter). */
+  mcpSharedIds: string[];
   /** Percent — default 100. Presets or 1% fine values (75–200). */
   uiScale: number;
   animateThemeChanges: boolean;
@@ -31,6 +33,7 @@ const defaults: PrefsState = {
   historyMax: 200,
   maxResultRows: 5000,
   mcpEnabled: false,
+  mcpSharedIds: [],
   uiScale: 100,
   animateThemeChanges: true,
 };
@@ -58,6 +61,7 @@ function load(): PrefsState {
     const parsed = JSON.parse(raw) as Partial<PrefsState>;
     const merged = { ...defaults, ...parsed };
     merged.uiScale = normalizeUiScale(merged.uiScale);
+    if (!Array.isArray(merged.mcpSharedIds)) merged.mcpSharedIds = [];
     return merged;
   } catch {
     return { ...defaults };

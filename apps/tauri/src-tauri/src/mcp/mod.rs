@@ -2,6 +2,7 @@
 
 mod endpoint;
 mod host;
+pub mod paths;
 mod server;
 pub mod shim;
 
